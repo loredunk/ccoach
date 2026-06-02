@@ -52,6 +52,16 @@
 
 ---
 
+## T10 · Codex token/成本计算对齐 ccusage（P0）— ✅ 已完成
+
+> 决策：[`adr/0012-codex-cost-tokens-ccusage-method.md`](adr/0012-codex-cost-tokens-ccusage-method.md)（已接受，已实现）。
+
+- [x] token 增量优先用 `last_token_usage`；缺失时回退对 `total_token_usage` 求增量（基线从 0、逐字段 saturating），修正首轮/单轮被吞。
+- [x] `cached_input` 钳制为 ≤ `input`；`info==null` 与重复样本不产生增量。
+- [x] 成本公式固化为「非缓存输入×输入价 + 缓存输入×缓存读取价 + 输出×输出价」，对齐 ccusage。
+- [x] 定价表镜像 LiteLLM，修正 `codex-mini` 系列映射（`gpt-5.1-codex-mini` 用 mini 价、`codex-mini-latest` 入表）。
+- [x] glossary（`tokens` / `estimated_cost_usd`）更新；`parse_test.go` 按新口径更新 + 新增 last_token_usage / 单轮会话测试。
+
 ## T8 · CLI 迁移到 Node/TypeScript（P0）— ☐ 规划中
 
 > 决策：[`adr/0010-cli-rewrite-node-ccusage.md`](adr/0010-cli-rewrite-node-ccusage.md)（已接受，待实现）。

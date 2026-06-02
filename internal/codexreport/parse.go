@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
-// tokenUsage mirrors info.total_token_usage in token_count events. Values are
-// cumulative per thread, so we diff consecutive samples to get increments.
+// tokenUsage mirrors the token figures inside token_count events
+// (info.last_token_usage and info.total_token_usage). last_token_usage is the
+// per-turn increment; total_token_usage is cumulative per thread.
 type tokenUsage struct {
 	Input           int64 `json:"input_tokens"`
 	CachedInput     int64 `json:"cached_input_tokens"`
@@ -19,13 +20,23 @@ type tokenUsage struct {
 	Total           int64 `json:"total_tokens"`
 }
 
-func (a tokenUsage) sub(b tokenUsage) tokenUsage {
+// satSub subtracts b from a, flooring every field at zero. Used to diff
+// cumulative totals when the per-turn last_token_usage is unavailable, matching
+// ccusage: a compaction/rollback that lowers a cumulative counter contributes
+// zero rather than negative usage.
+func (a tokenUsage) satSub(b tokenUsage) tokenUsage {
+	sub := func(x, y int64) int64 {
+		if x < y {
+			return 0
+		}
+		return x - y
+	}
 	return tokenUsage{
-		Input:           a.Input - b.Input,
-		CachedInput:     a.CachedInput - b.CachedInput,
-		Output:          a.Output - b.Output,
-		ReasoningOutput: a.ReasoningOutput - b.ReasoningOutput,
-		Total:           a.Total - b.Total,
+		Input:           sub(a.Input, b.Input),
+		CachedInput:     sub(a.CachedInput, b.CachedInput),
+		Output:          sub(a.Output, b.Output),
+		ReasoningOutput: sub(a.ReasoningOutput, b.ReasoningOutput),
+		Total:           sub(a.Total, b.Total),
 	}
 }
 
@@ -136,8 +147,7 @@ func parseThread(meta Thread, opts parseOptions, agg *aggregate) {
 	source := sourceKey(meta.Source)
 	profile := agg.profileForCWD(meta.Cwd)
 
-	var haveBaseline bool
-	var baseline tokenUsage
+	var prevTotal tokenUsage // last seen cumulative total, for the diff fallback
 	threadTouched := false
 	var prevActive time.Time // last in-window token_count, for active-time gaps
 
@@ -182,7 +192,8 @@ func parseThread(meta Thread, opts parseOptions, agg *aggregate) {
 			var pm struct {
 				Type string `json:"type"`
 				Info *struct {
-					TotalTokenUsage tokenUsage `json:"total_token_usage"`
+					LastTokenUsage  *tokenUsage `json:"last_token_usage"`
+					TotalTokenUsage *tokenUsage `json:"total_token_usage"`
 				} `json:"info"`
 				Changes map[string]json.RawMessage `json:"changes"`
 			}
@@ -196,16 +207,33 @@ func parseThread(meta Thread, opts parseOptions, agg *aggregate) {
 				if pm.Info == nil {
 					continue
 				}
-				cur := pm.Info.TotalTokenUsage
-				if !haveBaseline {
-					baseline, haveBaseline = cur, true
+				// ccusage's method: prefer Codex's own per-turn last_token_usage;
+				// only when it's absent fall back to diffing the cumulative
+				// total_token_usage against the previous total (starting at zero,
+				// so the very first turn is counted, not discarded as a baseline).
+				var delta tokenUsage
+				switch {
+				case pm.Info.LastTokenUsage != nil:
+					delta = *pm.Info.LastTokenUsage
+				case pm.Info.TotalTokenUsage != nil:
+					delta = pm.Info.TotalTokenUsage.satSub(prevTotal)
+				default:
 					continue
 				}
-				delta := cur.sub(baseline)
-				baseline = cur
-				// Compaction/rollback can lower the cumulative counters; ignore
-				// negative deltas rather than subtract usage.
-				if delta.Total < 0 || delta.Input < 0 || delta.Output < 0 {
+				if pm.Info.TotalTokenUsage != nil {
+					prevTotal = *pm.Info.TotalTokenUsage
+				}
+				// cached_input is a subset of input; never let it exceed input.
+				if delta.CachedInput > delta.Input {
+					delta.CachedInput = delta.Input
+				}
+				// Derive total when Codex omits it (rare), matching its own
+				// arithmetic (output already includes reasoning).
+				if delta.Total <= 0 {
+					delta.Total = delta.Input + delta.Output
+				}
+				// Skip empty increments (e.g. a repeated cumulative sample).
+				if delta.Input <= 0 && delta.CachedInput <= 0 && delta.Output <= 0 && delta.ReasoningOutput <= 0 {
 					continue
 				}
 				if !opts.inRange(ts) {

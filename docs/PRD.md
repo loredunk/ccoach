@@ -53,7 +53,9 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 
 - 报告**只反映本机**：同账号多机登录时 rollout 按机器隔离，不跨机器汇总。
 - 不输出任何**配额百分比**（CLI 下 `rate_limits` 恒为 null，且配额是账号级、跨机器的）。
-- 成本为**估算值**（token × 内置参考价），不等于实际账单。
+- 成本为**估算值**，不等于实际账单。Codex 的 token 累加与成本计算**对齐 ccusage**：按每轮
+  `last_token_usage` 累加（无该字段时回退对 `total_token_usage` 求增量），成本 = 非缓存输入×输入价 +
+  缓存输入×缓存读取价 + 输出×输出价（输出已含 reasoning），参考价镜像 LiteLLM（[ADR 0012](adr/0012-codex-cost-tokens-ccusage-method.md)）。
 
 ---
 

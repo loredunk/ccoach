@@ -32,10 +32,12 @@ func dayOpts(t *testing.T, date string) parseOptions {
 }
 
 func TestTokenDeltaDedupAndNullInfo(t *testing.T) {
-	// Cumulative token_count samples. The middle line is an info==null
-	// rate-limit refresh that must NOT be treated as a new increment, and the
+	// Cumulative-only token_count samples (no last_token_usage), so we diff the
+	// total against the previous total starting at zero. The first sample is now
+	// counted (ccusage's method), not discarded as a baseline. The middle line is
+	// an info==null rate-limit refresh that must NOT add an increment, and the
 	// final line repeats the same cumulative value (over-report trap) and must
-	// add zero.
+	// add zero. The session total therefore equals the final cumulative total.
 	path := writeRollout(t,
 		`{"timestamp":"2026-05-13T01:00:00Z","type":"turn_context","payload":{"model":"gpt-5.4"}}`,
 		`{"timestamp":"2026-05-13T01:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":10,"reasoning_output_tokens":4,"total_tokens":110}}}}`,
@@ -47,13 +49,45 @@ func TestTokenDeltaDedupAndNullInfo(t *testing.T) {
 	agg := newAggregate()
 	parseThread(Thread{ID: "t1", RolloutPath: path, Model: "gpt-5.4"}, dayOpts(t, "2026-05-13"), agg)
 
-	// First sample is the baseline; only the 300/140/30 jump counts. The null
-	// and the repeated final sample contribute nothing.
-	if agg.tokens.Input != 200 || agg.tokens.CachedInput != 100 || agg.tokens.Output != 20 {
+	if agg.tokens.Input != 300 || agg.tokens.CachedInput != 140 || agg.tokens.Output != 30 {
 		t.Fatalf("unexpected token totals: %+v", agg.tokens)
 	}
-	if agg.tokens.Total != 220 {
+	if agg.tokens.Total != 330 {
 		t.Fatalf("unexpected total: %d", agg.tokens.Total)
+	}
+}
+
+func TestLastTokenUsagePreferred(t *testing.T) {
+	// When Codex records per-turn last_token_usage, we sum those directly rather
+	// than diffing the cumulative total — including for a single-turn session,
+	// which the old baseline-diff approach incorrectly counted as zero.
+	path := writeRollout(t,
+		`{"timestamp":"2026-05-13T01:00:00Z","type":"turn_context","payload":{"model":"gpt-5"}}`,
+		`{"timestamp":"2026-05-13T01:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":10,"reasoning_output_tokens":4,"total_tokens":110},"total_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":10,"reasoning_output_tokens":4,"total_tokens":110}}}}`,
+		`{"timestamp":"2026-05-13T01:00:02Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":200,"cached_input_tokens":100,"output_tokens":20,"reasoning_output_tokens":8,"total_tokens":220},"total_token_usage":{"input_tokens":300,"cached_input_tokens":140,"output_tokens":30,"reasoning_output_tokens":12,"total_tokens":330}}}}`,
+	)
+
+	agg := newAggregate()
+	parseThread(Thread{ID: "t1", RolloutPath: path, Model: "gpt-5"}, dayOpts(t, "2026-05-13"), agg)
+
+	// Sum of last_token_usage = 300/140/30/330, matching the final cumulative.
+	if agg.tokens.Input != 300 || agg.tokens.CachedInput != 140 || agg.tokens.Output != 30 || agg.tokens.Total != 330 {
+		t.Fatalf("unexpected token totals: %+v", agg.tokens)
+	}
+}
+
+func TestSingleTurnSessionCounted(t *testing.T) {
+	// A one-event (cumulative-only) session must be counted, not zeroed.
+	path := writeRollout(t,
+		`{"timestamp":"2026-05-13T01:00:00Z","type":"turn_context","payload":{"model":"gpt-5"}}`,
+		`{"timestamp":"2026-05-13T01:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":40,"output_tokens":10,"reasoning_output_tokens":4,"total_tokens":110}}}}`,
+	)
+
+	agg := newAggregate()
+	parseThread(Thread{ID: "t1", RolloutPath: path, Model: "gpt-5"}, dayOpts(t, "2026-05-13"), agg)
+
+	if agg.tokens.Total != 110 || agg.tokens.Input != 100 {
+		t.Fatalf("single-turn session should be counted, got %+v", agg.tokens)
 	}
 }
 
@@ -115,7 +149,7 @@ func TestDuplicateRolloutPathIsCountedOnce(t *testing.T) {
 		parseThread(thread, dayOpts(t, "2026-05-13"), agg)
 	}
 
-	if agg.tokens.Total != 220 {
+	if agg.tokens.Total != 330 {
 		t.Fatalf("duplicate rollout should count once, got %+v", agg.tokens)
 	}
 }
@@ -143,11 +177,11 @@ func TestUsageBreakdownsTrackSourceAndLanguage(t *testing.T) {
 	agg := newAggregate()
 	parseThread(Thread{ID: "go-cli", RolloutPath: path, Cwd: repo, Source: "cli"}, dayOpts(t, "2026-05-13"), agg)
 
-	if got := agg.bySource["cli"].tokens.Total; got != 220 {
-		t.Fatalf("source tokens=%d want 220", got)
+	if got := agg.bySource["cli"].tokens.Total; got != 330 {
+		t.Fatalf("source tokens=%d want 330", got)
 	}
-	if got := agg.byLanguage["Go"].tokens.Total; got != 220 {
-		t.Fatalf("language tokens=%d want 220", got)
+	if got := agg.byLanguage["Go"].tokens.Total; got != 330 {
+		t.Fatalf("language tokens=%d want 330", got)
 	}
 	ra := agg.byRepo[filepath.Base(repo)]
 	if ra == nil {
@@ -197,6 +231,26 @@ func TestEstimateCost(t *testing.T) {
 	if cost < 1.35 || cost > 1.37 {
 		t.Fatalf("cost=%f want ~1.36", cost)
 	}
+	// codex-mini variants must use mini pricing, not the family default.
+	cost, ok = estimateCost(d, "gpt-5.1-codex-mini")
+	if !ok {
+		t.Fatal("expected gpt-5.1-codex-mini to be priced")
+	}
+	// 0.5M*0.25 + 0.5M*0.025 + 1M*2 = 0.125 + 0.0125 + 2 = 2.1375
+	if cost < 2.13 || cost > 2.14 {
+		t.Fatalf("cost=%f want ~2.1375", cost)
+	}
+
+	// codex-mini-latest normalizes to codex-mini (was previously unpriced).
+	cost, ok = estimateCost(d, "codex-mini-latest")
+	if !ok {
+		t.Fatal("expected codex-mini-latest to be priced")
+	}
+	// 0.5M*1.5 + 0.5M*0.375 + 1M*6 = 0.75 + 0.1875 + 6 = 6.9375
+	if cost < 6.93 || cost > 6.94 {
+		t.Fatalf("cost=%f want ~6.9375", cost)
+	}
+
 	if _, ok := estimateCost(d, "totally-unknown-model"); ok {
 		t.Fatal("unknown model should be unpriced")
 	}

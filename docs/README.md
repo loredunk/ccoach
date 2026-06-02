@@ -55,4 +55,5 @@ skill 侧已上线 `skills/ai-usage-html-report/`，后续在其上**演进**：
 | [0009](adr/0009-i18n-scorecard-copy.md) | 成绩卡固定文案的 i18n（人工本地化，zh/en） | 已接受（已实现） |
 | [0010](adr/0010-cli-rewrite-node-ccusage.md) | CLI 从 Go 迁移到 Node/TS，衔接 ccusage（中等偏轻） | 已接受（规划，待实现，取代 0003 的二进制分发） |
 | [0011](adr/0011-multi-platform-usage-sources.md) | 多平台用量分析：Codex + Claude Code，未来扩展 | 已接受（规划） |
+| [0012](adr/0012-codex-cost-tokens-ccusage-method.md) | Codex token/成本计算对齐 ccusage（修正首轮/单轮低估） | 已接受（已实现） |
 </content>
