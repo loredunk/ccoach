@@ -22,20 +22,21 @@
 
 下面两条是已定的方向，**当前代码仍是 Go**，迁移分步进行、不要一次性重写。动手前读对应 ADR。
 
-### 1. CLI 从 Go 迁移到 Node/TypeScript，衔接 ccusage（中等偏轻）
+### 1. CLI 迁移到 Node/TypeScript + 自建统一解析层
 
-详见 [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md)。要点：
+详见 [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md)（Node 迁移）与
+[ADR 0013](docs/adr/0013-self-built-unified-parser.md)（自建解析，取代 0010 D2「中等偏轻/依赖 ccusage」）。要点：
 
 - 整条产品线都在 Node 生态（skills 走 npx、用户是 Claude Code/Codex、ccusage 是 TS）。
   CLI 也用 **TypeScript** 写，分发统一成「一切皆 npx」，省掉为 Go 二进制套 npm 封装的不便。
-- **构建在 ccusage 之上（中等偏轻）**：ccusage 作为 npm 依赖（`ccusage` + `@ccusage/codex`）
-  拿结构化用量数据，ccoach 只叠加**习惯分析 / prompt 评级 / 人格化吐槽 / feature-first 建议**——
-  这些才是差异化价值；**不要重复造 JSONL 解析轮子**。ccusage 没覆盖的边角可子进程兜底。
-- 选型：`cac`/`citty`（轻量 CLI）、`tsdown`/`unbuild`（小 bundle）。Node 天然跨平台，
-  不再需要多平台预编译二进制矩阵。
-- **保持 `ccoach --json` 契约不变**，skill 侧无感切换。
-- **渐进迁移**：先在 Node 里跑通核心数据流并对齐 Go 版 `--json`、交叉验证一致，再叠分析层；
-  Go 版留作参考实现，稳定后退役。
+- **自建统一解析层**：ccoach 还要从同一批 JSONL 抓 **user prompt + 习惯指标**（ccusage 数据的超集），
+  所以**向 ccusage 学解析方法、不复制其代码（MIT）、不作运行时依赖**，一个 pass 出
+  「用量 + prompt + 习惯」。差异化价值在**习惯分析 / prompt 评级 / 人格化吐槽 / feature-first 建议**。
+- 分平台适配器 `claude-code` / `codex` → **统一数据结构**；上层评级/HTML 只认统一结构，加新平台只写一个适配器。
+- **ccusage 仅作交叉验证**（对答案）：token/成本跟 `npx ccusage` 对一下，用它验证、不依赖它运行。
+- 抓 prompt 严守隐私边界（需批准才读、不读 system/assistant，见下「隐私护栏」）。
+- 选型：`cac`/`citty`（轻量 CLI）、`tsdown`/`unbuild`（小 bundle）。Node 天然跨平台，无需二进制矩阵。
+- **保持 `ccoach --json` 契约不变**，skill 侧无感切换；Go 版留作参考实现，稳定后退役。
 
 ### 2. 多平台分析：Codex + Claude Code 对称，未来扩展
 

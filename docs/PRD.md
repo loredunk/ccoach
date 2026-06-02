@@ -44,10 +44,13 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 本次增强是在**已上线的 `ai-usage-html-report` skill** 之上演进，而非从零新建。
 
 > **技术栈演进（规划中）**：当前 CLI 是 Go、且数据侧偏 Codex（只解析 `~/.codex`），Claude Code
-> 侧目前在 skill 里经 ccusage 取数。规划将 CLI **迁移到 Node/TypeScript 并构建在 ccusage 之上**
-> （[ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)），届时 **Codex 与 Claude Code 在 CLI 内对称
-> 成为一等数据源**（[ADR 0011](adr/0011-multi-platform-usage-sources.md)）。迁移**保持 `--json`
-> 契约不变**，skill 侧无感切换；上述 Go 实现作为参考实现，交叉验证后退役。
+> 侧目前在 skill 里经 ccusage 取数。规划将 CLI **迁移到 Node/TypeScript**
+> （[ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)），并自建**统一解析层**——因 ccoach 还要从同一批
+> JSONL 抓 **user prompt 与习惯指标**（ccusage 数据的超集），改为**向 ccusage 学解析方法、仅作交叉
+> 验证、不作运行时依赖**，一个 pass 出「用量 + prompt + 习惯」（[ADR 0013](adr/0013-self-built-unified-parser.md)，
+> 取代 0010 D2）。分平台适配器对外吐统一结构，届时 **Codex 与 Claude Code 在 CLI 内对称成为一等
+> 数据源**（[ADR 0011](adr/0011-multi-platform-usage-sources.md)）。迁移**保持 `--json` 契约不变**，
+> skill 侧无感切换；上述 Go 实现作为参考实现，交叉验证后退役。
 
 ### 现状边界（PRD 需尊重的约束）
 
@@ -180,6 +183,13 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 - reasoning 占比高 / 贵 → Codex `model_reasoning_effort` / `model_verbosity`、简单任务换小模型、按需 extended thinking。
 
 给配置建议前须**联网核对最新官方文档**；skill 只建议、不自动改配置。
+
+**时间感知护栏（必须）**：用量是历史数据，任何「模型版本」类结论都必须考虑**模型可用时间**。
+不得把「新模型发布前用了旧模型」当成浪费或错误，也不得据此建议「回溯固定到新模型」。判断方式：
+看 per-day per-model 时间线，若新模型只在窗口末尾才出现（或尚未出现），则旧模型花费属发布时机所致、
+是预期行为；仅当新模型在窗口内确实可用时，才建议**今后**默认用更新的模型（须先联网核对发布日期）。
+对已开始切换到新模型的用户，应肯定其前瞻行为、无需纠偏。（落地见 `skills/ai-usage-html-report/`
+的 SKILL.md「Analysis Guidance」与 `references/insight-patterns.md`「Model Version Distribution」。）
 
 ### 3.11 可分享成绩卡（病毒传播）（已实现）
 

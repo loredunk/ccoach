@@ -120,6 +120,13 @@ Base all claims on the merged JSON / report data. If a claim is an inference, ph
 
 Before recommending any platform configuration or feature (CLAUDE.md/AGENTS.md, skills, subagents, hooks, sandbox/model/effort settings, permission/settings), search the web for the latest official Claude Code and Codex documentation and verify the suggestion against it. These tools change quickly, so confirm every configuration recommendation against current docs rather than relying on prior knowledge. Only suggest — never auto-change the user's config.
 
+**Model-version findings must be time-aware.** Usage is historical, so a model split across a window does NOT mean the user "chose" the older model — the newer one may not have existed yet. Before framing "most spend went to an older model" as waste or recommending "pin to the newest model":
+
+- Look at the **per-day, per-model timeline** (`ccusage codex daily` / ccusage daily give per-day per-model breakdowns). Find when each model *first appears*.
+- If a newer model only appears in the **last few days** of the window (or not at all), treat it as **recently released / newly available** — the older-model spend before that date is expected, not a mistake. Do **not** count it as waste, and do **not** compute a "X% wasted on the old model" figure over a span where the newer model didn't exist.
+- Scope any "switch to the newer model" suggestion to **going forward**, and only when the newer model was actually available during (most of) the window. Web-verify model release dates before asserting availability.
+- A user who *already started* adopting the newer model recently needs no correction here — acknowledge it as good, forward-looking behavior.
+
 Prioritize:
 
 - Cross-platform comparison: how Claude Code vs Codex split cost, tokens, cache reuse, and active days.
@@ -138,6 +145,7 @@ Avoid:
 - Dumping all prompts for a project. Prompt review must be session-scoped and opt-in.
 - Treating estimated cost as a bill. (Claude Code cost is real offline LiteLLM pricing; Codex per-model cost is partial/best-effort.)
 - Claiming OpenAI/Anthropic server-side account usage; this is local-machine evidence only.
+- **Flagging older-model usage as waste without temporal context.** If the newer model wasn't available during that part of the window, older-model spend is expected — don't call it waste or recommend "pinning" retroactively (see the time-aware model-findings rule above).
 
 ## Output Expectations
 

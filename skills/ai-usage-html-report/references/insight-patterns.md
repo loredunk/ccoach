@@ -117,6 +117,32 @@ Interventions:
 - Document whether Codex should commit automatically or only summarize diffs.
 - Ask for final `git status --short` and a commit-message suggestion.
 
+### Model Version Distribution (time-aware)
+
+Signals:
+
+- Spend/tokens concentrated on an older model, with a newer model at a small share.
+- The per-day, per-model timeline shows the newer model only appearing recently (or not at all).
+
+Interpretation:
+
+- Usage is historical. A model split is **not** a free choice between equally-available options — the
+  newer model may not have existed for most of the window. "94% on the old model" across a month where
+  the new model shipped 7 days ago is an artifact of release timing, **not** waste or a user mistake.
+
+Recommended wording:
+
+> Most spend is on `<old-model>` because `<new-model>` only became available on `<date>` (it appears in
+> the data starting then). That earlier spend was expected. Going forward, `<new-model>` is the stronger
+> default — and you've already started switching, which is the right move.
+
+Interventions:
+
+- Only suggest defaulting to the newer model **going forward**, and only after web-verifying it was
+  actually available during the window. Web-verify release dates before asserting availability.
+- Never compute a "% wasted on the old model" over a span where the newer model didn't exist.
+- If the user already started adopting it recently, acknowledge it as good behavior — no correction needed.
+
 ## Writing Rules
 
 - Phrase insights as likely interpretations, not absolute truth, unless the report directly proves them.

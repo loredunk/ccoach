@@ -62,6 +62,16 @@
 - [x] 定价表镜像 LiteLLM，修正 `codex-mini` 系列映射（`gpt-5.1-codex-mini` 用 mini 价、`codex-mini-latest` 入表）。
 - [x] glossary（`tokens` / `estimated_cost_usd`）更新；`parse_test.go` 按新口径更新 + 新增 last_token_usage / 单轮会话测试。
 
+## T11 · 分析的时间感知护栏（P1）— ✅ 已完成（skill 侧）
+
+> 背景：成绩卡/建议曾把「新模型发布前用旧模型」当成浪费（如「94% 花在 opus-4-7、建议固定到 opus-4-8」），
+> 但当时 opus-4-8 还没出。分析缺时间概念。决策口径见 PRD §3.10「时间感知护栏」。
+
+- [x] SKILL.md「Analysis Guidance」+「Avoid」：模型版本类结论必须时间感知，按 per-day per-model 时间线判断模型可用时间，不回溯指责、不算「X% 浪费在旧模型」。
+- [x] `references/insight-patterns.md` 新增「Model Version Distribution（time-aware）」模式与措辞模板。
+- [x] `references/feature-mapping.md` 新增「多花在旧版模型上」行（带时间感知警告）。
+- [ ]（迁移到统一解析层后，T9）在数据层直接产出**每模型首次出现日期 / per-day per-model 时间线**，让护栏不依赖 agent 自行推断。
+
 ## T8 · CLI 迁移到 Node/TypeScript（P0）— ☐ 规划中
 
 > 决策：[`adr/0010-cli-rewrite-node-ccusage.md`](adr/0010-cli-rewrite-node-ccusage.md)（已接受，待实现）。
@@ -73,15 +83,18 @@
 - [ ] 习惯分析 / 配置扫描 / 语言识别（原 `habits.go`/`configscan.go`/`language.go`）的 TS 等价实现 + 测试（ADR 0010 OQ3）。
 - [ ] Node 版稳定后退役 Go 版（删 `cmd/ccoach`、`internal/codexreport`）。
 
-## T9 · 衔接 ccusage + 双平台一等数据源（P0）— ☐ 规划中
+## T9 · 自建统一解析层 + 双平台一等数据源（P0）— ☐ 规划中
 
-> 决策：[`adr/0010`](adr/0010-cli-rewrite-node-ccusage.md)（中等偏轻）/ [`adr/0011`](adr/0011-multi-platform-usage-sources.md)（多平台）。
+> 决策：[`adr/0013`](adr/0013-self-built-unified-parser.md)（自建解析，取代 0010 D2）/ [`adr/0011`](adr/0011-multi-platform-usage-sources.md)（多平台）。
+> 不依赖 ccusage 运行，只学方法 + 交叉验证。
 
-- [ ] 引入 ccusage 依赖：`@ccusage/codex`（Codex）+ `ccusage`（Claude Code），调 API 拿结构化用量（中等）。
-- [ ] 确认 `@ccusage/codex` 覆盖既有 Codex JSONL 边界 case，不足处由 ccoach 适配层补（ADR 0010 OQ2）。
-- [ ] 定「平台数据源适配器 + 平台无关分析层」分层；定**统一用量模型**最小公共字段（ADR 0011 D2 / OQ1）。
+- [ ] 自建解析层 `src/parsers/`：一个 pass 出 **用量 + user prompt + 习惯指标**（ccusage 数据的超集）。
+- [ ] 学 ccusage 的 JSONL 解析方法（字段、cache creation/read、5h 窗口、成本估算、session/project 聚合）；**不复制其代码**（MIT，仅参考思路）。
+- [ ] 分平台适配器 `claude-code` / `codex`，吐**统一数据结构**（`usage` + `prompts` + `habits`）；上层评级/HTML 只认统一结构（ADR 0011 D2 / 0013 D3）。
 - [ ] **Claude Code 在 CLI 内升为一等数据源**（与 Codex 对称，不再只在 skill 侧取数）。
-- [ ]（未来）调研并接入 OpenClaw / Harness 等其它 Agent CLI（ADR 0011 D3 / OQ2）。
+- [ ] 抓 prompt 严守隐私边界（需批准才读、不读 system/assistant、全局零原文）（ADR 0013 D5 / 0005）。
+- [ ] 用 `npx ccusage` **交叉验证** token/成本（对答案，CI 或开发期），保留两平台样例 fixture 防格式漂移（ADR 0013 D4 / OQ3）。
+- [ ]（未来）调研并接入 OpenClaw / Harness / opencode / amp 等其它 Agent CLI（只需再写一个适配器）（ADR 0011 D3）。
 
 ## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）
 

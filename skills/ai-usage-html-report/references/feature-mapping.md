@@ -20,6 +20,10 @@ docs** (these tools change fast). Only suggest — never auto-change the user's 
 | 重复样板提示 | `prompt_signals` 显示同类提示反复、低 `structured_ratio` | 沉淀为 **skills / 自定义 slash 命令**；常用约定写进 **CLAUDE.md** |
 | web 搜索偏多 | `web` 类别占比高 | 配 **MCP servers**；把文档放进仓库 / 预置上下文，减少现搜 |
 | 提示模糊 / 频繁纠偏 | `correction_rate` 高、低 `constraint_ratio`、低 `file_ref_ratio` | 用 **plan mode** 先对齐；提示里给 **`@文件`引用 + 约束 + 验收标准**；先让 agent 复述再动手 |
+| 多花在旧版模型上 | 某旧模型占用量大头、新模型份额小 | ⚠️**先看时间线**：若新模型只是近几天才出现（per-day per-model），旧模型花费是发布时机所致、**不是浪费**，**不要**建议「回溯固定到新模型」。仅当新模型在窗口内确实可用时，才建议**今后**默认用更新的模型（先 web 核对发布日期）。见 `insight-patterns.md`「Model Version Distribution」 |
 
 > 该表为代表性映射，非穷举；随官方特性演进维护。计分卡的「Prompt 功力」轴正是基于
 > `prompt_signals` 的这些数值（见 `scripts/scorecard.py`）。
+>
+> **时间感知**：用量是历史数据，任何「模型版本」类结论都必须考虑**模型可用时间**——
+> 不能把「新模型出现前用旧模型」当问题。详见 `insight-patterns.md` 的时间感知规则。

@@ -1,8 +1,13 @@
 # ADR 0010 — CLI 从 Go 迁移到 Node/TypeScript，衔接 ccusage（中等偏轻）
 
-> 状态：已接受（规划，待实现） · 日期：2026-06-02
-> · 相关：[`PRD.md`](../PRD.md) §2 / §5、[`TODO.md`](../TODO.md) T8 / T9、[`adr/0003-npm-distribution.md`](0003-npm-distribution.md)、[`adr/0011-multi-platform-usage-sources.md`](0011-multi-platform-usage-sources.md)
+> 状态：已接受（规划，待实现；**D2 已被 [ADR 0013](0013-self-built-unified-parser.md) 取代**） · 日期：2026-06-02
+> · 相关：[`PRD.md`](../PRD.md) §2 / §5、[`TODO.md`](../TODO.md) T8 / T9、[`adr/0003-npm-distribution.md`](0003-npm-distribution.md)、[`adr/0011-multi-platform-usage-sources.md`](0011-multi-platform-usage-sources.md)、[`adr/0013-self-built-unified-parser.md`](0013-self-built-unified-parser.md)
 > · 影响：取代 ADR 0003 中「用 npm 分发 Go 二进制」的实现路径
+>
+> **更新（2026-06-02）**：D2「中等偏轻：把 ccusage 作为 npm 依赖」已被 [ADR 0013](0013-self-built-unified-parser.md)
+> 取代——因为 ccoach 还要从同一批 JSONL 抓 user prompt 与习惯指标（ccusage 数据的超集），改为
+> **自建统一解析层**，向 ccusage 学方法、仅作交叉验证，不作运行时依赖。本 ADR 的 D1（Node/TS 迁移）、
+> D3（选型）、D4（`--json` 契约不变）、D5（渐进迁移）仍有效。
 
 ## 背景
 
