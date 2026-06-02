@@ -15,6 +15,15 @@ export const emptyTokens = (): Tokens => ({
 export interface CommandCount { command: string; count: number }
 export interface UsageReport { name: string; sessions: number; tokens: number }
 export interface HourReport { hour: number; tokens: number }
+export interface ModelDayCount { date: string; tokens: number }
+export interface ModelTimeline {
+  model: string
+  first_day: string          // YYYY-MM-DD（本机时区）
+  last_day: string           // YYYY-MM-DD（本机时区）
+  tokens: number
+  estimated_cost_usd: number
+  days: ModelDayCount[]
+}
 export interface RepoReport {
   repo: string; branches?: string[]; sessions: number; tokens: number
   estimated_cost_usd: number; language?: string
@@ -46,6 +55,7 @@ export interface Report {
   estimated_cost_usd: number
   models: string[]
   unpriced_models?: string[]
+  models_timeline?: ModelTimeline[]
   tools: { shell_calls: number; web_searches: number; file_changes: number; total_calls: number; top_commands: CommandCount[] }
   repos: RepoReport[]
   hours: HourReport[]
@@ -60,9 +70,10 @@ export interface Report {
 
 export const REPORT_GLOSSARY: Record<string, string> = {
   _about: '仅本机数据，不跨机器汇总；不含任何账户级配额百分比（CLI 下 rate_limits 恒为 null）。',
-  cache_hit_rate: 'cached_input / input，缓存命中率；越高越省钱（重复上下文被缓存复用）。',
+  cache_hit_rate: 'cached_input /（cached_input + 非缓存输入）的缓存命中率，两平台口径统一、恒在 0–1（Codex 下 input 含缓存，等价于 cached/input）；越高越省钱（重复上下文被缓存复用）。',
   reasoning_ratio: 'reasoning_output / output，推理 token 占输出的比例；偏高常意味任务被反复推理。',
   estimated_cost_usd: '估算成本，仅供参考、不等于实际账单。算法对齐 ccusage（按各 token 类别 × LiteLLM 参考价）。',
+  models_timeline: '每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token；用于时间感知判断：某旧模型占大头若只因新模型当时还没出现，不应判为浪费。',
   tokens: 'input/cached_input/output/reasoning_output/cache_creation/total；cached_input 是 input 的子集。',
   prompt_signals: '仅由 user prompt 派生的数值信号（长度/结构化率/文件引用率/约束率/返工率），不含任何原文。',
   git_habits: 'git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。',
