@@ -23,30 +23,37 @@
 
 ## 安装
 
-### 从源码编译（当前可用）
-
-标准 Go 模块，入口 [cmd/ccoach/main.go](cmd/ccoach/main.go)，要求 Go 1.22+：
+ccoach 是 TypeScript / Node 包（ESM，Node ≥ 18），CLI 命令为 `ccoach`，分发统一成「一切皆 npx」。
 
 ```bash
-go build -o ccoach ./cmd/ccoach
+npx @loredunk/ccoach          # 免安装直接跑（发布后）
+npm i -g @loredunk/ccoach     # 或全局安装
 ```
 
-> npm 分发（`npx ccoach` / `npm i -g ccoach`）与预编译二进制为规划项，见 [docs/TODO.md](docs/TODO.md) T4。
+### 从源码运行（当前）
+
+```bash
+npm install
+npm run build                 # -> dist/cli.js（bin: ccoach）
+node dist/cli.js --json --days 7
+# 或 `npm link`，之后 `ccoach` 即在 PATH 中
+```
+
+> 原 Go 实现保留在仓库内（`cmd/`、`internal/`）作行为基准，TS CLI 稳定后退役（见 [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)）。
 
 ## 用法
 
-报告是默认命令——裸命令即出今天的用量报告：
+裸命令即出今天的用量报告（两平台合并）：
 
 ```bash
-./ccoach                      # 今天本机的用量报告
-./ccoach --date 2026-05-13    # 指定某一天
-./ccoach --since 2026-05-01   # 从某天起到今天
-./ccoach --days 7             # 最近 7 天
-./ccoach --by-repo            # 按 git 仓库展开（含分支）
-./ccoach --json               # 输出 JSON，脚本 / agent 友好
+ccoach                          # 今天，全部平台
+ccoach --date 2026-05-13        # 指定某一天
+ccoach --since 2026-05-01       # 从某天起到今天
+ccoach --days 7                 # 最近 7 天
+ccoach --platform claude-code   # claude-code | codex | all（默认 all）
+ccoach --by-repo                # 按 git 仓库展开（含分支）
+ccoach --json                   # 输出 JSON，脚本 / agent 友好
 ```
-
-> 为兼容习惯，`./ccoach report --json …` 也仍可用（`report` 为可选前缀）。
 
 ## 使用建议 skill
 
@@ -59,6 +66,6 @@ go build -o ccoach ./cmd/ccoach
 
 - **只反映本机**：同账号多机登录时 rollout 按机器隔离，本工具只读本机文件、不跨机器汇总。
 - **不输出配额百分比**：CLI 下 `rate_limits` 恒为 null，且配额是账号级、跨机器的。
-- **成本为估算值**（token × 内置参考价），不等于实际账单。
+- **成本为估算值**（按各 token 类别 × 对齐 LiteLLM 的参考价），不等于实际账单。Token 与成本经 `npm run verify:ccusage` 与 `ccusage` 对账——token 严格相等、成本 1% 容差内（ccusage 仅作开发/CI 校验，绝非运行时依赖）。
 - 时间窗口按本机时区的绝对日期边界划分，报告头部会标明时区。
 </content>

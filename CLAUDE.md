@@ -18,9 +18,11 @@
 
 两者通过 **`--json` 契约**解耦：CLI 出数据，skill 出解读。改 CLI 不应破坏该契约（见 ADR 0004 / 0010）。
 
-## 架构方向（重要，规划中、尚未实施）
+## 架构方向（Phase 1 已落地：CLI 核心已是 TypeScript）
 
-下面两条是已定的方向，**当前代码仍是 Go**，迁移分步进行、不要一次性重写。动手前读对应 ADR。
+下面两条是已定方向。**Phase 1 已实现**：CLI 核心已用 TypeScript 重写为 `@loredunk/ccoach`（统一解析层 +
+双平台适配器 + ccusage 对账，见 `src/` 与 `docs/superpowers/`）。Go 版（`cmd/`、`internal/`）原地保留作行为
+基准、稳定后退役。**Phase 2 待续**：skill 去 Python。动手前读对应 ADR。
 
 ### 1. CLI 迁移到 Node/TypeScript + 自建统一解析层
 
@@ -48,11 +50,14 @@
 
 ## 仓库布局
 
-- `cmd/ccoach/` — CLI 入口（当前 Go，将迁移到 TS）。
-- `internal/codexreport/` — 用量聚合（`report.go` / `habits.go` / `language.go` / `configscan.go`），迁移参考实现。
-- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）。
+- `src/` — **TS CLI（Phase 1，当前实现）**：`cli.ts`（cac）/ `index.ts`（`buildReport` + 平台合并）/
+  `parsers/{claude-code,codex}.ts`（双平台适配器）/ `aggregate.ts`（平台无关聚合）/ `model.ts`（统一结构 + glossary）/
+  `pricing.ts`（双平台计价）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `emit/{json,text}.ts`。
+- `test/` — vitest 单测 + 两平台 JSONL fixture；`scripts/verify-ccusage.ts` — 与 ccusage 对账（接入 CI）。
+- `cmd/ccoach/`、`internal/codexreport/` — 原 Go 实现，保留作**行为基准 / 交叉验证**，TS 稳定后退役。
+- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；Phase 2 去 Python。
 - `tools/` — 校验脚本（`check_adrs.py`、`test_scorecard.py`）。
-- `docs/` — PRD / ADR / TODO，见下。
+- `docs/` — PRD / ADR / TODO（含 `superpowers/` 设计与实现计划），见下。
 - `README.md`（英文，默认）/ `README_CN.md`（中文）。
 
 ## 文档约定（docs/）

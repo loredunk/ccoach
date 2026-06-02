@@ -71,32 +71,34 @@
 - [x] `references/insight-patterns.md` 新增「Model Version Distribution（time-aware）」模式与措辞模板。
 - [x] `references/feature-mapping.md` 新增「多花在旧版模型上」行（带时间感知警告）。
 - [x] 数据层产出结构化时间线：`ccoach report --json` 新增 `models_timeline`（每模型 `first_day`/`last_day` + 每日 token/成本），文本模式也显示模型时间线；SKILL/insight-patterns 指向该字段，护栏不再只靠 agent 推断。
-- [ ]（Claude Code 侧）迁移到统一解析层后（T9），同样在数据层产出 per-day per-model 时间线（当前经 ccusage daily 取）。
+- [x]（Claude Code 侧）统一解析层（T9）已为两平台在数据层原生产出 `models_timeline`（per-day per-model），不再依赖 ccusage daily。
 
-## T8 · CLI 迁移到 Node/TypeScript（P0）— ☐ 规划中
+## T8 · CLI 迁移到 Node/TypeScript（P0）— ✅ Phase 1 已完成
 
-> 决策：[`adr/0010-cli-rewrite-node-ccusage.md`](adr/0010-cli-rewrite-node-ccusage.md)（已接受，待实现）。
-> 渐进迁移、保持 `--json` 契约不变、Go 版留作参考实现交叉验证。
+> 决策：[`adr/0010-cli-rewrite-node-ccusage.md`](adr/0010-cli-rewrite-node-ccusage.md)（已实现 Phase 1）。
+> 实现：`docs/superpowers/specs/2026-06-02-ts-rewrite-design.md` + `plans/2026-06-02-ts-rewrite-phase1.md`。
+> 保持 `--json` 契约；Go 版原地保留作行为基准 / 交叉验证。
 
-- [ ] 搭 TS 项目骨架：`cac`/`citty`（轻量 CLI）+ `tsdown`/`unbuild`（小 bundle）。
-- [ ] 跑通核心数据流：读 `~/.codex` rollout（或调 `@ccusage/codex`）→ 结构化用量 → `--json`。
-- [ ] **对齐 Go 版 `--json`**：同一份数据交叉验证两版结果一致，确保解析不退化（ADR 0010 D5）。
-- [ ] 习惯分析 / 配置扫描 / 语言识别（原 `habits.go`/`configscan.go`/`language.go`）的 TS 等价实现 + 测试（ADR 0010 OQ3）。
+- [x] TS 项目骨架：`cac` + `tsdown` + `vitest`，ESM、Node ≥ 18（包 `@loredunk/ccoach`，bin `ccoach`）。
+- [x] 跑通核心数据流：读 `~/.codex` rollout（glob）+ `~/.claude/projects` → 统一结构 → `--json` / 人读文本。
+- [x] **对齐 ccusage**：`scripts/verify-ccusage.ts` 实测 token 严格相等、成本 1% 容差内（接入 CI）。
+- [x] 习惯分析 TS 等价（`src/habits.ts`：git_habits / project_management）+ 测试。
+- [ ]（后续）配置扫描 `configscan.go`、语言识别 `language.go` 的完整 TS 等价（Phase 1 为最小实现）。
+- [ ]（后续）Codex sqlite 元数据读取器（Phase 1 走 glob 路径，用量已正确）。
 - [ ] Node 版稳定后退役 Go 版（删 `cmd/ccoach`、`internal/codexreport`）。
 
-## T9 · 自建统一解析层 + 双平台一等数据源（P0）— ☐ 规划中
+## T9 · 自建统一解析层 + 双平台一等数据源（P0）— ✅ Phase 1 已完成
 
 > 决策：[`adr/0013`](adr/0013-self-built-unified-parser.md)（自建解析，取代 0010 D2）/ [`adr/0011`](adr/0011-multi-platform-usage-sources.md)（多平台）。
 > 不依赖 ccusage 运行，只学方法 + 交叉验证。
 
-- [ ] 自建解析层 `src/parsers/`：一个 pass 出 **用量 + user prompt + 习惯指标**（ccusage 数据的超集）。
-- [ ] 学 ccusage 的 JSONL 解析方法（字段、cache creation/read、5h 窗口、成本估算、session/project 聚合）；**不复制其代码**（MIT，仅参考思路）。
-- [ ] 分平台适配器 `claude-code` / `codex`，吐**统一数据结构**（`usage` + `prompts` + `habits`）；上层评级/HTML 只认统一结构（ADR 0011 D2 / 0013 D3）。
-- [ ] **Claude Code 在 CLI 内升为一等数据源**（与 Codex 对称，不再只在 skill 侧取数）。
-- [ ] 抓 prompt 严守隐私边界（需批准才读、不读 system/assistant、全局零原文）（ADR 0013 D5 / 0005）。
-  - [x] **内容层 prompt 评级数据面已先在 skill 侧落地**：`claude_session_prompts.py`（opt-in、单会话、脱敏），对称 Codex `session_drilldown.py`；统一解析层就绪后上移（ADR 0014）。
-  - [x] 修正 `file_ref_ratio` 口径（@引用 + 裸路径 + 文件名.后缀，防 prose/npm 误命中）（ADR 0014 D4）。
-- [ ] 用 `npx ccusage` **交叉验证** token/成本（对答案，CI 或开发期），保留两平台样例 fixture 防格式漂移（ADR 0013 D4 / OQ3）。
+- [x] 自建解析层 `src/parsers/`：一个 pass 出 **用量 + prompt 信号 + 习惯**（统一 `Report`）。
+- [x] 学 ccusage 的 JSONL 解析方法（按 `message.id:requestId` 去重、cache creation/read 计价、成本估算）；**不复制其代码**（仅参考思路）。
+- [x] 分平台适配器 `claude-code` / `codex` → **统一数据结构**；聚合器/emitter 只认统一结构（加平台 = 加一个适配器）。
+- [x] **Claude Code 在 CLI 内升为一等数据源**（与 Codex 对称、且优先实现）。
+- [x] 抓 prompt 严守隐私边界：只由 user prompt 派生数值 `prompt_signals`，绝不读 assistant / 工具输出 / sidechain 文本，输出脱敏（隐私回归 `test/privacy.test.ts`）。
+  - [x] 内容层 prompt 评级数据面（skill 侧 `claude_session_prompts.py`）；`file_ref_ratio` 口径已移植进 `src/prompt-signals.ts`。
+- [x] 用 ccusage **交叉验证** token/成本（`scripts/verify-ccusage.ts`，接入 CI），两平台 fixture 防格式漂移。
 - [ ]（未来）调研并接入 OpenClaw / Harness / opencode / amp 等其它 Agent CLI（只需再写一个适配器）（ADR 0011 D3）。
 
 ## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）
@@ -126,4 +128,5 @@
 - [x] **剥离保活、更名 ccoach、`report` 改为默认命令**（ADR 0007，2026-06-02）。
 - [x] 规划游戏化可分享成绩卡 + i18n（ADR 0008 / 0009，2026-06-02）。
 - [x] **实现** T1/T5/T6/T7/T2/T3（glossary、三层 scope + prompt 信号、feature-mapping、成绩卡 + zh/en、CI 检查，2026-06-02）。
+- [x] **TS 重构 Phase 1 落地**（T8/T9）：`@loredunk/ccoach`（cac/tsdown/vitest、ESM、Node≥18）——统一解析层（`claude-code` + `codex` 适配器）、平台无关聚合器、双平台计价、prompt 数值信号、习惯派生、JSON/文本 emitter、CLI（`--platform`/`--json`）、ccusage 交叉验证 + 隐私回归 + TS CI；token 与 ccusage 严格相等、成本 1% 内（2026-06-02）。
 </content>

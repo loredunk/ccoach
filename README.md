@@ -24,30 +24,37 @@
 
 ## Install
 
-### Build from source (available today)
-
-Standard Go module, entry point [cmd/ccoach/main.go](cmd/ccoach/main.go), requires Go 1.22+:
+ccoach is a TypeScript / Node package (ESM, Node ≥ 18); the CLI binary is `ccoach`. Distribution is "everything is npx".
 
 ```bash
-go build -o ccoach ./cmd/ccoach
+npx @loredunk/ccoach          # run without installing (once published)
+npm i -g @loredunk/ccoach     # or install globally
 ```
 
-> npm distribution (`npx ccoach` / `npm i -g ccoach`) and prebuilt binaries are planned — see [docs/TODO.md](docs/TODO.md) T4.
+### From source (today)
+
+```bash
+npm install
+npm run build                 # -> dist/cli.js (bin: ccoach)
+node dist/cli.js --json --days 7
+# or `npm link`, then `ccoach` is on your PATH
+```
+
+> The original Go implementation is kept in-tree (`cmd/`, `internal/`) as a behavior baseline and will be retired once the TS CLI is stable (see [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)).
 
 ## Usage
 
-The report is the default command — a bare invocation prints today's usage report:
+A bare invocation prints today's usage report, both platforms merged:
 
 ```bash
-./ccoach                      # today's local usage report
-./ccoach --date 2026-05-13    # a specific day
-./ccoach --since 2026-05-01   # from a day through today
-./ccoach --days 7             # the last 7 days
-./ccoach --by-repo            # per-repository breakdown (with branches)
-./ccoach --json               # JSON output, script / agent friendly
+ccoach                          # today, all platforms
+ccoach --date 2026-05-13        # a specific day
+ccoach --since 2026-05-01       # from a day through today
+ccoach --days 7                 # the last 7 days
+ccoach --platform claude-code   # claude-code | codex | all (default: all)
+ccoach --by-repo                # per-repository breakdown (with branches)
+ccoach --json                   # JSON output, script / agent friendly
 ```
-
-> For familiarity, `./ccoach report --json …` still works (`report` is an optional prefix).
 
 ## Advice skill
 
@@ -61,5 +68,5 @@ prompts only after explicit approval, and never reads hidden system prompts.
 
 - **Local machine only**: rollouts are per-machine; this tool reads only local files and never aggregates across machines.
 - **No quota percentages**: `rate_limits` is always null under the CLI, and quota is account-level / cross-machine.
-- **Cost is an estimate** (token × built-in reference price), not your actual bill.
+- **Cost is an estimate** (per token-class × LiteLLM-aligned reference price), not your actual bill. Tokens and cost are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
 - Time windows use absolute local-timezone day boundaries; the report header states the timezone.
