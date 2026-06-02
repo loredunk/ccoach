@@ -1,0 +1,19 @@
+name: ts-ci
+
+on: [push, pull_request]
+
+jobs:
+  ts:
+    runs-on: ubuntu-latest
+    env:
+      TZ: UTC # 窗口/本地日期判定确定化
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run verify:ccusage # 在线时强校验（token 严等 / 成本 1% 容差）；无数据/离线则 SKIP
