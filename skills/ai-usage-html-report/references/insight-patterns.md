@@ -123,6 +123,8 @@ Signals:
 
 - Spend/tokens concentrated on an older model, with a newer model at a small share.
 - The per-day, per-model timeline shows the newer model only appearing recently (or not at all).
+  Read it from `models_timeline` in `ccoach report --json` (`first_day` / `last_day` / per-day tokens),
+  or from `ccusage codex daily` / ccusage daily.
 
 Interpretation:
 

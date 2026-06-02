@@ -50,6 +50,12 @@ type Report struct {
 	Models           []string `json:"models"`
 	UnpricedModels   []string `json:"unpriced_models,omitempty"`
 
+	// ModelsTimeline gives, per model, when it first/last appeared in the window
+	// and its per-day token usage. It exists so advice can be time-aware: an
+	// older model dominating only because a newer one wasn't available yet must
+	// not be flagged as waste (see the skill's time-aware model guidance).
+	ModelsTimeline []ModelTimeline `json:"models_timeline,omitempty"`
+
 	Tools struct {
 		ShellCalls  int            `json:"shell_calls"`
 		WebSearches int            `json:"web_searches"`
@@ -79,6 +85,7 @@ var reportGlossary = map[string]string{
 	"cache_hit_rate":     "cached_input / input，缓存命中率；越高越省钱（重复上下文被缓存复用）。",
 	"reasoning_ratio":    "reasoning_output / output，推理 token 占输出的比例；偏高常意味任务被反复推理。",
 	"estimated_cost_usd": "估算成本，仅供参考、不等于实际账单。算法对齐 ccusage：非缓存输入×输入价 + 缓存输入×缓存读取价 + 输出×输出价（输出已含 reasoning），参考价来自 LiteLLM。",
+	"models_timeline":    "每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token。用于时间感知判断：某旧模型占大头若只因新模型当时还没出现（first_day 很晚），不应判为浪费或建议回溯固定。",
 	"tokens":             "input/cached_input/output/reasoning_output/total。按 Codex 每轮 last_token_usage 累加（无该字段时回退为对 total_token_usage 求增量），对齐 ccusage；cached_input 是 input 的子集。",
 	"sources":            "用量来源拆分（CLI / Codex App / IDE 插件等，若可识别）。",
 	"git_habits":         "git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。",
@@ -107,6 +114,20 @@ type RepoReport struct {
 type HourReport struct {
 	Hour   int   `json:"hour"`
 	Tokens int64 `json:"tokens"`
+}
+
+type ModelTimeline struct {
+	Model    string          `json:"model"`
+	FirstDay string          `json:"first_day"` // YYYY-MM-DD, local
+	LastDay  string          `json:"last_day"`  // YYYY-MM-DD, local
+	Tokens   int64           `json:"tokens"`
+	CostUSD  float64         `json:"estimated_cost_usd"`
+	Days     []ModelDayCount `json:"days"`
+}
+
+type ModelDayCount struct {
+	Date   string `json:"date"`
+	Tokens int64  `json:"tokens"`
 }
 
 type UsageReport struct {
@@ -267,6 +288,7 @@ func assemble(agg *aggregate, desc, source, home string, loc *time.Location) Rep
 	r.EstimatedCostUSD = agg.cost
 	r.Models = sortedKeys(agg.modelsSeen)
 	r.UnpricedModels = sortedKeys(agg.missingPrice)
+	r.ModelsTimeline = buildModelsTimeline(agg.byModelDay)
 
 	r.Tools.ShellCalls = agg.shellCalls
 	r.Tools.WebSearches = agg.webSearches
@@ -301,6 +323,38 @@ func assemble(agg *aggregate, desc, source, home string, loc *time.Location) Rep
 	r.Project = buildProjectMgmt(r.Repos)
 	r.Codex = scanCodexConfig(home, agg)
 	return r
+}
+
+// buildModelsTimeline turns the per-model/per-day aggregate into a sorted
+// timeline, ordered by total tokens (highest first) so the dominant model leads.
+func buildModelsTimeline(byModelDay map[string]map[string]*modelDayAgg) []ModelTimeline {
+	out := make([]ModelTimeline, 0, len(byModelDay))
+	for model, days := range byModelDay {
+		dayKeys := make([]string, 0, len(days))
+		for d := range days {
+			dayKeys = append(dayKeys, d)
+		}
+		sort.Strings(dayKeys)
+		mt := ModelTimeline{
+			Model:    model,
+			FirstDay: dayKeys[0],
+			LastDay:  dayKeys[len(dayKeys)-1],
+		}
+		for _, d := range dayKeys {
+			da := days[d]
+			mt.Tokens += da.tokens
+			mt.CostUSD += da.cost
+			mt.Days = append(mt.Days, ModelDayCount{Date: d, Tokens: da.tokens})
+		}
+		out = append(out, mt)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Tokens != out[j].Tokens {
+			return out[i].Tokens > out[j].Tokens
+		}
+		return out[i].Model < out[j].Model
+	})
+	return out
 }
 
 func usageReports(groups map[string]*usageAgg) []UsageReport {
@@ -407,6 +461,16 @@ func renderText(r Report, byRepo bool, out io.Writer) error {
 	fmt.Fprintf(&b, "  估算成本 $%.2f（估算价，仅供参考%s）\n", r.EstimatedCostUSD, modelNote)
 	if len(r.UnpricedModels) > 0 {
 		fmt.Fprintf(&b, "  注意: 以下模型无内置价格，未计入成本: %s\n", strings.Join(r.UnpricedModels, ", "))
+	}
+	if len(r.ModelsTimeline) > 1 {
+		fmt.Fprintln(&b, "  模型时间线 (首次→最后, 本机时区):")
+		for _, mt := range r.ModelsTimeline {
+			span := mt.FirstDay
+			if mt.LastDay != mt.FirstDay {
+				span = mt.FirstDay + "→" + mt.LastDay
+			}
+			fmt.Fprintf(&b, "    %-16s %s · %s token\n", truncate(mt.Model, 16), span, comma(mt.Tokens))
+		}
 	}
 	fmt.Fprintln(&b)
 

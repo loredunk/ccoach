@@ -91,6 +91,40 @@ func TestSingleTurnSessionCounted(t *testing.T) {
 	}
 }
 
+func TestModelsTimeline(t *testing.T) {
+	// gpt-5 used on day 1, gpt-5.4 introduced on day 2: the timeline must record
+	// each model's first/last day so advice can tell that gpt-5.4 only appeared
+	// later (not a user mistake to have used gpt-5 before it existed).
+	path := writeRollout(t,
+		`{"timestamp":"2026-05-13T01:00:00Z","type":"turn_context","payload":{"model":"gpt-5"}}`,
+		`{"timestamp":"2026-05-13T01:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":10,"reasoning_output_tokens":0,"total_tokens":110}}}}`,
+		`{"timestamp":"2026-05-14T01:00:00Z","type":"turn_context","payload":{"model":"gpt-5.4"}}`,
+		`{"timestamp":"2026-05-14T01:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":200,"cached_input_tokens":0,"output_tokens":20,"reasoning_output_tokens":0,"total_tokens":220}}}}`,
+	)
+
+	loc := time.UTC
+	from, _ := time.ParseInLocation("2006-01-02", "2026-05-13", loc)
+	to, _ := time.ParseInLocation("2006-01-02", "2026-05-15", loc)
+	agg := newAggregate()
+	parseThread(Thread{ID: "t1", RolloutPath: path, Model: "gpt-5"}, parseOptions{from: from, to: to, loc: loc}, agg)
+
+	rep := assemble(agg, "test", "glob", "/tmp", loc)
+	tl := map[string]ModelTimeline{}
+	for _, mt := range rep.ModelsTimeline {
+		tl[mt.Model] = mt
+	}
+	if got, ok := tl["gpt-5"]; !ok || got.FirstDay != "2026-05-13" || got.LastDay != "2026-05-13" || got.Tokens != 110 {
+		t.Fatalf("gpt-5 timeline wrong: %+v", got)
+	}
+	if got, ok := tl["gpt-5.4"]; !ok || got.FirstDay != "2026-05-14" || got.Tokens != 220 {
+		t.Fatalf("gpt-5.4 timeline wrong: %+v", got)
+	}
+	// gpt-5.4 dominates tokens, so it should sort first.
+	if rep.ModelsTimeline[0].Model != "gpt-5.4" {
+		t.Fatalf("expected gpt-5.4 first by tokens, got %q", rep.ModelsTimeline[0].Model)
+	}
+}
+
 func TestToolCountingAndCommands(t *testing.T) {
 	path := writeRollout(t,
 		`{"timestamp":"2026-05-13T02:00:00Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"rg -n foo\"}"}}`,

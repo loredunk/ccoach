@@ -70,7 +70,8 @@
 - [x] SKILL.md「Analysis Guidance」+「Avoid」：模型版本类结论必须时间感知，按 per-day per-model 时间线判断模型可用时间，不回溯指责、不算「X% 浪费在旧模型」。
 - [x] `references/insight-patterns.md` 新增「Model Version Distribution（time-aware）」模式与措辞模板。
 - [x] `references/feature-mapping.md` 新增「多花在旧版模型上」行（带时间感知警告）。
-- [ ]（迁移到统一解析层后，T9）在数据层直接产出**每模型首次出现日期 / per-day per-model 时间线**，让护栏不依赖 agent 自行推断。
+- [x] 数据层产出结构化时间线：`ccoach report --json` 新增 `models_timeline`（每模型 `first_day`/`last_day` + 每日 token/成本），文本模式也显示模型时间线；SKILL/insight-patterns 指向该字段，护栏不再只靠 agent 推断。
+- [ ]（Claude Code 侧）迁移到统一解析层后（T9），同样在数据层产出 per-day per-model 时间线（当前经 ccusage daily 取）。
 
 ## T8 · CLI 迁移到 Node/TypeScript（P0）— ☐ 规划中
 

@@ -122,7 +122,7 @@ Before recommending any platform configuration or feature (CLAUDE.md/AGENTS.md, 
 
 **Model-version findings must be time-aware.** Usage is historical, so a model split across a window does NOT mean the user "chose" the older model — the newer one may not have existed yet. Before framing "most spend went to an older model" as waste or recommending "pin to the newest model":
 
-- Look at the **per-day, per-model timeline** (`ccusage codex daily` / ccusage daily give per-day per-model breakdowns). Find when each model *first appears*.
+- Look at the **per-day, per-model timeline**. Codex's `ccoach report --json` emits `models_timeline` (each model's `first_day` / `last_day` / per-day tokens); `ccusage codex daily` / ccusage daily give the same per-day per-model breakdown. Find when each model *first appears* — a late `first_day` means it was recently released.
 - If a newer model only appears in the **last few days** of the window (or not at all), treat it as **recently released / newly available** — the older-model spend before that date is expected, not a mistake. Do **not** count it as waste, and do **not** compute a "X% wasted on the old model" figure over a span where the newer model didn't exist.
 - Scope any "switch to the newer model" suggestion to **going forward**, and only when the newer model was actually available during (most of) the window. Web-verify model release dates before asserting availability.
 - A user who *already started* adopting the newer model recently needs no correction here — acknowledge it as good, forward-looking behavior.

@@ -74,6 +74,7 @@ type aggregate struct {
 	byHour       [24]tokenUsage
 	bySource     map[string]*usageAgg
 	byLanguage   map[string]*usageAgg
+	byModelDay   map[string]map[string]*modelDayAgg // model -> YYYY-MM-DD -> usage
 	profileCache map[string]projectProfile
 
 	missingPrice map[string]bool // models we had no price for
@@ -100,6 +101,11 @@ type usageAgg struct {
 	sessions map[string]bool
 }
 
+type modelDayAgg struct {
+	tokens int64
+	cost   float64
+}
+
 func newAggregate() *aggregate {
 	return &aggregate{
 		shellCommands: map[string]int{},
@@ -108,6 +114,7 @@ func newAggregate() *aggregate {
 		byRepo:        map[string]*repoAgg{},
 		bySource:      map[string]*usageAgg{},
 		byLanguage:    map[string]*usageAgg{},
+		byModelDay:    map[string]map[string]*modelDayAgg{},
 		profileCache:  map[string]projectProfile{},
 		missingPrice:  map[string]bool{},
 		modelsSeen:    map[string]bool{},
@@ -327,9 +334,31 @@ func (agg *aggregate) applyTokens(d tokenUsage, model, repo, branch, session, so
 
 	agg.applyUsage(agg.bySource, source, d, session)
 	agg.applyUsage(agg.byLanguage, profile.Language, d, session)
+	agg.applyModelDay(normalizeModel(model), ts, loc, d, cost)
 
 	hour := ts.In(loc).Hour()
 	agg.byHour[hour].add(d)
+}
+
+// applyModelDay records per-model, per-local-day token/cost for the timeline.
+// Empty (unidentified) models are skipped — the timeline is about model versions.
+func (agg *aggregate) applyModelDay(model string, ts time.Time, loc *time.Location, d tokenUsage, cost float64) {
+	if model == "" {
+		return
+	}
+	day := ts.In(loc).Format("2006-01-02")
+	days := agg.byModelDay[model]
+	if days == nil {
+		days = map[string]*modelDayAgg{}
+		agg.byModelDay[model] = days
+	}
+	md := days[day]
+	if md == nil {
+		md = &modelDayAgg{}
+		days[day] = md
+	}
+	md.tokens += d.Total
+	md.cost += cost
 }
 
 func (agg *aggregate) repoFor(repo string, profile projectProfile) *repoAgg {

@@ -186,7 +186,8 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 **时间感知护栏（必须）**：用量是历史数据，任何「模型版本」类结论都必须考虑**模型可用时间**。
 不得把「新模型发布前用了旧模型」当成浪费或错误，也不得据此建议「回溯固定到新模型」。判断方式：
-看 per-day per-model 时间线，若新模型只在窗口末尾才出现（或尚未出现），则旧模型花费属发布时机所致、
+看 per-day per-model 时间线（`ccoach report --json` 已产出 `models_timeline`：每模型 `first_day`/`last_day`
++ 每日 token），若新模型只在窗口末尾才出现（`first_day` 很晚）或尚未出现，则旧模型花费属发布时机所致、
 是预期行为；仅当新模型在窗口内确实可用时，才建议**今后**默认用更新的模型（须先联网核对发布日期）。
 对已开始切换到新模型的用户，应肯定其前瞻行为、无需纠偏。（落地见 `skills/ai-usage-html-report/`
 的 SKILL.md「Analysis Guidance」与 `references/insight-patterns.md`「Model Version Distribution」。）
