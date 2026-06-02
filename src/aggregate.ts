@@ -24,7 +24,7 @@ interface RepoAgg {
 interface UsageAgg { name: string; tokens: number; sessions: Set<string> }
 interface ModelDayAgg { tokens: number; cost: number }
 
-export type ToolKind = 'shell' | 'web' | 'file'
+export type ToolKind = 'shell' | 'web' | 'file' | 'other'
 
 function emptyTokensLocal(): Tokens {
   return { input: 0, cached_input: 0, output: 0, reasoning_output: 0, cache_creation: 0, total: 0 }
@@ -118,9 +118,10 @@ export class Aggregator {
       }
     } else if (kind === 'web') {
       this.webSearches++
-    } else {
+    } else if (kind === 'file') {
       this.fileChanges++
     }
+    // 'other'：仅计入 totalCalls（顶部已 ++），用于 Codex 的通用 function_call/custom_tool_call 等
   }
 
   applyFileChangeExt(repo: string, ext: string): void {
