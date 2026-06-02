@@ -94,6 +94,8 @@
 - [ ] 分平台适配器 `claude-code` / `codex`，吐**统一数据结构**（`usage` + `prompts` + `habits`）；上层评级/HTML 只认统一结构（ADR 0011 D2 / 0013 D3）。
 - [ ] **Claude Code 在 CLI 内升为一等数据源**（与 Codex 对称，不再只在 skill 侧取数）。
 - [ ] 抓 prompt 严守隐私边界（需批准才读、不读 system/assistant、全局零原文）（ADR 0013 D5 / 0005）。
+  - [x] **内容层 prompt 评级数据面已先在 skill 侧落地**：`claude_session_prompts.py`（opt-in、单会话、脱敏），对称 Codex `session_drilldown.py`；统一解析层就绪后上移（ADR 0014）。
+  - [x] 修正 `file_ref_ratio` 口径（@引用 + 裸路径 + 文件名.后缀，防 prose/npm 误命中）（ADR 0014 D4）。
 - [ ] 用 `npx ccusage` **交叉验证** token/成本（对答案，CI 或开发期），保留两平台样例 fixture 防格式漂移（ADR 0013 D4 / OQ3）。
 - [ ]（未来）调研并接入 OpenClaw / Harness / opencode / amp 等其它 Agent CLI（只需再写一个适配器）（ADR 0011 D3）。
 

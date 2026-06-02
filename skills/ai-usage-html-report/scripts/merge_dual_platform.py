@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge Claude Code data (from ccusage) + Codex data (from autofresh
+"""Merge Claude Code data (from ccusage) + Codex data (from ccoach
 report --json, with ccusage codex as historical fallback) into one dual-platform
 usage JSON.
 
@@ -7,7 +7,7 @@ Inputs (all JSON files produced beforehand):
   --cc-daily        ccusage claude daily --json --offline --breakdown
   --cc-session      ccusage claude session --json --offline
   --cc-behavior     collect_claude_behavior.py output (Claude Code behavior)
-  --codex-report    ./autofresh report --since <date> --json  (Codex behavior+tokens)
+  --codex-report    ./ccoach report --since <date> --json  (Codex behavior+tokens)
   --codex-ccusage   ccusage codex daily --json --offline   (historical Codex, fallback)
   --output          merged dual-platform JSON path
 
@@ -68,7 +68,7 @@ def cache_hit_rate(cache_read, total_input_like):
 # --------------------------------------------------------------------------
 
 # Known git subcommands; anything else (e.g. a leaked path captured by
-# autofresh's parser) is dropped from the rendered git-habits list so no
+# ccoach's parser) is dropped from the rendered git-habits list so no
 # absolute path or arbitrary token reaches the report.
 GIT_SUBCMDS = {
     "add", "commit", "push", "pull", "fetch", "diff", "status", "log",
@@ -148,7 +148,7 @@ def claude_behavior(cb):
 
 
 def codex_behavior(r):
-    """Normalize autofresh report --json into the unified behavior shape."""
+    """Normalize ccoach report --json into the unified behavior shape."""
     if not r:
         return None
     tools = r.get("tools", {})
@@ -159,7 +159,7 @@ def codex_behavior(r):
     )
     repos = [dict(repo=x.get("repo"), sessions=x.get("sessions", 0),
                   tokens=x.get("tokens", 0),
-                  tool_calls=0)  # autofresh repo has no per-repo tool count
+                  tool_calls=0)  # ccoach repo has no per-repo tool count
              for x in r.get("repos", [])][:10]
     git = r.get("git_habits", {})
     pm = r.get("project_management", {})
@@ -176,7 +176,7 @@ def codex_behavior(r):
         generated_for=r.get("generated_for"),
         sessions=r.get("sessions", 0),
         total_tool_calls=tools.get("total_calls", 0),
-        tools_by_name=[],  # autofresh doesn't break tools down by name
+        tools_by_name=[],  # ccoach doesn't break tools down by name
         top_commands=_clean_commands(tools.get("top_commands", [])),
         tool_categories=cats,
         git_habits=_clean_git(git.get("top_subcommands", [])),
@@ -235,7 +235,7 @@ def build_claude(cc_daily, cc_session, cc_behavior=None):
 
 
 def build_codex(codex_report, codex_ccusage):
-    """Codex from autofresh (today) + ccusage codex (history fallback)."""
+    """Codex from ccoach (today) + ccusage codex (history fallback)."""
     r = codex_report
     tok = r.get("tokens", {})
     af_total = tok.get("total", 0)
@@ -265,8 +265,8 @@ def build_codex(codex_report, codex_ccusage):
                    tokens=d.get("totalTokens", 0)) for d in cdaily]
     return dict(
         platform="Codex",
-        # autofresh = authoritative for "today"; ccusage codex = history.
-        autofresh_today=dict(
+        # ccoach = authoritative for "today"; ccusage codex = history.
+        codex_today=dict(
             generated_for=r.get("generated_for"),
             timezone=r.get("timezone"),
             sessions=af_sessions,
@@ -275,7 +275,7 @@ def build_codex(codex_report, codex_ccusage):
             cache_hit_rate=r.get("cache_hit_rate", 0),
             empty=(af_total == 0),
         ),
-        source="autofresh report --json (today) + ccusage codex (history)",
+        source="ccoach report --json (today) + ccusage codex (history)",
         active_days=len(cdaily),
         date_range=[cdaily[0]["date"], cdaily[-1]["date"]] if cdaily else [],
         tokens=dict(
@@ -327,7 +327,7 @@ def main():
           f"${claude['cost_usd']}, {claude['tokens']['total']:,} tokens")
     print(f"  Codex: {codex['active_days']} days, "
           f"${codex['cost_usd']}, {codex['tokens']['total']:,} tokens "
-          f"(autofresh today empty={codex['autofresh_today']['empty']})")
+          f"(ccoach today empty={codex['codex_today']['empty']})")
 
 
 if __name__ == "__main__":

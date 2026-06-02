@@ -31,6 +31,8 @@ internal/codexreport JSON tags where they overlap:
   sources{entrypoints[], permission_modes[], subagent_calls, subagent_share},
   prompt_signals{prompts, avg_len, structured_ratio, file_ref_ratio,
                  constraint_ratio, correction_rate}
+                 (file_ref_ratio counts @-mentions AND bare paths/filenames, so
+                  it reflects file-grounding even when the user never types @)
 
 PRIVACY (hard rules):
   - never emit prompt text, thinking text, tool_result content, or file contents
@@ -87,7 +89,23 @@ SECRET_RE = re.compile(
     r"(sk-[A-Za-z0-9]{6,}|ghp_[A-Za-z0-9]{6,}|AKIA[0-9A-Z]{10,}"
     r"|xox[baprs]-[A-Za-z0-9-]{6,})")
 LIST_RE = re.compile(r"(^|\n)\s*([-*•]|\d+[.)])\s+")
-FILE_REF_RE = re.compile(r"@[\w./\-]+")
+# A prompt "references a file" if it uses an @-mention OR names a concrete file by
+# path / filename. Many users never type @ (they paste bare paths like src/main.go
+# or just main.go), so counting only @ undercounts real file-grounding. We anchor
+# bare matches on a known code/config extension to avoid prose false positives
+# (e.g. version "4.5", "node.js" prose), and require the @-mention to carry a
+# path/extension so npm tags like "ccusage@latest" don't count.
+_FILE_EXT_GROUP = (
+    r"(?:py|go|js|jsx|ts|tsx|rs|java|kt|swift|c|h|cc|cpp|cxx|hpp|rb|php|cs|"
+    r"sh|bash|zsh|html|htm|css|scss|less|md|json|yaml|yml|toml|xml|sql|vue|"
+    r"svelte|dart|scala|lua|ipynb|cfg|ini|env|gradle|proto|txt|lock|mod)"
+)
+FILE_REF_RE = re.compile(
+    r"@[\w\-]*[./][\w./\-]+"                                   # @path / @file.ext
+    r"|(?:[\w\-]+/)+[\w\-.]*\." + _FILE_EXT_GROUP + r"\b"      # a/b/c.ext
+    r"|\b[\w\-]+\." + _FILE_EXT_GROUP + r"\b",                 # bare file.ext
+    re.IGNORECASE,
+)
 
 # file extension -> language label
 EXT_LANG = {

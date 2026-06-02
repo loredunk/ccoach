@@ -24,7 +24,7 @@ Create a JSON file with this shape:
       "evidence": [
         "total tokens 约 2549 万",
         "cached_input 占比约 96%",
-        "autofresh 2 个 session 占当天绝大多数 token"
+        "某仓库 2 个 session 占当天绝大多数 token"
       ],
       "meaning": "这些指标说明什么使用模式",
       "impact": "它为什么影响成本、速度、质量或工作方式",

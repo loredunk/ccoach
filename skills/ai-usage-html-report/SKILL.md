@@ -57,6 +57,7 @@ Keep responsibilities separate:
    - All fields are optional and backward-compatible: a flat `{"insights": ["string", ...]}` still renders. Use Chinese unless the user asks otherwise.
    - Behavior data is in `platforms.<plat>.behavior` (tools / top_commands / git_habits / languages / repos / hours / sources / extras) for both platforms — ground at least one insight per platform in these behavior numbers.
    - For richer interpretation patterns (evidence → meaning → impact → drilldown → intervention), read `references/insight-patterns.md`; distill those ladders into the `recommendations`/`insights` fields described in `references/dual-insights-schema.md`.
+   - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization (ADR 0015); skip it only if the user opts out.
 6. (Optional) Build the shareable **scorecard** (see "Shareable scorecard" below):
    - `python3 ${CLAUDE_SKILL_DIR}/scripts/scorecard.py --data /tmp/ai-usage.json --lang zh --output /tmp/scorecard.json`
    - Pick `--lang zh|en` per the user's language. Then write the personality-summary
@@ -92,6 +93,19 @@ Use this when the user wants to find expensive or unclear Codex sessions.
    - Or `python3 ${CLAUDE_SKILL_DIR}/scripts/session_drilldown.py --session-id SESSION_ID --include-user-prompts > /tmp/codex-session-review-source.json`
 8. Read `references/session-prompt-review.md`, then summarize the session review findings. Fold the key diagnoses into the `insights` strings of `/tmp/ai-usage-insights.json` (or, in the Codex-only fallback, into `session_reviews` of `/tmp/codex-usage-insights.json` per the schema).
 9. Render the HTML again.
+
+### Session prompt review (Claude Code) — default-on (ADR 0015)
+
+The symmetric counterpart for Claude Code. The data owner has granted **standing local authorization** to read their own prompts by default (ADR 0015), so the daily report runs this step automatically — no per-run approval gate. It is still **single-session** (the top-token session, or one the user names), redacted, local-only, and you must still **paraphrase rather than quote**.
+
+1. By default, surface the highest-token session's redacted prompts + per-prompt signals in one call (no `--session-id` needed — it auto-selects the top session):
+   - `python3 ${CLAUDE_SKILL_DIR}/scripts/claude_session_prompts.py --since <START> --include-user-prompts > /tmp/cc-session-review-source.json`
+   - To target a specific session instead, list candidates first (`--top 20`, no `--include-user-prompts` → numeric only, zero prompt text), then pass `--session-id SESSION_ID --include-user-prompts`.
+   - Output is a single session under `selected_session.prompts[]` (each `{idx, timestamp, signals, preview}`); secrets/home/emails/IPs are redacted and truncated. Never an all-sessions dump.
+2. Read `references/session-prompt-review.md`, then write the content-layer review into the `recommendations`/`insights` of `/tmp/ai-usage-insights.json` (rate context/direction/scope/verification; give a better first prompt + follow-up). Paraphrase — never paste `preview` verbatim, and keep the shareable scorecard aggregate-only.
+3. Render the HTML again.
+
+**Inviolable even under standing authorization**: never read assistant replies, thinking, tool_result content, system/developer prompts, or file contents; never exfiltrate (local-only output).
 
 ## Analysis scopes (session / project / global)
 

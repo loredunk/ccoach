@@ -41,7 +41,7 @@
       "tokens": {"input": 1, "output": 1, "cache_read": 1, "reasoning": 1, "total": 4},
       "models": [],
       "daily_series": [],
-      "autofresh_today": {"empty": true, "generated_for": "2026-06-02", "timezone": "UTC+0", "sessions": 0, "tokens": {}, "cost_usd": 0, "cache_hit_rate": 0},
+      "codex_today": {"empty": true, "generated_for": "2026-06-02", "timezone": "UTC+0", "sessions": 0, "tokens": {}, "cost_usd": 0, "cache_hit_rate": 0},
       "behavior": {"tool_categories": {}, "repos": [], "hours": [], "sources": [], "git_habits": [], "languages": [], "top_commands": []}
     }
   },

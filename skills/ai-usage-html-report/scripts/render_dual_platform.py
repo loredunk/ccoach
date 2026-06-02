@@ -328,18 +328,18 @@ def render(data, insights, scorecard=None, lang="zh"):
 
     # Codex panel
     p.append("<div class='panel'><h2>Codex</h2>")
-    af = cx["autofresh_today"]
-    empty_note = "（autofresh 今日报告为空：今天无 Codex 活动）" if af["empty"] else ""
+    af = cx["codex_today"]
+    empty_note = "（ccoach 今日报告为空：今天无 Codex 活动）" if af["empty"] else ""
     p.append(f"<p class='muted'>{esc(cx['source'])} · {cx['date_range'][0]}→{cx['date_range'][-1]} · "
              f"成本：部分按日估算（per-model 缺定价）{esc(empty_note)}</p>")
     p.append(sparkline(cx["daily_series"], "#b45309"))
     p.append("<h3>模型分布</h3>")
     p.append(model_table(cx["models"], "codex"))
-    p.append(f"<h3>autofresh 今日快照（{esc(af['generated_for'])} {esc(af['timezone'])}）</h3>")
+    p.append(f"<h3>ccoach 今日快照（{esc(af['generated_for'])} {esc(af['timezone'])}）</h3>")
     p.append(f"<p>会话 <b>{af['sessions']}</b> · token <b>{comma(af['tokens'].get('total', 0))}</b> · "
              f"成本 <b>{money(af['cost_usd'])}</b> · 缓存命中 <b>{pct(af['cache_hit_rate'])}</b></p>")
     if af["empty"]:
-        p.append("<p class='muted'>说明：autofresh <code>report --json</code> 只统计当天；"
+        p.append("<p class='muted'>说明：ccoach <code>report --json</code> 只统计当天；"
                  "今天无 Codex 会话，故快照为 0。历史 Codex 数据由 ccusage codex 提供（上方）。</p>")
     p.append("</div>")
     p.append("</section>")
@@ -372,11 +372,13 @@ def render(data, insights, scorecard=None, lang="zh"):
     p.append("<section class='panel'><h2>数据来源与隐私</h2><ul>")
     p.append("<li>Claude Code：<code>ccusage claude daily/session --json --offline --breakdown</code>，"
              "成本由 ccusage 内置 LiteLLM 定价离线计算（真实）。</li>")
-    p.append("<li>Codex：<code>autofresh report --json</code>（当天快照）+ "
+    p.append("<li>Codex：<code>ccoach report --json</code>（当天快照）+ "
              "<code>ccusage codex daily --json --offline</code>（历史）。Codex 成本为按日估算，"
              "ccusage 对 Codex per-model 不输出 costUSD。</li>")
-    p.append("<li>隐私：仅读取聚合 token/成本/模型名/项目目录名；不嵌入任何 prompt 原文、对话内容或密钥。"
-             "ccusage 离线模式不联网、不上传。</li>")
+    p.append("<li>隐私：用量为聚合 token/成本/模型名/项目目录名。<b>会读取你本人的 user prompt</b> "
+             "用于习惯与质量评级（本机长期授权）——但读取前一律<b>脱敏</b>（密钥/home 目录/绝对路径/邮箱/IP）"
+             "并截断，报告只写<b>转述与数值信号、不嵌入 prompt 原文</b>；可分享成绩卡纯聚合、零原文。"
+             "绝不读取助手回复 / 思考 / 工具结果 / system 提示 / 文件内容。全程本地，ccusage 离线不联网、不上传。</li>")
     p.append("</ul></section>")
 
     p.append("</main></body></html>")

@@ -34,7 +34,7 @@
   「用量 + prompt + 习惯」。差异化价值在**习惯分析 / prompt 评级 / 人格化吐槽 / feature-first 建议**。
 - 分平台适配器 `claude-code` / `codex` → **统一数据结构**；上层评级/HTML 只认统一结构，加新平台只写一个适配器。
 - **ccusage 仅作交叉验证**（对答案）：token/成本跟 `npx ccusage` 对一下，用它验证、不依赖它运行。
-- 抓 prompt 严守隐私边界（需批准才读、不读 system/assistant，见下「隐私护栏」）。
+- 抓 prompt 严守隐私边界（本人 prompt 默认读、长期授权，红线见 ADR 0015；不读 system/assistant，见下「隐私护栏」）。
 - 选型：`cac`/`citty`（轻量 CLI）、`tsdown`/`unbuild`（小 bundle）。Node 天然跨平台，无需二进制矩阵。
 - **保持 `ccoach --json` 契约不变**，skill 侧无感切换；Go 版留作参考实现，稳定后退役。
 
@@ -65,6 +65,8 @@
 ## 隐私护栏（不可违反）
 
 - 全程**只读**、默认不外发；分析只基于 **user prompt + permission + tool 调用**，**绝不读 assistant 回复**。
-- user prompt 仅在会话 / 项目层、**转述 + 脱敏**后使用；全局层纯聚合、零 prompt 原文。
+- **本人 prompt 长期授权、默认读**（ADR 0015）：报告默认读取并评级用户自己的 prompt，不再每次弹授权门；
+  但**红线不放宽**——绝不读 assistant/thinking/tool_result/system·developer prompt/文件内容、绝不外发、写入前一律脱敏+截断。
+- user prompt 仅在会话 / 项目层、**转述 + 脱敏**后使用；全局层 / 可分享成绩卡纯聚合、零 prompt 原文。
 - **不输出配额百分比**（CLI 下 `rate_limits` 恒 null，配额是账号级 / 跨机器）；成本为**估算值**，非实际账单。
 - 只反映**本机**，不跨机器汇总。
