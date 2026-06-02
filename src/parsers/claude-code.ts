@@ -44,6 +44,10 @@ function userText(message: any): string {
 
 export function parseClaudeCode(dir: string, window: Window): Report {
   const agg = new Aggregator('claude-code')
+  // 跨文件去重（对齐 ccusage）：会话 resume/fork 会把同一条消息复制进多个 JSONL，
+  // 不去重会把用量成倍高估。assistant 用 message.id:requestId，其它用 uuid 作稳定标识。
+  // 复制条目时间戳一致，故"先去重再过滤窗口"不会误伤跨窗口的同一消息。
+  const seen = new Set<string>()
   for (const file of walkJsonl(dir)) {
     agg.resetActive() // 每个文件独立计活跃时长，避免跨文件桥接
     let content: string
@@ -53,20 +57,38 @@ export function parseClaudeCode(dir: string, window: Window): Report {
       if (!trimmed) continue
       let rec: any
       try { rec = JSON.parse(trimmed) } catch { continue }
-      if (rec?.isSidechain === true) continue
+
+      const msgId = rec?.message?.id
+      const dedupKey =
+        typeof msgId === 'string' && msgId !== ''
+          ? `${msgId}:${rec?.requestId ?? ''}`
+          : typeof rec?.uuid === 'string' && rec.uuid !== ''
+            ? rec.uuid
+            : null
+      if (dedupKey !== null) {
+        if (seen.has(dedupKey)) continue
+        seen.add(dedupKey)
+      }
+
       const tsRaw = rec?.timestamp
       if (typeof tsRaw !== 'string') continue
       const ts = new Date(tsRaw)
       if (Number.isNaN(ts.getTime())) continue
       if (!inLocalRange(ts, window)) continue
+
+      const sidechain = rec?.isSidechain === true
       const session = typeof rec.sessionId === 'string' ? rec.sessionId : ''
       const repo = repoName(typeof rec.cwd === 'string' ? rec.cwd : '')
       const branch = typeof rec.gitBranch === 'string' ? rec.gitBranch : undefined
 
       if (rec.type === 'user') {
-        agg.touchSession(session)
-        const text = userText(rec.message)
-        if (text) agg.applyPrompt(text)
+        // prompt 信号只反映"人类本人"的 prompt：sidechain（子代理）user 文本是 agent 生成的
+        // 任务描述、非人类输入，排除。
+        if (!sidechain) {
+          agg.touchSession(session)
+          const text = userText(rec.message)
+          if (text) agg.applyPrompt(text)
+        }
       } else if (rec.type === 'assistant') {
         const msg = rec.message ?? {}
         const usage = msg.usage ?? {}
@@ -79,21 +101,27 @@ export function parseClaudeCode(dir: string, window: Window): Report {
           cache_creation: cacheCreation, total: input + output + cachedInput + cacheCreation,
         }
         const model = typeof msg.model === 'string' ? msg.model : ''
-        agg.touchSession(session)
-        agg.applyTokens(tokens, model, repo, session, ts, branch)
+        // 用量/成本计入全部（含 sidechain 子代理），与 ccusage 一致；sidechain 不计入会话数，
+        // 故 session 传空避免污染按仓库会话数。
+        agg.applyTokens(tokens, model, repo, sidechain ? '' : session, ts, branch)
         agg.markActive(ts)
-        const blocks = Array.isArray(msg.content) ? msg.content : []
-        for (const b of blocks) {
-          if (!b || b.type !== 'tool_use') continue
-          const name = b.name
-          const inp = b.input ?? {}
-          if (name === 'Bash') {
-            agg.applyTool('shell', typeof inp.command === 'string' ? inp.command : undefined)
-          } else if (name === 'WebFetch' || name === 'WebSearch') {
-            agg.applyTool('web')
-          } else if (name === 'Edit' || name === 'Write' || name === 'Read' || name === 'NotebookEdit') {
-            agg.applyTool('file')
-            agg.applyFileChangeExt(repo, extOf(typeof inp.file_path === 'string' ? inp.file_path : ''))
+        if (!sidechain) {
+          // 工具/git 习惯只反映主会话（用户驱动）：子代理内部工具调用不计入"用户习惯"，
+          // 也避免泄露子代理命令。
+          agg.touchSession(session)
+          const blocks = Array.isArray(msg.content) ? msg.content : []
+          for (const b of blocks) {
+            if (!b || b.type !== 'tool_use') continue
+            const name = b.name
+            const inp = b.input ?? {}
+            if (name === 'Bash') {
+              agg.applyTool('shell', typeof inp.command === 'string' ? inp.command : undefined)
+            } else if (name === 'WebFetch' || name === 'WebSearch') {
+              agg.applyTool('web')
+            } else if (name === 'Edit' || name === 'Write' || name === 'Read' || name === 'NotebookEdit') {
+              agg.applyTool('file')
+              agg.applyFileChangeExt(repo, extOf(typeof inp.file_path === 'string' ? inp.file_path : ''))
+            }
           }
         }
       }
