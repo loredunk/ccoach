@@ -1,0 +1,28 @@
+// test/emit.test.ts
+import { describe, it, expect } from 'vitest'
+import { emitJson } from '../src/emit/json.js'
+import { emitText } from '../src/emit/text.js'
+import { Aggregator } from '../src/aggregate.js'
+
+function sample() {
+  const agg = new Aggregator('claude-code')
+  agg.applyTokens({ input: 100, cached_input: 40, output: 50, reasoning_output: 0,
+    cache_creation: 10, total: 200 }, 'claude-opus-4-8', 'ccoach', 's1', new Date('2026-06-02T03:00:00Z'))
+  agg.touchSession('s1')
+  return agg.assemble({ fromYmd: '2026-06-02', toYmd: '2026-06-02', desc: '2026-06-02' }, 'glob')
+}
+
+describe('emit', () => {
+  it('JSON 含 glossary 与 rate_limits:null，可解析', () => {
+    const out = emitJson(sample())
+    const parsed = JSON.parse(out)
+    expect(parsed.rate_limits).toBeNull()
+    expect(parsed.glossary._about).toContain('仅本机')
+    expect(parsed.tokens.total).toBe(200)
+  })
+  it('文本含 token 行与“仅本机”声明', () => {
+    const out = emitText(sample(), false)
+    expect(out).toContain('仅本机')
+    expect(out).toContain('total')
+  })
+})
