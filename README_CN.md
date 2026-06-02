@@ -2,16 +2,17 @@
 
 <p align="center"><a href="README.md">English README</a></p>
 
-> 本机 AI 用量教练（macOS / Linux）。只读分析你在 **Codex / Claude Code** 上的用量，
+> 本机 AI 用量教练（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
 > 告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。
+> 两个平台是对称的一等公民（不是只给 Codex 用的工具），未来还会扩展到 OpenClaw、Harness 等其它 Agent CLI。
 >
 > 本项目原名 **autofresh**（Codex/Claude 保活工具），已剥离保活、聚焦用量分析与建议，
 > 更名为 **ccoach**。设计与决策见 [`docs/`](docs/)（PRD / ADR / TODO）。
 
 ## 它能做什么
 
-- **用量报告**：只读本机 `~/.codex` rollout，输出 Token、估算成本、工具调用、按仓库 / 时段 /
-  来源 / 语言 / git 习惯 / 配置扫描的统计。纯只读，不改任何东西。
+- **用量报告**：只读本机 **Claude Code / Codex** 记录，输出 Token、估算成本、工具调用、按仓库 /
+  时段 / 来源 / 语言 / git 习惯 / 配置扫描的统计。纯只读，不改任何东西。
 - **使用建议**（skill）：教 Claude Code / Codex 解读这些数据，给出**特性优先**的建议——
   凡能用产品原生特性（CLAUDE.md/AGENTS.md、subagents、hooks、plan mode、permission 设置、
   模型/effort 档位…）解决的，就点名特性去解决。支持**会话 / 项目 / 全局**三层分析。

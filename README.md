@@ -2,16 +2,17 @@
 
 <p align="center"><a href="README_CN.md">中文 README</a></p>
 
-> A local AI usage coach (macOS / Linux). Read-only analysis of how you use **Codex / Claude Code** —
+> A local AI usage coach (macOS / Linux). Read-only analysis of how you use **Claude Code / Codex** —
 > where your tokens go, what's wasted, and how to use the tools better — turned into a **shareable scorecard**.
+> Both platforms are first-class and symmetric (not a Codex-only tool); more agent CLIs (OpenClaw, Harness, …) are planned.
 >
 > Formerly **autofresh** (a Codex/Claude keep-alive tool). Keep-alive has been removed; the project now
 > focuses on usage analysis and advice, and is renamed **ccoach**. Design & decisions live in [`docs/`](docs/).
 
 ## What it does
 
-- **Usage report**: read-only parse of local `~/.codex` rollouts — tokens, estimated cost, tool calls,
-  and breakdowns by repo / hour / source / language / git habits / config scan. Read-only; changes nothing.
+- **Usage report**: read-only parse of your local **Claude Code / Codex** records — tokens, estimated cost,
+  tool calls, and breakdowns by repo / hour / source / language / git habits / config scan. Read-only; changes nothing.
 - **Advice** (skill): teaches Claude Code / Codex to interpret this data and give **feature-first** advice —
   whenever a finding can be solved with a native feature (CLAUDE.md/AGENTS.md, subagents, hooks, plan mode,
   permission settings, model/effort tiers…), it names the feature. Supports **session / project / global** scopes.

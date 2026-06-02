@@ -9,8 +9,12 @@
 
 ## 1. 产品定位
 
-ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只读分析你在 Claude Code / Codex
+ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只读分析你在 **Claude Code / Codex**
 上的用量，告诉你**花在哪、哪里浪费、怎么用得更好**，并以**可分享的成绩卡**把结果变成社交货币。
+
+> **双平台对称、可扩展**：Codex 与 Claude Code 是**对称的一等数据源**（不是只给 Codex 用的工具），
+> 未来扩展到 **OpenClaw / Harness** 等其它 Agent CLI。架构上分「平台数据源适配器 + 平台无关的分析层」，
+> 见 [ADR 0011](adr/0011-multi-platform-usage-sources.md)。
 
 1. **用量分析（已上线）**：只读本机记录，输出 Token、成本、工具调用、仓库 / 时段 / 语言 /
    git 习惯 / 配置扫描等。
@@ -38,6 +42,12 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 [`habits.go`](../internal/codexreport/habits.go) / [`language.go`](../internal/codexreport/language.go) /
 [`configscan.go`](../internal/codexreport/configscan.go) 产出），是 AI 分析能力的天然数据底座。
 本次增强是在**已上线的 `ai-usage-html-report` skill** 之上演进，而非从零新建。
+
+> **技术栈演进（规划中）**：当前 CLI 是 Go、且数据侧偏 Codex（只解析 `~/.codex`），Claude Code
+> 侧目前在 skill 里经 ccusage 取数。规划将 CLI **迁移到 Node/TypeScript 并构建在 ccusage 之上**
+> （[ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)），届时 **Codex 与 Claude Code 在 CLI 内对称
+> 成为一等数据源**（[ADR 0011](adr/0011-multi-platform-usage-sources.md)）。迁移**保持 `--json`
+> 契约不变**，skill 侧无感切换；上述 Go 实现作为参考实现，交叉验证后退役。
 
 ### 现状边界（PRD 需尊重的约束）
 
@@ -210,17 +220,19 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 ### 5.2 方案
 
-- **单仓库、两包**：`ccoach`（CLI，包装 Go 二进制）+ `@ccoach/skills`（skills 内容）。
-- **CLI 二进制**走「平台专属 optionalDependencies」分发（esbuild 式），对 `npx` 友好、可复现、
-  无 postinstall 联网风险。
+> 随 [ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)（CLI 迁移到 Node/TS）调整：CLI 是**普通
+> Node 包**，不再是「包装 Go 二进制」。ADR 0003 D2 的「平台专属 optionalDependencies 二进制矩阵」
+> **作废**——Node 包天然跨平台，分发大幅简化。
+
+- **单仓库、两包**：`ccoach`（CLI，纯 Node 包）+ `@ccoach/skills`（skills 内容）。
+- **CLI 走普通 npm 发布**：`npx ccoach` 即用，无预编译二进制矩阵、无 postinstall 联网下载。
 - **skills 安装便捷化**：除 `npm i @ccoach/skills` 外，提供 `ccoach skills install`
   把 skills 落到 Claude Code / Codex 的 skills 目录。
 
 ### 5.3 验收标准
 
-- [ ] `npx ccoach` 可在不预装的情况下直接跑通（当前平台）。
+- [ ] `npx ccoach` 可在不预装的情况下直接跑通（跨平台，普通 Node 包）。
 - [ ] `npm i -g ccoach` 后全局可用 `ccoach`。
 - [ ] skills 可经 `npm i @ccoach/skills` 或 `ccoach skills install` 两条路径安装。
-- [ ] npm 上的二进制与仓库 CI 同一次构建一致、可校验。
-- [ ] README / README_EN 增补 npm 安装方式（保留二进制下载为备选）。
+- [ ] README / README_CN 安装段简化为 `npx ccoach` 一行。
 </content>

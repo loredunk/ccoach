@@ -52,19 +52,40 @@
 
 ---
 
+## T8 · CLI 迁移到 Node/TypeScript（P0）— ☐ 规划中
+
+> 决策：[`adr/0010-cli-rewrite-node-ccusage.md`](adr/0010-cli-rewrite-node-ccusage.md)（已接受，待实现）。
+> 渐进迁移、保持 `--json` 契约不变、Go 版留作参考实现交叉验证。
+
+- [ ] 搭 TS 项目骨架：`cac`/`citty`（轻量 CLI）+ `tsdown`/`unbuild`（小 bundle）。
+- [ ] 跑通核心数据流：读 `~/.codex` rollout（或调 `@ccusage/codex`）→ 结构化用量 → `--json`。
+- [ ] **对齐 Go 版 `--json`**：同一份数据交叉验证两版结果一致，确保解析不退化（ADR 0010 D5）。
+- [ ] 习惯分析 / 配置扫描 / 语言识别（原 `habits.go`/`configscan.go`/`language.go`）的 TS 等价实现 + 测试（ADR 0010 OQ3）。
+- [ ] Node 版稳定后退役 Go 版（删 `cmd/ccoach`、`internal/codexreport`）。
+
+## T9 · 衔接 ccusage + 双平台一等数据源（P0）— ☐ 规划中
+
+> 决策：[`adr/0010`](adr/0010-cli-rewrite-node-ccusage.md)（中等偏轻）/ [`adr/0011`](adr/0011-multi-platform-usage-sources.md)（多平台）。
+
+- [ ] 引入 ccusage 依赖：`@ccusage/codex`（Codex）+ `ccusage`（Claude Code），调 API 拿结构化用量（中等）。
+- [ ] 确认 `@ccusage/codex` 覆盖既有 Codex JSONL 边界 case，不足处由 ccoach 适配层补（ADR 0010 OQ2）。
+- [ ] 定「平台数据源适配器 + 平台无关分析层」分层；定**统一用量模型**最小公共字段（ADR 0011 D2 / OQ1）。
+- [ ] **Claude Code 在 CLI 内升为一等数据源**（与 Codex 对称，不再只在 skill 侧取数）。
+- [ ]（未来）调研并接入 OpenClaw / Harness 等其它 Agent CLI（ADR 0011 D3 / OQ2）。
+
 ## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）
 
-> 决策：[`adr/0003-npm-distribution.md`](adr/0003-npm-distribution.md)（提议中）。
-> 沙箱无法真正 `npm publish` / `npx` 端到端验证；待提供 npm 凭证与包名归属后落地。
+> 决策：[`adr/0003-npm-distribution.md`](adr/0003-npm-distribution.md)。
+> **随 [ADR 0010](adr/0010-cli-rewrite-node-ccusage.md) 简化**：CLI 是普通 Node 包，原「Go 二进制
+> 平台子包矩阵」（旧 T4.2）作废。沙箱无法真正 `npm publish` / `npx` 端到端验证；待 npm 凭证与包名归属后落地。
 
 ### T4.1 仓库结构
 - [ ] 落地 monorepo：`packages/cli/`（`ccoach`）+ `packages/skills/`（`@ccoach/skills`），npm workspaces。
 - [ ] 终定包名 / scope（ADR 0003 OQ1）。
 
-### T4.2 CLI 二进制分发
-- [ ] CLI 主包 `bin` 薄包装：运行时解析并 exec 对应平台二进制。
-- [ ] 平台专属子包 + `optionalDependencies` + `os`/`cpu`（esbuild 式），定平台矩阵（ADR 0003 OQ2）。
-- [ ] CI 跨平台构建 Go 二进制并发布各平台子包；npm 与 Release 同源、带 checksum（ADR 0003 D4）。
+### T4.2 CLI 发布（普通 Node 包）
+- [ ] CLI 作为普通 npm 包发布，`npx ccoach` 跨平台即用（无二进制矩阵、无 postinstall 下载）。
+- [ ] CI：build + test + 发布；版本与仓库同源。
 
 ### T4.3 skills 安装
 - [ ] `@ccoach/skills` 可直接 `npm i` 安装。
