@@ -6,6 +6,7 @@ import { type Window, localYmd } from './window.js'
 import { estimateCost, normalizeModel } from './pricing.js'
 import { firstToken, gitSubcommand } from './text.js'
 import { buildGitHabits, buildProjectMgmt, topCounts, type RepoFacts } from './habits.js'
+import { dominantLanguage } from './language.js'
 import { newPromptAcc, promptAccUpdate, promptSignals, type PromptAcc } from './prompt-signals.js'
 
 const IDLE_CAP_MS = 5 * 60 * 1000
@@ -176,6 +177,8 @@ export class Aggregator {
       const branches = [...r.branches].filter(Boolean).sort()
       const rep: RepoReport = { repo: r.repo, sessions: r.sessions.size, tokens: r.tokens, estimated_cost_usd: r.cost }
       if (branches.length) rep.branches = branches
+      const lang = dominantLanguage(r.fileTypes)
+      if (lang) rep.language = lang
       repos.push(rep)
       repoFacts.push({ hasTests: r.hasTests, hasBuild: r.hasBuild, hasCI: r.hasCI })
       for (const b of r.branches) branchSet.add(r.repo + '@' + b)
