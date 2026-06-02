@@ -1,0 +1,27 @@
+{
+  "name": "@loredunk/ccoach",
+  "version": "0.1.0",
+  "description": "本机 AI 用量教练：只读分析 Claude Code / Codex 用量与习惯",
+  "type": "module",
+  "bin": { "ccoach": "./dist/cli.js" },
+  "files": ["dist"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "verify:ccusage": "tsx scripts/verify-ccusage.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsdown": "^0.9",
+    "tsx": "^4",
+    "typescript": "^5.6",
+    "vitest": "^2"
+  },
+  "dependencies": {
+    "cac": "^6.7.14"
+  }
+}
