@@ -70,6 +70,15 @@ export function emitText(r: Report, byRepo: boolean): string {
     lines.push('')
   }
 
+  const es = r.error_signals
+  if (es.tool_calls > 0 || es.interrupted > 0 || es.api_errors > 0) {
+    lines.push('错误 / 卡顿')
+    lines.push(`  工具失败 ${es.tool_errors}/${es.tool_calls} (${(es.error_rate * 100).toFixed(1)}%) · 中断 ${es.interrupted} · API 错误 ${es.api_errors}`)
+    if (es.by_category?.length) lines.push('  按类别: ' + es.by_category.map((c) => `${c.command}(${c.count})`).join(' '))
+    if (es.by_tool?.length) lines.push('  按工具: ' + es.by_tool.map((c) => `${c.command}(${c.count})`).join(' '))
+    lines.push('')
+  }
+
   lines.push('习惯')
   lines.push(`  Git 命令 ${r.git_habits.command_count} 次 · 分支上下文 ${r.git_habits.branch_count} 个 · 多分支仓库 ${r.git_habits.multi_branch_repos} 个`)
   if (r.project_management.signals?.length) lines.push(`  项目管理: ${r.project_management.signals.join('；')}`)

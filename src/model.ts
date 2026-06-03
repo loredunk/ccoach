@@ -41,6 +41,16 @@ export interface ProjectMgmtReport {
   repos_with_tests: number; repos_with_build_system: number; repos_with_ci: number
   signals?: string[]
 }
+// 错误/卡顿信号——只由工具结果派生的数值与白名单类别，绝不含原始 stderr/输出/文件内容（ADR 0016）。
+export interface ErrorSignals {
+  tool_calls: number            // 观测到的 tool_result 总数（分母）
+  tool_errors: number           // is_error 的工具结果数
+  error_rate: number            // tool_errors / tool_calls
+  interrupted: number           // 被中断/取消的工具调用（Esc / 超时）
+  api_errors: number            // API/网络/限流报错（isApiErrorMessage）
+  by_tool?: CommandCount[]       // 失败按工具（top）
+  by_category?: CommandCount[]   // 失败按白名单类别（git/test/build/permission/network/timeout/not-read/other）
+}
 export interface Report {
   generated_for: string
   timezone: string
@@ -64,6 +74,7 @@ export interface Report {
   git_habits: GitHabitsReport
   project_management: ProjectMgmtReport
   prompt_signals: PromptSignals
+  error_signals: ErrorSignals
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
   glossary?: Record<string, string>
 }
@@ -76,6 +87,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   models_timeline: '每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token；用于时间感知判断：某旧模型占大头若只因新模型当时还没出现，不应判为浪费。',
   tokens: 'input/cached_input/output/reasoning_output/cache_creation/total；cached_input 是 input 的子集。',
   prompt_signals: '仅由 user prompt 派生的数值信号（长度/结构化率/文件引用率/约束率/返工率），不含任何原文。',
+  error_signals: '工具失败率/中断数/API错误，及失败按工具与按白名单类别（git/test/build/permission/network/timeout/not-read/other）。仅由工具结果派生计数+类别，绝不含原始 stderr/输出/文件内容/命令全行（隐私红线细化，ADR 0016）。',
   git_habits: 'git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。',
   project_management: '各仓库是否有测试/构建/CI 信号。',
   duration: '活跃时长（相邻事件间隔 ≤5 分钟才计入），非墙钟跨度。',

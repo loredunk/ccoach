@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { Aggregator } from '../aggregate.js'
 import { inLocalRange, type Window } from '../window.js'
 import { repoName, extOf } from '../text.js'
+import { classifyError } from '../errors.js'
 import { type Tokens, type Report } from '../model.js'
 
 // $CLAUDE_CONFIG_DIR/projects 或 ~/.claude/projects
@@ -54,7 +55,24 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
   // 跨文件去重（对齐 ccusage）：会话 resume/fork 会把同一条消息复制进多个 JSONL，不去重会把
   // 用量成倍高估。assistant 用 message.id:requestId、其它用 uuid 作稳定标识。
   const seen = new Set<string>()
-  for (const file of walkJsonl(dir)) {
+  const files = walkJsonl(dir)
+  // 预扫描建 tool_use_id -> 工具名 全量表：resume/fork 可能把 user 的 tool_result 排到其
+  // assistant tool_use 之前（文件按 uuid 排序、非时间序），单遍按序查会查不到，故先建全量映射。
+  const toolUseNames = new Map<string, string>()
+  for (const file of files) {
+    let pre: string
+    try { pre = readFileSync(file, 'utf8') } catch { continue }
+    for (const line of pre.split('\n')) {
+      const t = line.trim()
+      if (!t) continue
+      let rec: any
+      try { rec = JSON.parse(t) } catch { continue }
+      if (rec?.type !== 'assistant') continue
+      const blocks = Array.isArray(rec.message?.content) ? rec.message.content : []
+      for (const b of blocks) if (b && b.type === 'tool_use' && typeof b.id === 'string') toolUseNames.set(b.id, b.name)
+    }
+  }
+  for (const file of files) {
     agg.resetActive() // 每个文件独立计活跃时长，避免跨文件桥接
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
@@ -89,6 +107,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       const repo = repoName(typeof rec.cwd === 'string' ? rec.cwd : '')
       const branch = typeof rec.gitBranch === 'string' ? rec.gitBranch : undefined
 
+      // API/网络/限流报错：仅主会话计入（错误信号反映用户的工作环境）。
+      if (rec.isApiErrorMessage === true && !sidechain) agg.applyApiError()
+
       if (rec.type === 'user') {
         // prompt 信号只反映"人类本人"的 prompt：sidechain（子代理）user 文本是 agent 生成的
         // 任务描述、非人类输入，排除。
@@ -96,6 +117,28 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
           agg.touchSession(session)
           const text = userText(rec.message)
           if (text) agg.applyPrompt(text)
+          // 错误/卡顿信号：扫描 tool_result（is_error）+ toolUseResult.interrupted。
+          // 隐私：错误文本只**瞬时**分类成白名单类别标签，绝不存原始 stderr/输出。
+          const blocks = Array.isArray(rec.message?.content) ? rec.message.content : []
+          for (const b of blocks) {
+            if (!b || b.type !== 'tool_result') continue
+            const toolName =
+              (typeof b.tool_use_id === 'string' ? toolUseNames.get(b.tool_use_id) : undefined) ?? '(unknown)'
+            const isError = b.is_error === true
+            let category: string | null = null
+            if (isError) {
+              const txt =
+                typeof b.content === 'string'
+                  ? b.content
+                  : Array.isArray(b.content)
+                    ? b.content.map((c: any) => (c && typeof c.text === 'string' ? c.text : '')).join(' ')
+                    : ''
+              category = classifyError(txt)
+            }
+            agg.applyToolResult(toolName, isError, category)
+          }
+          const tur = rec.toolUseResult
+          if (tur && typeof tur === 'object' && tur.interrupted === true) agg.markInterrupted()
         }
       } else if (rec.type === 'assistant') {
         const msg = rec.message ?? {}

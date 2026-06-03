@@ -1,5 +1,5 @@
 import {
-  type Tokens, type Report, type RepoReport, type UsageReport,
+  type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
   type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
 import { type Window, localYmd } from './window.js'
@@ -50,6 +50,13 @@ export class Aggregator {
   private modelsSeen = new Set<string>()
   private missingPrice = new Set<string>()
   private promptAcc: PromptAcc = newPromptAcc()
+  // 错误/卡顿信号（只存派生计数与类别，绝不存原始输出）
+  private errToolResults = 0
+  private errToolErrors = 0
+  private errInterrupted = 0
+  private errApiErrors = 0
+  private errByTool = new Map<string, number>()
+  private errByCategory = new Map<string, number>()
 
   constructor(platform: string) {
     this.platform = platform
@@ -147,6 +154,20 @@ export class Aggregator {
   }
 
   applyPrompt(text: string): void { promptAccUpdate(this.promptAcc, text) }
+
+  // 工具结果（错误/卡顿信号）：category 已由适配器瞬时分类成白名单标签，聚合器只存计数、不见原文。
+  applyToolResult(toolName: string, isError: boolean, category: string | null): void {
+    this.errToolResults++
+    if (isError) {
+      this.errToolErrors++
+      const tn = toolName || '(unknown)'
+      this.errByTool.set(tn, (this.errByTool.get(tn) ?? 0) + 1)
+      if (category) this.errByCategory.set(category, (this.errByCategory.get(category) ?? 0) + 1)
+    }
+  }
+  markInterrupted(): void { this.errInterrupted++ }
+  applyApiError(): void { this.errApiErrors++ }
+
   touchSession(id: string): void { if (id) this.sessionIds.add(id) }
 
   markActive(ts: Date): void {
@@ -191,6 +212,20 @@ export class Aggregator {
     const gitRecord: Record<string, number> = {}
     for (const [k, v] of this.gitCommands) gitRecord[k] = v
 
+    const errToolRec: Record<string, number> = {}
+    for (const [k, v] of this.errByTool) errToolRec[k] = v
+    const errCatRec: Record<string, number> = {}
+    for (const [k, v] of this.errByCategory) errCatRec[k] = v
+    const errorSignals: ErrorSignals = {
+      tool_calls: this.errToolResults,
+      tool_errors: this.errToolErrors,
+      error_rate: this.errToolResults > 0 ? Math.round((this.errToolErrors / this.errToolResults) * 1e4) / 1e4 : 0,
+      interrupted: this.errInterrupted,
+      api_errors: this.errApiErrors,
+    }
+    if (this.errByTool.size) errorSignals.by_tool = topCounts(errToolRec, 8)
+    if (this.errByCategory.size) errorSignals.by_category = topCounts(errCatRec, 8)
+
     const report: Report = {
       generated_for: window.desc,
       timezone: localTimezone(),
@@ -218,6 +253,7 @@ export class Aggregator {
       git_habits: buildGitHabits(gitRecord, branchSet.size, multiBranchRepos),
       project_management: buildProjectMgmt(repoFacts),
       prompt_signals: promptSignals(this.promptAcc),
+      error_signals: errorSignals,
       rate_limits: null,
       glossary: REPORT_GLOSSARY,
     }
