@@ -1,6 +1,6 @@
 # Dual-Platform Insights JSON Schema
 
-This is the insights file consumed by `scripts/render_dual_platform.py` (the
+This is the insights file consumed by `scripts/render_dual_platform.mjs` (the
 **dual-platform** Claude Code + Codex report). It is different from the
 Codex-only `insights-schema.md`: the dual renderer already builds the
 comparison cards, model tables, token-composition bars, and active-hours chart

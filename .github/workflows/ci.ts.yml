@@ -14,6 +14,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm test # vitest（含 scorecard 回归：四轴/本地化/估算/不泄配额%·密钥）
       - run: npm run build
+      - run: node tools/check_adrs.mjs # docs lint：ADR 编号/状态 + 相对链接（原 tools/check_adrs.py）
       - run: npm run verify:ccusage # 在线时强校验（token 严等 / 成本 1% 容差）；无数据/离线则 SKIP

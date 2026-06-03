@@ -23,7 +23,7 @@ docs** (these tools change fast). Only suggest — never auto-change the user's 
 | 多花在旧版模型上 | 某旧模型占用量大头、新模型份额小 | ⚠️**先看时间线**：若新模型只是近几天才出现（per-day per-model），旧模型花费是发布时机所致、**不是浪费**，**不要**建议「回溯固定到新模型」。仅当新模型在窗口内确实可用时，才建议**今后**默认用更新的模型（先 web 核对发布日期）。见 `insight-patterns.md`「Model Version Distribution」 |
 
 > 该表为代表性映射，非穷举；随官方特性演进维护。计分卡的「Prompt 功力」轴正是基于
-> `prompt_signals` 的这些数值（见 `scripts/scorecard.py`）。
+> `prompt_signals` 的这些数值（见 `scripts/scorecard.mjs`）。
 >
 > **时间感知**：用量是历史数据，任何「模型版本」类结论都必须考虑**模型可用时间**——
 > 不能把「新模型出现前用旧模型」当问题。详见 `insight-patterns.md` 的时间感知规则。

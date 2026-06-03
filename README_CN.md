@@ -39,7 +39,7 @@ node dist/cli.js --json --days 7
 # 或 `npm link`，之后 `ccoach` 即在 PATH 中
 ```
 
-> 原 Go 实现保留在仓库内（`cmd/`、`internal/`）作行为基准，TS CLI 稳定后退役（见 [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)）。
+> 原 Go 实现（`cmd/`、`internal/`）已退役并移除——重写期间它作行为基准；TS CLI 现直接以 ccusage 交叉验证（见 [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)）。
 
 ## 用法
 

@@ -37,20 +37,19 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 | 双平台 AI 使用报告 skill | `skills/ai-usage-html-report/` | 已上线：用 ccusage + `ccoach report --json` 数据，产出 Claude Code + Codex 双平台 HTML 报告、行为画像，并支持 Codex 高耗会话钻取 |
 
 `ccoach --json` 已经是「脚本友好」的结构化输出（见
-[`internal/codexreport/report.go`](../internal/codexreport/report.go) 的 `Report` 结构体，
-已含 `Repos / Hours / Sources / Languages / Git / Project / Codex` 等行为维度，由
-[`habits.go`](../internal/codexreport/habits.go) / [`language.go`](../internal/codexreport/language.go) /
-[`configscan.go`](../internal/codexreport/configscan.go) 产出），是 AI 分析能力的天然数据底座。
+[`src/model.ts`](../src/model.ts) 的 `Report` 结构，
+已含 `repos / hours / sources / languages / git_habits / project_management` 等行为维度，由
+[`src/aggregate.ts`](../src/aggregate.ts) / [`src/habits.ts`](../src/habits.ts) /
+[`src/language.ts`](../src/language.ts) 产出），是 AI 分析能力的天然数据底座。
 本次增强是在**已上线的 `ai-usage-html-report` skill** 之上演进，而非从零新建。
 
-> **技术栈演进（规划中）**：当前 CLI 是 Go、且数据侧偏 Codex（只解析 `~/.codex`），Claude Code
-> 侧目前在 skill 里经 ccusage 取数。规划将 CLI **迁移到 Node/TypeScript**
-> （[ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)），并自建**统一解析层**——因 ccoach 还要从同一批
-> JSONL 抓 **user prompt 与习惯指标**（ccusage 数据的超集），改为**向 ccusage 学解析方法、仅作交叉
+> **技术栈（Phase 1 已落地 · 已去 Go）**：CLI 已从 Go **迁移到 Node/TypeScript**
+> （`@loredunk/ccoach`，[ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)），并自建**统一解析层**——因 ccoach 还要从同一批
+> JSONL 抓 **user prompt 与习惯指标**（ccusage 数据的超集），**向 ccusage 学解析方法、仅作交叉
 > 验证、不作运行时依赖**，一个 pass 出「用量 + prompt + 习惯」（[ADR 0013](adr/0013-self-built-unified-parser.md)，
-> 取代 0010 D2）。分平台适配器对外吐统一结构，届时 **Codex 与 Claude Code 在 CLI 内对称成为一等
+> 取代 0010 D2）。分平台适配器对外吐统一结构，**Codex 与 Claude Code 在 CLI 内对称成为一等
 > 数据源**（[ADR 0011](adr/0011-multi-platform-usage-sources.md)）。迁移**保持 `--json` 契约不变**，
-> skill 侧无感切换；上述 Go 实现作为参考实现，交叉验证后退役。
+> skill 侧无感切换；原 Go 实现（`cmd/`、`internal/`）已交叉验证后**退役删除**。
 
 ### 现状边界（PRD 需尊重的约束）
 
@@ -111,7 +110,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 每个 skill 至少包含：
 
 - **触发场景**：用户询问用量 / 花销 / 如何省额度 / 保活窗口是否合理。
-- **操作步骤**：建议运行的命令，如 `autofresh report --json --days 7`。
+- **操作步骤**：建议运行的命令，如 `ccoach report --json --days 7`。
 - **解读指南**：各指标含义与经验阈值（缓存命中率偏低 → 提示复用上下文；reasoning 占比过高 → 提示精简任务）。
 - **输出模板**：结论 / 依据 / 行动项 / 风险与不确定性。
 - **口径护栏**：强制声明「仅本机数据 / 成本为估算 / **不得编造配额百分比**」。
@@ -161,7 +160,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 | --- | --- | --- |
 | **会话级 session** | 当前这次会话 | 在会话中插入 skill 即时分析；agent 已持有当前会话上下文 |
 | **项目级 project** | 单个项目跨会话 | Claude Code：`~/.claude/projects/<cwd 编码目录>/`；Codex：按 repo/cwd 过滤 rollout |
-| **全局级 global** | 跨所有项目 / 时间窗口 | 复用 `collect_claude_behavior.py` + `autofresh report` |
+| **全局级 global** | 跨所有项目 / 时间窗口 | 复用 `collect_claude_behavior.py` + `ccoach report` |
 
 **信号选择**：分析只基于 **user prompt + permission + tool 调用**，**不读取 assistant 回复**
 （回复体量大、对「人如何驱动工具」诊断价值低，去掉后上下文显著变小，会话级「插入即分析」才可行）。

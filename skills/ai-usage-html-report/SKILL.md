@@ -4,7 +4,7 @@ description: Generate an enriched dual-platform (Claude Code + Codex) HTML repor
 when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage across Claude Code and Codex — for example "how much did I spend on Claude Code / Codex", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my Claude Code and Codex usage", "which projects burned the most tokens", "compare my Claude Code vs Codex usage", "review my most expensive or unclear Codex sessions", "analyze my AI coding habits", or an explicit /ai-usage-html-report invocation.'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
-allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(./ccoach *) Bash(python3 *) Bash(npx *) Bash(ccusage *)
+allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(python3 *) Bash(ccusage *)
 ---
 
 # AI Usage HTML Report (Claude Code + Codex)
@@ -29,12 +29,12 @@ Keep responsibilities separate:
 
 ### Daily dual-platform report
 
-1. Locate / build `ccoach`:
-   - Prefer `./ccoach` in the current repo.
-   - Otherwise use `ccoach` from `PATH`.
-   - If neither exists but this is the ccoach source repo, run `GOCACHE=/tmp/ccoach-go-cache go build -o ccoach ./cmd/ccoach`.
+1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
+   - Prefer `ccoach` from `PATH`.
+   - Otherwise run it via `npx @loredunk/ccoach@latest`.
+   - If this is the ccoach source repo, run `npm ci && npm run build`, then invoke `node dist/cli.js` (or `npm run dev --` to run `tsx src/cli.ts`).
    - Generate the Codex report **over a window** (not just today), so ccoach emits its behavior dimensions (repos/hours/tools/git_habits/project_management/languages/sources):
-     - `./ccoach report --since <START> --json > /tmp/codex-usage-report.json`
+     - `ccoach report --since <START> --json > /tmp/codex-usage-report.json`
      - Choose `<START>` as the earliest Claude Code activity date or a sensible floor (e.g. start of the current year). ccoach supports `--since YYYY-MM-DD`, `--days N`, and `--date YYYY-MM-DD` (mutually exclusive).
      - If invoked with an argument (`$period`): a date like `2026-06-01` maps to `--date $period`; a bare integer like `7` maps to `--days $period`; empty means a wide window via `--since`.
 2. Pull data with `ccusage` (offline, no network, no upload):
@@ -47,7 +47,7 @@ Keep responsibilities separate:
    - Match `<START>`/`--days`/`--date` to the ccoach window so both platforms cover the same span. Default (no flag) is full history.
    - Add `--scope project` / `--scope session` for per-project / per-session breakdowns (see "Analysis scopes" below). The script also emits `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis.
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block):
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.py --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json --output /tmp/ai-usage.json`
+   - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json --output /tmp/ai-usage.json`
    - `--cc-behavior` is optional: if omitted, the Claude Code behavior panel degrades gracefully and the Codex behavior panel (from ccoach) still renders.
 5. Read `/tmp/ai-usage.json`, then write `/tmp/ai-usage-insights.json` following `references/dual-insights-schema.md`.
    - Write the rich AI-interpretation layer the dual renderer expects:
@@ -59,12 +59,12 @@ Keep responsibilities separate:
    - For richer interpretation patterns (evidence → meaning → impact → drilldown → intervention), read `references/insight-patterns.md`; distill those ladders into the `recommendations`/`insights` fields described in `references/dual-insights-schema.md`.
    - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization (ADR 0015); skip it only if the user opts out.
 6. (Optional) Build the shareable **scorecard** (see "Shareable scorecard" below):
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/scorecard.py --data /tmp/ai-usage.json --lang zh --output /tmp/scorecard.json`
+   - `node ${CLAUDE_SKILL_DIR}/scripts/scorecard.mjs --data /tmp/ai-usage.json --lang zh --output /tmp/scorecard.json`
    - Pick `--lang zh|en` per the user's language. Then write the personality-summary
      sentence yourself (in the user's language) into the insights `executive_summary` —
      the fixed tier names / roasts come from the localized copy table, not from you.
 7. Render HTML:
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.py --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang zh --output ai-usage-report.html`
+   - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang zh --output ai-usage-report.html`
    - `--scorecard` is optional; include it to put the screenshot-friendly cover card at the top. Match `--lang` to the scorecard's.
    - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
 
@@ -72,7 +72,7 @@ Keep responsibilities separate:
 
 If `node`/`npx` is missing or `ccusage` fails to run, degrade to a **Codex-only** report from ccoach data:
 
-- Run `./ccoach report --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `python3 ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.py --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --output codex-report.enriched.html`.
+- Run `ccoach report --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --output codex-report.enriched.html`.
 - Tell the user the Claude Code half was skipped and that installing Node/ccusage (`npx ccusage@latest`) enables the dual-platform report.
 - **Never** substitute `~/.claude/stats-cache.json` for the missing Claude Code data — it is wrong and stale (see data-layer rules).
 
@@ -119,7 +119,7 @@ Signal model for every scope: analyze **user prompts + permissions + tool calls 
 
 ## Shareable scorecard
 
-`scripts/scorecard.py` grades four independent axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier labels + roast lines from `references/scorecard-copy.json` (hand-localized zh/en, ADR 0008/0009). The renderer shows it as a screenshot-friendly cover card.
+`scripts/scorecard.mjs` grades four independent axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier labels + roast lines from `references/scorecard-copy.json` (hand-localized zh/en, ADR 0008/0009). The renderer shows it as a screenshot-friendly cover card.
 
 - Tiers/roasts/UI labels are **fixed localized copy** (the table) — do not translate them yourself; pick `--lang zh|en`.
 - The personality-summary sentence and any deeper roast IS yours to write, in the user's language.

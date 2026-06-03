@@ -1,7 +1,7 @@
 # TODO — ccoach
 
 > 约定：`[ ]` 待办 · `[~]` 进行中 · `[x]` 完成。优先级 P0 > P1 > P2。
-> 最近更新：2026-06-02
+> 最近更新：2026-06-03
 
 ---
 
@@ -36,9 +36,9 @@
 
 > 决策：[`adr/0008-gamified-shareable-scorecard.md`](adr/0008-gamified-shareable-scorecard.md) / [`0009`](adr/0009-i18n-scorecard-copy.md)（均已接受）
 
-- [x] 四轴段位与阈值（Prompt 功力 / 烧钱姿势 / 工程素养 / 勤奋度）：`scripts/scorecard.py`。
+- [x] 四轴段位与阈值（Prompt 功力 / 烧钱姿势 / 工程素养 / 勤奋度）：`scripts/scorecard.mjs`（原 `scorecard.py`）。
 - [x] `references/scorecard-copy.json`：zh/en 段位名 + 吐槽语 + UI 标签（人工本地化，非直译）。
-- [x] 渲染层封面成绩卡（竖版、可截图、置顶）：`render_dual_platform.py --scorecard --lang zh|en`。
+- [x] 渲染层封面成绩卡（竖版、可截图、置顶）：`render_dual_platform.mjs --scorecard --lang zh|en`（原 `.py`）。
 - [x] 相对排名「超过 X% 用户」：本地估算并标注 estimate；分寸=只损习惯不伤人（文案表）。
 - [ ]（后续）相对排名用真实大盘校准；称号整段由模型按语言现写（已在 SKILL.md 指明，运行时完成）。
 
@@ -46,9 +46,9 @@
 - [x] README / README_EN / PRD §2 统一「仅本机、不跨机器汇总、成本为估算、不含配额」措辞。
 
 ## T3 · 工程基建（P2）— ✅ 已完成
-- [x] `tools/check_adrs.py`：ADR 编号唯一 / 状态字段 / docs 相对链接校验。
-- [x] `tools/test_scorecard.py`：回归——四轴有段位、zh/en 本地化、估算标注、**不泄配额% / prompt 原文 / 密钥**。
-- [x] `.github/workflows/ci.yml`：`go build/vet/test` + 上述两项检查。
+- [x] `tools/check_adrs.mjs`（原 `check_adrs.py`）：ADR 编号唯一 / 状态字段 / docs 相对链接校验。
+- [x] scorecard 回归迁入 vitest（`test/scorecard.test.ts`，原 `tools/test_scorecard.py`）：四轴有段位、zh/en 本地化、估算标注、**不泄配额% / prompt 原文 / 密钥**。
+- [x] CI（`.github/workflows/ci.ts.yml`）：typecheck / vitest / build / `check_adrs.mjs` / ccusage 对账；**去 Go** 后删除 `ci.yml`（`go build/vet/test`）。
 
 ---
 
@@ -77,7 +77,7 @@
 
 > 决策：[`adr/0010-cli-rewrite-node-ccusage.md`](adr/0010-cli-rewrite-node-ccusage.md)（已实现 Phase 1）。
 > 实现：`docs/superpowers/specs/2026-06-02-ts-rewrite-design.md` + `plans/2026-06-02-ts-rewrite-phase1.md`。
-> 保持 `--json` 契约；Go 版原地保留作行为基准 / 交叉验证。
+> 保持 `--json` 契约；原 Go 版已交叉验证后退役删除（见 T12「去 Go」）。
 
 - [x] TS 项目骨架：`cac` + `tsdown` + `vitest`，ESM、Node ≥ 18（包 `@loredunk/ccoach`，bin `ccoach`）。
 - [x] 跑通核心数据流：读 `~/.codex` rollout（glob）+ `~/.claude/projects` → 统一结构 → `--json` / 人读文本。
@@ -85,7 +85,7 @@
 - [x] 习惯分析 TS 等价（`src/habits.ts`：git_habits / project_management）+ 测试。
 - [ ]（后续）配置扫描 `configscan.go`、语言识别 `language.go` 的完整 TS 等价（Phase 1 为最小实现）。
 - [ ]（后续）Codex sqlite 元数据读取器（Phase 1 走 glob 路径，用量已正确）。
-- [ ] Node 版稳定后退役 Go 版（删 `cmd/ccoach`、`internal/codexreport`）。
+- [x] Node 版稳定后退役 Go 版（删 `cmd/ccoach`、`internal/codexreport`）——见 T12「去 Go」（已完成）。
 
 ## T9 · 自建统一解析层 + 双平台一等数据源（P0）— ✅ Phase 1 已完成
 
@@ -100,6 +100,18 @@
   - [x] 内容层 prompt 评级数据面（skill 侧 `claude_session_prompts.py`）；`file_ref_ratio` 口径已移植进 `src/prompt-signals.ts`。
 - [x] 用 ccusage **交叉验证** token/成本（`scripts/verify-ccusage.ts`，接入 CI），两平台 fixture 防格式漂移。
 - [ ]（未来）调研并接入 OpenClaw / Harness / opencode / amp 等其它 Agent CLI（只需再写一个适配器）（ADR 0011 D3）。
+
+## T12 · 去 Go + skill 去 Python（Phase 2 进行中）（P0）
+
+> 决策：[`superpowers/specs/2026-06-02-ts-rewrite-design.md`](superpowers/specs/2026-06-02-ts-rewrite-design.md) §2（Phase 2）。
+> Phase 1 已用 TS + ccusage 对账取代 Go 行为基准，故 Go 可退役；skill 的确定性脚本改写为 `.mjs`（零依赖、可直接 `node` 跑）。
+
+- [x] **去 Go**：删除 `cmd/ccoach`、`internal/`（codexreport + cli）、`go.mod`，及 `ci.yml`（`go build/vet/test`）。
+- [x] **渲染/计算层去 Python**：`merge_dual_platform` / `scorecard` / `render_dual_platform` /
+      `render_enriched_codex_report` 由 `.py` 改写为 skill 内 `.mjs`；SKILL.md 改调 `node *.mjs`，行为/输出口径不变。
+- [x] **tools 去 Python**：`check_adrs.py → check_adrs.mjs`；`test_scorecard.py` 回归迁入 vitest（`test/scorecard.test.ts`），并入 `ci.ts.yml`。
+- [ ]（待续）**采集类去 Python**：`collect_claude_behavior` / `session_drilldown` / `claude_session_prompts` 仍是 `.py`；
+      待改写为 `.mjs`（或下沉 `ccoach` 子命令，含 scope / 会话钻取 / prompt 预览的隐私设计）。
 
 ## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）
 

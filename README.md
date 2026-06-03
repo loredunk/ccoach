@@ -40,7 +40,7 @@ node dist/cli.js --json --days 7
 # or `npm link`, then `ccoach` is on your PATH
 ```
 
-> The original Go implementation is kept in-tree (`cmd/`, `internal/`) as a behavior baseline and will be retired once the TS CLI is stable (see [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)).
+> The original Go implementation (`cmd/`, `internal/`) has been retired and removed — it served as a behavior baseline during the rewrite; the TS CLI is now validated directly against ccusage (see [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)).
 
 ## Usage
 
