@@ -13,8 +13,10 @@ export const emptyTokens = (): Tokens => ({
 })
 
 export interface CommandCount { command: string; count: number }
+export interface NameCount { name: string; count: number }
+export interface FileLanguage { name: string; files: number }
 export interface UsageReport { name: string; sessions: number; tokens: number }
-export interface HourReport { hour: number; tokens: number }
+export interface HourReport { hour: number; tokens: number; count?: number }
 export interface ModelDayCount { date: string; tokens: number }
 export interface ModelTimeline {
   model: string
@@ -81,11 +83,17 @@ export interface Report {
   models: string[]
   unpriced_models?: string[]
   models_timeline?: ModelTimeline[]
-  tools: { shell_calls: number; web_searches: number; file_changes: number; total_calls: number; top_commands: CommandCount[] }
+  tools: {
+    shell_calls: number; web_searches: number; file_changes: number; total_calls: number
+    top_commands: CommandCount[]
+    by_name?: NameCount[]              // 各工具被调用次数（Claude：Bash/Edit/Glob/mcp__… 计数）
+    categories?: Record<string, number> // 工具类别计数：shell/web/file/search/mcp/other
+  }
   repos: RepoReport[]
   hours: HourReport[]
   sources: UsageReport[]
   languages: UsageReport[]
+  file_languages?: FileLanguage[]      // 按"读写/编辑文件扩展名"派生的语言文件数（仅扩展名，不含路径）
   git_habits: GitHabitsReport
   project_management: ProjectMgmtReport
   prompt_signals: PromptSignals
@@ -111,5 +119,9 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   environment: 'Claude Code 版本、权限模式分布、附件数、子代理消息数——只由记录元数据派生的非敏感标签/计数（ADR 0017）。',
   git_habits: 'git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。',
   project_management: '各仓库是否有测试/构建/CI 信号。',
+  'tools.by_name': '各工具被调用次数（仅工具名计数，如 Bash/Edit/Glob/mcp__…；不含命令行/参数）。',
+  'tools.categories': '工具类别计数 shell/web/file/search/mcp/other（纯计数，无内容）。',
+  file_languages: '按读写/编辑文件的扩展名派生的语言文件数（仅扩展名映射语言，绝不含路径/文件内容）。',
+  'hours.count': '该时段的活跃事件数（与 tokens 并列；用于活跃度热力，不含内容）。',
   duration: '活跃时长（相邻事件间隔 ≤5 分钟才计入），非墙钟跨度。',
 }

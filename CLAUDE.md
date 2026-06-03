@@ -24,7 +24,9 @@
 双平台适配器 + ccusage 对账，见 `src/` 与 `docs/superpowers/`）；原 Go 版（`cmd/`、`internal/`）已交叉验证后
 **退役删除（去 Go 完成）**。**Phase 2 进行中（去 Python）**：确定性渲染/计算层（merge / scorecard / render×2）
 已改写为 skill 内的 `.mjs`，`tools/` 校验已转 TS（scorecard 回归进 vitest、`check_adrs.mjs` 跑 docs lint）；
-采集类脚本（`collect_claude_behavior` / `session_drilldown` / `claude_session_prompts`）去 Python 待续。动手前读对应 ADR。
+采集类脚本正**并入 ccoach**（[ADR 0018](docs/adr/0018-cli-absorbs-collection-prompt-preview.md)：块 A 行为字段已落地——
+`tools.by_name`/`categories`/`hours.count`/`file_languages` + Claude 行为改吃 `ccoach report --platform claude-code --json`；
+块 B `--scope`、块 C `ccoach sessions` opt-in 预览待续）。动手前读对应 ADR。
 
 ### 1. CLI 迁移到 Node/TypeScript + 自建统一解析层
 

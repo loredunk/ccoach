@@ -1,13 +1,13 @@
 import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
-  type ReworkSignals, type EnvironmentSignals,
+  type ReworkSignals, type EnvironmentSignals, type FileLanguage,
   type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
 import { type Window, localYmd } from './window.js'
 import { estimateCost, normalizeModel, disjointInputBuckets } from './pricing.js'
 import { firstToken, gitSubcommand } from './text.js'
 import { buildGitHabits, buildProjectMgmt, topCounts, type RepoFacts } from './habits.js'
-import { dominantLanguage } from './language.js'
+import { dominantLanguage, EXT_LANG } from './language.js'
 import { newPromptAcc, promptAccUpdate, promptSignals, type PromptAcc } from './prompt-signals.js'
 
 const IDLE_CAP_MS = 5 * 60 * 1000
@@ -33,7 +33,7 @@ interface RepoAgg {
 interface UsageAgg { name: string; tokens: number; sessions: Set<string> }
 interface ModelDayAgg { tokens: number; cost: number }
 
-export type ToolKind = 'shell' | 'web' | 'file' | 'other'
+export type ToolKind = 'shell' | 'web' | 'file' | 'search' | 'mcp' | 'other'
 
 // 平台无关聚合器：适配器把每条事件喂进来，assemble 出统一 Report。
 export class Aggregator {
@@ -52,6 +52,10 @@ export class Aggregator {
   private prevActive: number | null = null
   private byRepo = new Map<string, RepoAgg>()
   private byHour: number[] = new Array<number>(24).fill(0)
+  private byHourCount: number[] = new Array<number>(24).fill(0) // 该时段活跃事件数（与 tokens 并列）
+  private categories = new Map<string, number>() // 工具类别计数：shell/web/file/search/mcp/other
+  private toolByName = new Map<string, number>() // 各工具名调用次数（仅名字，不含参数）
+  private langFiles = new Map<string, number>() // 按读写/编辑文件扩展名派生的语言文件数
   private bySource = new Map<string, UsageAgg>()
   private byLanguage = new Map<string, UsageAgg>()
   private byModelDay = new Map<string, Map<string, ModelDayAgg>>()
@@ -118,6 +122,7 @@ export class Aggregator {
     if (branch) r.branches.add(branch)
     if (nm) this.applyModelDay(nm, ts, d.total, usd)
     this.byHour[ts.getHours()] += d.total
+    this.byHourCount[ts.getHours()]++
   }
 
   private applyModelDay(model: string, ts: Date, tokens: number, cost: number): void {
@@ -132,6 +137,7 @@ export class Aggregator {
 
   applyTool(kind: ToolKind, command?: string): void {
     this.totalCalls++
+    this.categories.set(kind, (this.categories.get(kind) ?? 0) + 1)
     if (kind === 'shell') {
       this.shellCalls++
       if (command) {
@@ -145,7 +151,19 @@ export class Aggregator {
     } else if (kind === 'file') {
       this.fileChanges++
     }
-    // 'other'：仅计入 totalCalls（顶部已 ++），用于 Codex 的通用 function_call/custom_tool_call 等
+    // 'search'/'mcp'/'other'：仅计入 totalCalls + categories（如 Glob/Grep、mcp__*、Codex 通用 call）
+  }
+
+  // 各工具名计数（仅工具名，绝不含命令行/参数；隐私同 skills/environment 标签）。
+  applyToolName(name: string): void {
+    if (name) this.toolByName.set(name, (this.toolByName.get(name) ?? 0) + 1)
+  }
+
+  // 按文件扩展名派生语言的文件数（仅扩展名→语言映射，绝不含路径/文件内容）。
+  applyLanguageFile(ext: string): void {
+    if (!ext) return
+    const lang = EXT_LANG[ext.toLowerCase()] ?? ext.toUpperCase()
+    this.langFiles.set(lang, (this.langFiles.get(lang) ?? 0) + 1)
   }
 
   applyFileChangeExt(repo: string, ext: string): void {
@@ -236,8 +254,8 @@ export class Aggregator {
     }
     repos.sort((a, b) => b.tokens - a.tokens)
 
-    const hours: { hour: number; tokens: number }[] = []
-    for (let h = 0; h < 24; h++) if (this.byHour[h] > 0) hours.push({ hour: h, tokens: this.byHour[h] })
+    const hours: { hour: number; tokens: number; count: number }[] = []
+    for (let h = 0; h < 24; h++) if (this.byHour[h] > 0) hours.push({ hour: h, tokens: this.byHour[h], count: this.byHourCount[h] })
 
     const shellRecord: Record<string, number> = {}
     for (const [k, v] of this.shellCommands) shellRecord[k] = v
@@ -301,6 +319,22 @@ export class Aggregator {
       rework_signals: reworkSignals,
       rate_limits: null,
       glossary: REPORT_GLOSSARY,
+    }
+    if (this.toolByName.size) {
+      const byNameRec: Record<string, number> = {}
+      for (const [k, v] of this.toolByName) byNameRec[k] = v
+      report.tools.by_name = topCounts(byNameRec, 15).map((c) => ({ name: c.command, count: c.count }))
+    }
+    if (this.categories.size) {
+      const cats: Record<string, number> = {}
+      for (const [k, v] of this.categories) cats[k] = v
+      report.tools.categories = cats
+    }
+    if (this.langFiles.size) {
+      report.file_languages = [...this.langFiles.entries()]
+        .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+        .slice(0, USAGE_MAX)
+        .map(([name, files]): FileLanguage => ({ name, files }))
     }
     if (this.skillCounts.size) report.skills = topCounts(skillRec, 12)
     if (this.attachments || this.subagentMsgs || this.versions.size || this.permModes.size) {

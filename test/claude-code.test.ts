@@ -31,4 +31,16 @@ describe('parseClaudeCode', () => {
     expect(j).not.toContain('保留测试') // 不含 prompt 原文
     expect(j).not.toContain('rm -rf') // 不含 sidechain 命令
   })
+  it('行为字段（采集并入 ccoach）：categories / by_name / hours.count / file_languages', () => {
+    const r = parseClaudeCode('test/fixtures/claude', window)
+    expect(r.tools.total_calls).toBe(2) // 仅主会话 Bash + Edit（旧版漏计非 shell/web/file 工具已修）
+    expect(r.tools.categories).toEqual({ shell: 1, file: 1 })
+    expect(r.tools.by_name).toEqual(
+      expect.arrayContaining([{ name: 'Bash', count: 1 }, { name: 'Edit', count: 1 }]),
+    )
+    // 主 200 + 子代理 300 = 两条 token 事件，同在本机 03 时（UTC fixture + TZ=UTC）
+    expect(r.hours).toEqual([{ hour: 3, tokens: 500, count: 2 }])
+    expect(r.file_languages).toEqual([{ name: 'TypeScript', files: 1 }]) // Edit src/main.ts → ts
+    expect(JSON.stringify(r)).not.toContain('main.ts') // file_languages 只留扩展名映射，不含路径/文件名
+  })
 })

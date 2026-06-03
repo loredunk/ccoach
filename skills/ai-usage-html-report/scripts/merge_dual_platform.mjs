@@ -5,7 +5,7 @@
 // Inputs (all JSON files produced beforehand):
 //   --cc-daily        ccusage claude daily --json --offline --breakdown
 //   --cc-session      ccusage claude session --json --offline
-//   --cc-behavior     collect_claude_behavior.py output (Claude Code behavior)
+//   --cc-behavior     ccoach report --platform claude-code --json (Claude Code behavior)
 //   --codex-report    ccoach report --since <date> --json  (Codex behavior+tokens)
 //   --codex-ccusage   ccusage codex daily --json --offline   (historical Codex, fallback)
 //   --output          merged dual-platform JSON path
@@ -113,34 +113,40 @@ function normHours(hours, countKey = null) {
   return out
 }
 
-// Normalize collect_claude_behavior.py output into the unified shape.
-export function claudeBehavior(cb) {
-  if (!cb) return null
-  const tools = cb.tools ?? {}
-  const repos = (cb.repos ?? []).slice(0, 10).map((r) => ({
-    repo: r.repo, sessions: r.sessions ?? 0, tokens: r.tokens ?? 0, tool_calls: r.tool_calls ?? 0,
-  }))
-  const sc = cb.sources ?? {}
-  const sources = [...(sc.entrypoints ?? [])]
-  const extras = []
-  const pm = sc.permission_modes ?? []
-  if (pm.length) extras.push('权限模式: ' + pm.slice(0, 4).map((p) => `${p.name}×${p.count}`).join('、'))
-  if (sc.subagent_calls) {
-    extras.push(`子代理调用 ${sc.subagent_calls} 次（占记录 ${((sc.subagent_share ?? 0) * 100).toFixed(1)}%）`)
+// Normalize `ccoach report --platform claude-code --json` (a unified Report) into
+// the renderer's behavior shape. As of Phase-2 "采集并入 ccoach", Claude *behavior*
+// comes from ccoach (not collect_claude_behavior.py); tokens/cost still from ccusage.
+export function claudeBehavior(r) {
+  if (!r) return null
+  const tools = r.tools ?? {}
+  const cats = tools.categories ?? {
+    shell: tools.shell_calls ?? 0, web: tools.web_searches ?? 0, file: tools.file_changes ?? 0,
   }
+  const git = r.git_habits ?? {}
+  const pm = r.project_management ?? {}
+  const env = r.environment ?? {}
+  // Drop any signal containing a path-like token so no absolute path leaks.
+  const safe = (sigs, n) => (sigs ?? []).filter((s) => !String(s).includes('/')).slice(0, n)
+  const extras = []
+  const pmodes = env.permission_modes ?? []
+  if (pmodes.length) extras.push('权限模式: ' + pmodes.slice(0, 4).map((p) => `${p.command}×${p.count}`).join('、'))
+  if (env.subagent_messages) extras.push(`子代理消息 ${env.subagent_messages} 条`)
+  extras.push(...safe(git.review_signals, 3), ...safe(git.risk_signals, 2), ...safe(pm.signals, 3))
   return {
-    generated_for: cb.generated_for ?? null,
-    sessions: cb.sessions ?? 0,
+    generated_for: r.generated_for ?? null,
+    sessions: r.sessions ?? 0,
     total_tool_calls: tools.total_calls ?? 0,
-    tools_by_name: tools.by_name ?? [],
+    tools_by_name: (tools.by_name ?? []).map((x) => ({ name: x.name, count: x.count })),
     top_commands: cleanCommands(tools.top_commands ?? []),
-    tool_categories: tools.categories ?? {},
-    git_habits: cleanGit((cb.git_habits ?? {}).top_subcommands ?? []),
-    languages: (cb.languages ?? []).slice(0, 10).map((l) => ({ name: l.name, count: l.files ?? 0 })),
+    tool_categories: cats,
+    git_habits: cleanGit(git.top_subcommands ?? []),
+    languages: (r.file_languages ?? []).slice(0, 10).map((l) => ({ name: l.name, count: l.files ?? 0 })),
     languages_unit: '文件',
-    repos,
-    hours: normHours(cb.hours ?? []),
-    sources,
+    repos: (r.repos ?? []).slice(0, 10).map((x) => ({
+      repo: x.repo, sessions: x.sessions ?? 0, tokens: x.tokens ?? 0, tool_calls: 0,
+    })),
+    hours: normHours(r.hours ?? []),
+    sources: (r.sources ?? []).map((s) => ({ name: s.name, count: s.sessions ?? 0 })),
     extras,
   }
 }

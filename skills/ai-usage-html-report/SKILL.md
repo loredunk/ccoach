@@ -23,7 +23,7 @@ Keep responsibilities separate:
 - **Claude Code data MUST come from `ccusage`.** ccusage reads each `~/.claude/projects/*.jsonl` line for the real per-message model and prices it with offline LiteLLM data, so its model/cost attribution is correct.
 - **NEVER use `~/.claude/stats-cache.json`.** It is polluted by cc-switch swapping in third-party providers (kimi, etc.), so its model/cost attribution is wrong, and it stopped updating after 2026-04-09 — stale and inaccurate. This was confirmed against real data when comparing approaches. Do not read or fall back to it under any circumstances.
 - **Codex data** comes from `ccoach report --since <date> --json` (token *and* behavior: repos/hours/tools/git_habits/project_management/languages/sources over the window) plus `ccusage codex daily` (token/cost history).
-- **Claude Code behavior** comes from `scripts/collect_claude_behavior.py`, which parses `~/.claude/projects/**/*.jsonl` locally (pure stdlib, offline) into the same behavior shape so both platforms render symmetrically. It emits only aggregates: Bash → first word / git subcommand only, repo → cwd basename, file → extension only. Never prompt text, file contents, full commands, or absolute paths.
+- **Claude Code behavior** comes from `ccoach report --platform claude-code --json`, which parses `~/.claude/projects/**/*.jsonl` locally (offline) into the unified Report — tokens + `tools{by_name,categories}` + repos + `hours{count}` + git_habits + `file_languages` + `prompt_signals` + environment — so both platforms render symmetrically. It emits only aggregates: Bash → first token / git subcommand only, repo → cwd basename, file → extension only. Never prompt text, file contents, full commands, or absolute paths.
 
 ## Workflow
 
@@ -42,10 +42,10 @@ Keep responsibilities separate:
    - `npx ccusage@latest claude session --json --offline > /tmp/cc-session.json`
    - `npx ccusage@latest codex daily --json --offline > /tmp/cc-codex.json`
    - Use `ccusage ...` directly if it is already on `PATH`; otherwise `npx ccusage@latest ...`.
-3. Collect the Claude Code **behavior** profile (local stdlib parser, offline) over the same window:
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/collect_claude_behavior.py --since <START> --output /tmp/claude-behavior.json`
-   - Match `<START>`/`--days`/`--date` to the ccoach window so both platforms cover the same span. Default (no flag) is full history.
-   - Add `--scope project` / `--scope session` for per-project / per-session breakdowns (see "Analysis scopes" below). The script also emits `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis.
+3. Collect the Claude Code **behavior** profile from ccoach (offline, local parse), over the same window:
+   - `ccoach report --platform claude-code --since <START> --json > /tmp/claude-behavior.json`
+   - Match `--since`/`--days`/`--date` to the Codex ccoach window so both platforms cover the same span.
+   - This report also carries `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block):
    - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json --output /tmp/ai-usage.json`
    - `--cc-behavior` is optional: if omitted, the Claude Code behavior panel degrades gracefully and the Codex behavior panel (from ccoach) still renders.

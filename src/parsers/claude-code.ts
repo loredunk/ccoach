@@ -188,15 +188,25 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
           const blocks = Array.isArray(msg.content) ? msg.content : []
           for (const b of blocks) {
             if (!b || b.type !== 'tool_use') continue
-            const name = b.name
+            const name = typeof b.name === 'string' ? b.name : ''
             const inp = b.input ?? {}
+            // 全量计数 + 类别 + 工具名（仅名字，不含参数）；修正旧版只数 shell/web/file 的漏计。
+            agg.applyToolName(name)
             if (name === 'Bash') {
               agg.applyTool('shell', typeof inp.command === 'string' ? inp.command : undefined)
             } else if (name === 'WebFetch' || name === 'WebSearch') {
               agg.applyTool('web')
             } else if (name === 'Edit' || name === 'Write' || name === 'Read' || name === 'NotebookEdit') {
               agg.applyTool('file')
-              agg.applyFileChangeExt(repo, extOf(typeof inp.file_path === 'string' ? inp.file_path : ''))
+              const ext = extOf(typeof inp.file_path === 'string' ? inp.file_path : '')
+              agg.applyFileChangeExt(repo, ext)
+              agg.applyLanguageFile(ext)
+            } else if (name === 'Glob' || name === 'Grep' || name === 'ToolSearch') {
+              agg.applyTool('search')
+            } else if (name.startsWith('mcp__')) {
+              agg.applyTool('mcp')
+            } else {
+              agg.applyTool('other')
             }
           }
         }

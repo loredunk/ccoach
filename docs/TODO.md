@@ -110,8 +110,11 @@
 - [x] **渲染/计算层去 Python**：`merge_dual_platform` / `scorecard` / `render_dual_platform` /
       `render_enriched_codex_report` 由 `.py` 改写为 skill 内 `.mjs`；SKILL.md 改调 `node *.mjs`，行为/输出口径不变。
 - [x] **tools 去 Python**：`check_adrs.py → check_adrs.mjs`；`test_scorecard.py` 回归迁入 vitest（`test/scorecard.test.ts`），并入 `ci.ts.yml`。
-- [ ]（待续）**采集类去 Python**：`collect_claude_behavior` / `session_drilldown` / `claude_session_prompts` 仍是 `.py`；
-      待改写为 `.mjs`（或下沉 `ccoach` 子命令，含 scope / 会话钻取 / prompt 预览的隐私设计）。
+- [~]（进行中）**采集类并入 ccoach**（决策见 [`adr/0018`](adr/0018-cli-absorbs-collection-prompt-preview.md)，取代「照搬 .mjs」）：
+  - [x] **块 A · 行为字段**：`Report` 增补可选 `tools.by_name` / `tools.categories` / `hours.count` / `file_languages`（契约兼容）；
+        Claude 适配器全量计数 + 分类工具（修旧版漏计）；`merge_dual_platform.mjs` 与 SKILL 的 Claude 行为改吃 `ccoach report --platform claude-code --json`。
+  - [ ] **块 B · scope**：`ccoach report --scope {global,project,session}` → `projects[]` / `sessions_detail[]`，取代 `collect_claude_behavior --scope`。
+  - [ ] **块 C · 会话钻取/预览**：`ccoach sessions`（候选清单 + opt-in 单会话 redacted 预览）取代 `session_drilldown` / `claude_session_prompts`；删 3 个 `.py`、去掉 `Bash(python3 *)`。
 
 ## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）
 
