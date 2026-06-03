@@ -1,5 +1,6 @@
 import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
+  type ReworkSignals, type EnvironmentSignals,
   type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
 import { type Window, localYmd } from './window.js'
@@ -57,6 +58,17 @@ export class Aggregator {
   private errApiErrors = 0
   private errByTool = new Map<string, number>()
   private errByCategory = new Map<string, number>()
+  // 返工/改动信号
+  private rwEdits = 0
+  private rwUserModified = 0
+  private rwLinesAdded = 0
+  private rwLinesRemoved = 0
+  // 技能 / 环境画像
+  private skillCounts = new Map<string, number>()
+  private versions = new Set<string>()
+  private permModes = new Map<string, number>()
+  private attachments = 0
+  private subagentMsgs = 0
 
   constructor(platform: string) {
     this.platform = platform
@@ -168,6 +180,19 @@ export class Aggregator {
   markInterrupted(): void { this.errInterrupted++ }
   applyApiError(): void { this.errApiErrors++ }
 
+  // 返工/改动：linesAdded/Removed 已由适配器从 structuredPatch 数出（只数行、不读 diff 文本）。
+  applyEdit(linesAdded: number, linesRemoved: number, userModified: boolean): void {
+    this.rwEdits++
+    if (userModified) this.rwUserModified++
+    this.rwLinesAdded += linesAdded
+    this.rwLinesRemoved += linesRemoved
+  }
+  applySkill(name: string): void { if (name) this.skillCounts.set(name, (this.skillCounts.get(name) ?? 0) + 1) }
+  applyVersion(v: string): void { if (v) this.versions.add(v) }
+  applyPermissionMode(m: string): void { if (m) this.permModes.set(m, (this.permModes.get(m) ?? 0) + 1) }
+  markAttachment(): void { this.attachments++ }
+  markSubagentMessage(): void { this.subagentMsgs++ }
+
   touchSession(id: string): void { if (id) this.sessionIds.add(id) }
 
   markActive(ts: Date): void {
@@ -226,6 +251,18 @@ export class Aggregator {
     if (this.errByTool.size) errorSignals.by_tool = topCounts(errToolRec, 8)
     if (this.errByCategory.size) errorSignals.by_category = topCounts(errCatRec, 8)
 
+    const reworkSignals: ReworkSignals = {
+      edits: this.rwEdits,
+      user_modified: this.rwUserModified,
+      user_modified_rate: this.rwEdits > 0 ? Math.round((this.rwUserModified / this.rwEdits) * 1e4) / 1e4 : 0,
+      lines_added: this.rwLinesAdded,
+      lines_removed: this.rwLinesRemoved,
+    }
+    const skillRec: Record<string, number> = {}
+    for (const [k, v] of this.skillCounts) skillRec[k] = v
+    const permRec: Record<string, number> = {}
+    for (const [k, v] of this.permModes) permRec[k] = v
+
     const report: Report = {
       generated_for: window.desc,
       timezone: localTimezone(),
@@ -254,8 +291,16 @@ export class Aggregator {
       project_management: buildProjectMgmt(repoFacts),
       prompt_signals: promptSignals(this.promptAcc),
       error_signals: errorSignals,
+      rework_signals: reworkSignals,
       rate_limits: null,
       glossary: REPORT_GLOSSARY,
+    }
+    if (this.skillCounts.size) report.skills = topCounts(skillRec, 12)
+    if (this.attachments || this.subagentMsgs || this.versions.size || this.permModes.size) {
+      const env: EnvironmentSignals = { attachments: this.attachments, subagent_messages: this.subagentMsgs }
+      if (this.versions.size) env.claude_versions = [...this.versions].sort()
+      if (this.permModes.size) env.permission_modes = topCounts(permRec, 8)
+      report.environment = env
     }
     if (this.missingPrice.size) report.unpriced_models = [...this.missingPrice].sort()
     if (this.byModelDay.size) report.models_timeline = buildModelsTimeline(this.byModelDay)

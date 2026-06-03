@@ -110,6 +110,13 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       // API/网络/限流报错：仅主会话计入（错误信号反映用户的工作环境）。
       if (rec.isApiErrorMessage === true && !sidechain) agg.applyApiError()
 
+      // 环境 / 技能 / 子代理画像（只派生非敏感元数据：版本/权限模式/skill名/附件/子代理消息）。
+      if (typeof rec.version === 'string') agg.applyVersion(rec.version)
+      if (typeof rec.permissionMode === 'string') agg.applyPermissionMode(rec.permissionMode)
+      if (typeof rec.attributionSkill === 'string') agg.applySkill(rec.attributionSkill)
+      if (rec.type === 'attachment') agg.markAttachment()
+      if (sidechain) agg.markSubagentMessage()
+
       if (rec.type === 'user') {
         // prompt 信号只反映"人类本人"的 prompt：sidechain（子代理）user 文本是 agent 生成的
         // 任务描述、非人类输入，排除。
@@ -138,7 +145,25 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
             agg.applyToolResult(toolName, isError, category)
           }
           const tur = rec.toolUseResult
-          if (tur && typeof tur === 'object' && tur.interrupted === true) agg.markInterrupted()
+          if (tur && typeof tur === 'object') {
+            if (tur.interrupted === true) agg.markInterrupted()
+            // 返工/改动：从 structuredPatch 只数 +/- 行数（绝不读 diff 文本内容），并取 userModified 布尔。
+            if (Array.isArray(tur.structuredPatch)) {
+              let added = 0
+              let removed = 0
+              for (const h of tur.structuredPatch) {
+                if (h && Array.isArray(h.lines)) {
+                  for (const l of h.lines) {
+                    if (typeof l === 'string') {
+                      if (l.startsWith('+')) added++
+                      else if (l.startsWith('-')) removed++
+                    }
+                  }
+                }
+              }
+              agg.applyEdit(added, removed, tur.userModified === true)
+            }
+          }
         }
       } else if (rec.type === 'assistant') {
         const msg = rec.message ?? {}

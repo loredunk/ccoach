@@ -4,7 +4,26 @@ import { homedir } from 'node:os'
 import { Aggregator } from '../aggregate.js'
 import { inLocalRange, type Window } from '../window.js'
 import { repoName } from '../text.js'
+import { classifyError } from '../errors.js'
 import { type Tokens, type Report } from '../model.js'
+
+// 从 Codex function_call_output 的 output 解析 exit code 与（瞬时）错误文本。
+// 注意：Codex 输出形状为**推断**（无 ~/.codex 真实数据验证），不匹配时静默产出 0。
+function codexOutcome(output: unknown): { exitCode: number | null; text: string; interrupted: boolean } {
+  if (typeof output !== 'string') return { exitCode: null, text: '', interrupted: false }
+  let parsed: any = null
+  try { parsed = JSON.parse(output) } catch { /* 纯文本输出 */ }
+  if (parsed && typeof parsed === 'object') {
+    const meta = parsed.metadata ?? {}
+    const ec = meta.exit_code ?? parsed.exit_code
+    return {
+      exitCode: typeof ec === 'number' ? ec : null,
+      text: typeof parsed.output === 'string' ? parsed.output : output,
+      interrupted: meta.interrupted === true || parsed.interrupted === true,
+    }
+  }
+  return { exitCode: null, text: output, interrupted: false }
+}
 
 // $CODEX_HOME 或 ~/.codex
 export function codexHome(): string {
@@ -118,6 +137,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
     let repo = '(unknown)'
     let source = '(unknown)'
     let threadTouched = false
+    const callNames = new Map<string, string>() // call_id -> 工具名（把 *_output 错误归因到工具）
     for (const line of lines) {
       const trimmed = line.trim(); if (!trimmed) continue
       let rec: any
@@ -137,6 +157,11 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           break
         }
         case 'event_msg': {
+          // API/网络/流式错误事件（类型推断）：窗口内则计入 api_errors。
+          if (payload.type === 'error' || payload.type === 'stream_error') {
+            if (!Number.isNaN(ts.getTime()) && inLocalRange(ts, window)) agg.applyApiError()
+            break
+          }
           if (payload.type !== 'token_count') break
           const info = payload.info
           if (!info) break
@@ -170,11 +195,19 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           const t = payload.type
           if (t === 'function_call') {
             const name = payload.name
+            if (typeof payload.call_id === 'string') callNames.set(payload.call_id, name)
             if (name === 'exec_command' || name === 'local_shell_call' || name === 'shell') {
               agg.applyTool('shell', normalizedCommandLine(typeof payload.arguments === 'string' ? payload.arguments : ''))
             } else {
               agg.applyTool('other')
             }
+          } else if (t === 'function_call_output' || t === 'local_shell_call_output') {
+            // 错误/卡顿信号（输出形状推断）：解析 exit code，非 0 即错误，瞬时分类成白名单类别。
+            const { exitCode, text, interrupted } = codexOutcome(payload.output)
+            const name = (typeof payload.call_id === 'string' ? callNames.get(payload.call_id) : undefined) ?? 'shell'
+            const isError = exitCode !== null && exitCode !== 0
+            agg.applyToolResult(name, isError, isError ? classifyError(text) : null)
+            if (interrupted) agg.markInterrupted()
           } else if (t === 'local_shell_call') {
             agg.applyTool('shell')
           } else if (t === 'web_search_call') {

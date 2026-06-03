@@ -43,3 +43,26 @@ describe('parseClaudeCode error_signals', () => {
     expect(j).not.toContain('sidechain error')
   })
 })
+
+describe('rework / skills / environment', () => {
+  it('返工/改动 + skill 画像 + 环境元数据', () => {
+    const r = parseClaudeCode('test/fixtures/claude-rework', window)
+    expect(r.rework_signals).toEqual({
+      edits: 2, user_modified: 1, user_modified_rate: 0.5, lines_added: 4, lines_removed: 1,
+    })
+    expect(r.skills).toEqual([{ command: 'my-skill', count: 2 }])
+    expect(r.environment?.attachments).toBe(1)
+    expect(r.environment?.subagent_messages).toBe(1)
+    expect(r.environment?.claude_versions).toEqual(['2.1.161'])
+    expect(r.environment?.permission_modes).toEqual(expect.arrayContaining([
+      { command: 'auto', count: 1 },
+      { command: 'default', count: 1 },
+    ]))
+  })
+  it('隐私：structuredPatch 只数行，绝不含 diff 文本内容', () => {
+    const j = JSON.stringify(parseClaudeCode('test/fixtures/claude-rework', window))
+    expect(j).not.toContain('secretNew')
+    expect(j).not.toContain('secretOnly')
+    expect(j).not.toContain('secretOldLine')
+  })
+})

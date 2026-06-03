@@ -51,6 +51,21 @@ export interface ErrorSignals {
   by_tool?: CommandCount[]       // 失败按工具（top）
   by_category?: CommandCount[]   // 失败按白名单类别（git/test/build/permission/network/timeout/not-read/other）
 }
+// 返工/改动信号——只由 toolUseResult 的 userModified 布尔与 structuredPatch 的行数派生，绝不含 diff 文本（ADR 0017）。
+export interface ReworkSignals {
+  edits: number              // 文件编辑次数（有 structuredPatch）
+  user_modified: number      // 其中用户事后手动改过的次数
+  user_modified_rate: number // user_modified / edits
+  lines_added: number        // 累计新增行数（仅计数，不含内容）
+  lines_removed: number      // 累计删除行数
+}
+// 环境/使用画像——只由记录元数据派生的非敏感标签/计数（ADR 0017）。
+export interface EnvironmentSignals {
+  claude_versions?: string[]        // Claude Code 版本
+  permission_modes?: CommandCount[] // 权限模式分布（default/auto/…）
+  attachments: number               // 附件（图片/粘贴）数
+  subagent_messages: number         // 子代理（sidechain）消息数
+}
 export interface Report {
   generated_for: string
   timezone: string
@@ -75,6 +90,9 @@ export interface Report {
   project_management: ProjectMgmtReport
   prompt_signals: PromptSignals
   error_signals: ErrorSignals
+  rework_signals: ReworkSignals
+  skills?: CommandCount[]
+  environment?: EnvironmentSignals
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
   glossary?: Record<string, string>
 }
@@ -88,6 +106,9 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   tokens: 'input/cached_input/output/reasoning_output/cache_creation/total；cached_input 是 input 的子集。',
   prompt_signals: '仅由 user prompt 派生的数值信号（长度/结构化率/文件引用率/约束率/返工率），不含任何原文。',
   error_signals: '工具失败率/中断数/API错误，及失败按工具与按白名单类别（git/test/build/permission/network/timeout/not-read/other）。仅由工具结果派生计数+类别，绝不含原始 stderr/输出/文件内容/命令全行（隐私红线细化，ADR 0016）。',
+  rework_signals: '编辑次数、用户事后手改率（userModified）、累计新增/删除行数（structuredPatch）。只派生计数，绝不含 diff 文本（ADR 0017）。',
+  skills: '各 skill 被调用的次数（按 attributionSkill），反映 skill 使用画像。',
+  environment: 'Claude Code 版本、权限模式分布、附件数、子代理消息数——只由记录元数据派生的非敏感标签/计数（ADR 0017）。',
   git_habits: 'git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。',
   project_management: '各仓库是否有测试/构建/CI 信号。',
   duration: '活跃时长（相邻事件间隔 ≤5 分钟才计入），非墙钟跨度。',

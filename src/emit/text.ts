@@ -79,6 +79,29 @@ export function emitText(r: Report, byRepo: boolean): string {
     lines.push('')
   }
 
+  const rw = r.rework_signals
+  if (rw.edits > 0) {
+    lines.push('返工 / 改动')
+    lines.push(`  编辑 ${rw.edits} 次 · 手改率 ${(rw.user_modified_rate * 100).toFixed(1)}% · +${rw.lines_added}/-${rw.lines_removed} 行`)
+    lines.push('')
+  }
+  if (r.skills?.length) {
+    lines.push('Skill: ' + r.skills.map((c) => `${c.command}(${c.count})`).join(' '))
+    lines.push('')
+  }
+  const env = r.environment
+  if (env) {
+    const parts: string[] = []
+    if (env.claude_versions?.length) parts.push('版本 ' + env.claude_versions.join('/'))
+    if (env.permission_modes?.length) parts.push('权限 ' + env.permission_modes.map((c) => `${c.command}(${c.count})`).join(' '))
+    if (env.attachments) parts.push(`附件 ${env.attachments}`)
+    if (env.subagent_messages) parts.push(`子代理消息 ${env.subagent_messages}`)
+    if (parts.length) {
+      lines.push('环境: ' + parts.join(' · '))
+      lines.push('')
+    }
+  }
+
   lines.push('习惯')
   lines.push(`  Git 命令 ${r.git_habits.command_count} 次 · 分支上下文 ${r.git_habits.branch_count} 个 · 多分支仓库 ${r.git_habits.multi_branch_repos} 个`)
   if (r.project_management.signals?.length) lines.push(`  项目管理: ${r.project_management.signals.join('；')}`)

@@ -72,10 +72,11 @@
 - 全程**只读**、默认不外发；分析只基于 **user prompt + permission + tool 调用**，**绝不读 assistant 回复**。
 - **本人 prompt 长期授权、默认读**（ADR 0015）：报告默认读取并评级用户自己的 prompt，不再每次弹授权门；
   但**红线不放宽**——绝不读 assistant/thinking/system·developer prompt/文件内容、绝不外发、写入前一律脱敏+截断。
-- **错误信号是 tool_result 的唯一例外（ADR 0016，派生化读取）**：`error_signals` 只从 tool_result/toolUseResult/
-  isApiErrorMessage 派生 **`is_error` 布尔、工具名、`interrupted`、API 错误、白名单错误类别**（git/test/build/
-  permission/network/timeout/not-read/other）；错误文本仅**瞬时分类成标签即弃**，**绝不存储/外发原始 stderr/
-  stdout/diff/文件内容/命令全行**，也绝不读 tool_result 的非错误内容。仅主会话、走去重。
+- **工具结果/元数据的「派生信号」是受控例外（ADR 0016/0017）**：`error_signals` / `rework_signals` / `skills` /
+  `environment` 只从 tool_result/toolUseResult/记录元数据派生**布尔、纯计数、固定白名单或非敏感标签**——
+  `is_error`/`interrupted`/`userModified`、失败率/编辑次数/±行数/附件/子代理数、错误类别/skill名/版本/权限模式；
+  内容（stderr/stdout/diff/文件/命令全行）只**瞬时用于派生即弃、绝不存储/外发**，也绝不读非错误正文做内容用途。
+  仅主会话、走去重。
 - user prompt 仅在会话 / 项目层、**转述 + 脱敏**后使用；全局层 / 可分享成绩卡纯聚合、零 prompt 原文。
 - **不输出配额百分比**（CLI 下 `rate_limits` 恒 null，配额是账号级 / 跨机器）；成本为**估算值**，非实际账单。
 - 只反映**本机**，不跨机器汇总。

@@ -25,4 +25,13 @@ describe('parseCodex（glob）', () => {
     expect(r.tokens.input).toBe(15)
     expect(r.tokens.total).toBe(15)
   })
+  it('error_signals：function_call_output exit code + error 事件（格式推断）', () => {
+    const e = parseCodex('test/fixtures/codex-errors', window).error_signals
+    expect(e.tool_calls).toBe(2) // c1(err) + c2(ok)
+    expect(e.tool_errors).toBe(1) // c1 exit 128
+    expect(e.api_errors).toBe(1) // error 事件
+    expect(e.by_category).toEqual(expect.arrayContaining([{ command: 'git', count: 1 }]))
+    // 隐私：不含原始输出
+    expect(JSON.stringify(parseCodex('test/fixtures/codex-errors', window))).not.toContain('fatal: not a git repository')
+  })
 })
