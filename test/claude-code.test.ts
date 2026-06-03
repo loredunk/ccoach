@@ -64,4 +64,11 @@ describe('parseClaudeCode', () => {
     })
     expect(JSON.stringify(sess)).not.toContain('保留测试') // scope 桶绝不含 prompt 原文
   })
+  it('来源（entrypoint）：按 token 加权填 sources（双平台「来源」面板对称）', () => {
+    const r = parseClaudeCode('test/fixtures/claude-sources', { fromYmd: '2026-06-02', toYmd: '2026-06-02', desc: '2026-06-02' })
+    expect(r.sources.map((s) => s.name)).toEqual(['vscode', 'cli']) // token 降序：vscode 300 > cli 150
+    const by = Object.fromEntries(r.sources.map((s) => [s.name, s]))
+    expect(by.cli).toMatchObject({ sessions: 1, tokens: 150 })
+    expect(by.vscode).toMatchObject({ sessions: 1, tokens: 300 })
+  })
 })

@@ -59,6 +59,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
   // 预扫描建 tool_use_id -> 工具名 全量表：resume/fork 可能把 user 的 tool_result 排到其
   // assistant tool_use 之前（文件按 uuid 排序、非时间序），单遍按序查会查不到，故先建全量映射。
   const toolUseNames = new Map<string, string>()
+  // 预扫描同时建 session -> entrypoint（首个非空）：entrypoint 多在会话早期记录上、未必在每条
+  // assistant 上，预扫描可保证归因 token 时已知来源。仅取标签字符串（如 cli/vscode），无敏感信息。
+  const sessionEntrypoint = new Map<string, string>()
   for (const file of files) {
     let pre: string
     try { pre = readFileSync(file, 'utf8') } catch { continue }
@@ -67,6 +70,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       if (!t) continue
       let rec: any
       try { rec = JSON.parse(t) } catch { continue }
+      const psid = typeof rec?.sessionId === 'string' ? rec.sessionId : ''
+      const pep = typeof rec?.entrypoint === 'string' ? rec.entrypoint.trim() : ''
+      if (psid && pep && !sessionEntrypoint.has(psid)) sessionEntrypoint.set(psid, pep)
       if (rec?.type !== 'assistant') continue
       const blocks = Array.isArray(rec.message?.content) ? rec.message.content : []
       for (const b of blocks) if (b && b.type === 'tool_use' && typeof b.id === 'string') toolUseNames.set(b.id, b.name)
@@ -188,6 +194,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
           // 也避免泄露子代理命令；且 sidechain 时间戳与主会话交错，markActive 计入会虚增活跃时长。
           agg.touchSession(session)
           agg.markActive(ts)
+          // 来源（entrypoint）：按 token 加权填入 sources（如 cli / vscode），供双平台「来源」面板对称。
+          const ep = sessionEntrypoint.get(session)
+          if (ep) agg.applyUsageSource(ep, tokens, session)
           const blocks = Array.isArray(msg.content) ? msg.content : []
           for (const b of blocks) {
             if (!b || b.type !== 'tool_use') continue

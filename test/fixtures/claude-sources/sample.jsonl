@@ -1,0 +1,3 @@
+{"type":"user","sessionId":"s1","cwd":"/h/work/ccoach","timestamp":"2026-06-02T03:00:00.000Z","entrypoint":"cli","uuid":"u1","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}
+{"type":"assistant","sessionId":"s1","cwd":"/h/work/ccoach","timestamp":"2026-06-02T03:00:01.000Z","entrypoint":"cli","uuid":"u2","requestId":"r1","message":{"role":"assistant","id":"m1","model":"claude-opus-4-8","content":[],"usage":{"input_tokens":100,"output_tokens":50}}}
+{"type":"assistant","sessionId":"s2","cwd":"/h/work/other","timestamp":"2026-06-02T04:00:00.000Z","entrypoint":"vscode","uuid":"u3","requestId":"r2","message":{"role":"assistant","id":"m2","model":"claude-opus-4-8","content":[],"usage":{"input_tokens":200,"output_tokens":100}}}
