@@ -55,6 +55,10 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
   // 跨文件去重（对齐 ccusage）：会话 resume/fork 会把同一条消息复制进多个 JSONL，不去重会把
   // 用量成倍高估。assistant 用 message.id:requestId、其它用 uuid 作稳定标识。
   const seen = new Set<string>()
+  // 流式分片：同一 message.id:requestId 会多次落盘且 usage 递增（早期分片偏小、最终分片完整）。
+  // ccusage 取该 key 的最终(最大)usage；故预扫描先求每 key 最大 usage，主循环对保留的那条用最大值，
+  // 避免只取首个早期分片而少算（对齐 ccusage，见 verify:ccusage 逐日对账）。
+  const maxUsageByKey = new Map<string, Tokens>()
   const files = walkJsonl(dir)
   // 预扫描建 tool_use_id -> 工具名 全量表：resume/fork 可能把 user 的 tool_result 排到其
   // assistant tool_use 之前（文件按 uuid 排序、非时间序），单遍按序查会查不到，故先建全量映射。
@@ -76,6 +80,25 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       if (rec?.type !== 'assistant') continue
       const blocks = Array.isArray(rec.message?.content) ? rec.message.content : []
       for (const b of blocks) if (b && b.type === 'tool_use' && typeof b.id === 'string') toolUseNames.set(b.id, b.name)
+      // 每个 dedup key 取最大 usage（key 同主循环：有 message.id 用 id:requestId，否则退 uuid）。
+      const pmsgId = rec?.message?.id
+      const pKey =
+        typeof pmsgId === 'string' && pmsgId !== ''
+          ? `${pmsgId}:${rec?.requestId ?? ''}`
+          : typeof rec?.uuid === 'string' && rec.uuid !== ''
+            ? rec.uuid
+            : null
+      if (pKey !== null) {
+        const u = rec.message?.usage ?? {}
+        const input = num(u.input_tokens)
+        const cachedInput = num(u.cache_read_input_tokens)
+        const output = num(u.output_tokens)
+        const cacheCreation = num(u.cache_creation_input_tokens)
+        const total = input + output + cachedInput + cacheCreation
+        const prev = maxUsageByKey.get(pKey)
+        if (!prev || total > prev.total)
+          maxUsageByKey.set(pKey, { input, cached_input: cachedInput, output, reasoning_output: 0, cache_creation: cacheCreation, total })
+      }
     }
   }
   for (const file of files) {
@@ -176,14 +199,21 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
         }
       } else if (rec.type === 'assistant') {
         const msg = rec.message ?? {}
-        const usage = msg.usage ?? {}
-        const input = num(usage.input_tokens)
-        const cachedInput = num(usage.cache_read_input_tokens)
-        const output = num(usage.output_tokens)
-        const cacheCreation = num(usage.cache_creation_input_tokens)
-        const tokens: Tokens = {
-          input, cached_input: cachedInput, output, reasoning_output: 0,
-          cache_creation: cacheCreation, total: input + output + cachedInput + cacheCreation,
+        // 保留的是首次出现的那条；token 用预扫描得到的该 key 最大 usage（流式分片取最终值，对齐 ccusage）。
+        const best = dedupKey !== null ? maxUsageByKey.get(dedupKey) : undefined
+        let tokens: Tokens
+        if (best) {
+          tokens = { ...best }
+        } else {
+          const usage = msg.usage ?? {}
+          const input = num(usage.input_tokens)
+          const cachedInput = num(usage.cache_read_input_tokens)
+          const output = num(usage.output_tokens)
+          const cacheCreation = num(usage.cache_creation_input_tokens)
+          tokens = {
+            input, cached_input: cachedInput, output, reasoning_output: 0,
+            cache_creation: cacheCreation, total: input + output + cachedInput + cacheCreation,
+          }
         }
         const model = typeof msg.model === 'string' ? msg.model : ''
         // 用量/成本计入全部（含 sidechain 子代理），与 ccusage 一致；sidechain 不计入会话数，

@@ -16,6 +16,13 @@ describe('parseClaudeCode', () => {
     expect(r.repos[0].repo).toBe('ccoach')
     expect(r.models).toContain('claude-opus-4-8')
   })
+  it('流式分片：同 message.id:requestId 多次落盘且 usage 递增 → 取最终(最大)值（对齐 ccusage）', () => {
+    // ccusage 对同一 (messageId,requestId) 保留最终(最大)usage；ccoach 旧实现取首个早期分片会少算。
+    const r = parseClaudeCode('test/fixtures/claude-stream', window)
+    expect(r.tokens.input).toBe(10)
+    expect(r.tokens.output).toBe(80) // 取最大分片 80，而非首个分片 5
+    expect(r.tokens.total).toBe(90)
+  })
   it('工具/习惯仅主会话：去重、排除 sidechain 工具', () => {
     const r = parseClaudeCode('test/fixtures/claude', window)
     expect(r.tools.shell_calls).toBe(1) // 仅主会话一次；重复与 sidechain 的 Bash 都不计

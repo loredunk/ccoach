@@ -100,7 +100,9 @@ function normalizedCommandLine(args: string): string {
   return stripShellWrapper(commandLine(args).split(/\s+/).filter(Boolean)).join(' ')
 }
 
-// 子代理：session_meta payload 含 subagent/thread_spawn → 整文件跳过。
+// 子代理：session_meta payload 含 subagent/thread_spawn → 整个 rollout 视为 sidechain。
+// 注意（与 ccusage 对齐的口径）：子代理的 token/成本**计入用量**（用户真实花费，ccusage 也计入），
+// 仅不计入会话数 / 工具 / 活跃时长 / scope 桶等"用户习惯"信号——与 Claude 侧 isSidechain 处理对称。
 // 先剔除 cwd 等路径字段再做子串匹配，避免仓库路径里恰好含 'subagent' 而误判整文件。
 function isSubagentRollout(lines: string[]): boolean {
   for (const line of lines) {
@@ -129,7 +131,8 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
     const lines = content.split('\n')
-    if (isSubagentRollout(lines)) continue
+    // 子代理 rollout：token 仍计入用量，但工具/会话/活跃时长等习惯信号不计（对齐 Claude sidechain）。
+    const sidechain = isSubagentRollout(lines)
     agg.resetActive()
     let prevTotal: CodexTokens = { input: 0, cached: 0, output: 0, reasoning: 0, total: 0 }
     let curModel = ''
@@ -157,9 +160,9 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           break
         }
         case 'event_msg': {
-          // API/网络/流式错误事件（类型推断）：窗口内则计入 api_errors。
+          // API/网络/流式错误事件（类型推断）：窗口内则计入 api_errors；子代理不计入（习惯信号）。
           if (payload.type === 'error' || payload.type === 'stream_error') {
-            if (!Number.isNaN(ts.getTime()) && inLocalRange(ts, window)) agg.applyApiError()
+            if (!sidechain && !Number.isNaN(ts.getTime()) && inLocalRange(ts, window)) agg.applyApiError()
             break
           }
           if (payload.type !== 'token_count') break
@@ -185,13 +188,20 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
             input: delta.input, cached_input: delta.cached, output: delta.output,
             reasoning_output: delta.reasoning, cache_creation: 0, total: delta.total,
           }
-          agg.beginRecord(repo, sessionId, ts) // 分层 scope 桶（project=repo / session=sessionId）
-          agg.applyTokens(tokens, curModel, repo, sessionId, ts)
-          threadTouched = true
-          agg.markActive(ts)
+          // 用量/成本计入全部（含子代理 rollout），与 ccusage 一致；子代理 sessionId 传空避免污染会话/scope 桶。
+          agg.beginRecord(repo, sidechain ? '' : sessionId, ts) // 分层 scope 桶（project=repo / session=sessionId）
+          agg.applyTokens(tokens, curModel, repo, sidechain ? '' : sessionId, ts)
+          if (sidechain) {
+            agg.markSubagentMessage()
+          } else {
+            threadTouched = true
+            agg.markActive(ts) // 活跃时长只反映主会话；子代理时间戳与主会话交错，计入会虚增
+          }
           break
         }
         case 'response_item': {
+          // 子代理工具/错误不计入"用户习惯"（对齐 Claude：sidechain 不计工具/错误信号）。
+          if (sidechain) break
           if (Number.isNaN(ts.getTime()) || !inLocalRange(ts, window)) break
           agg.beginRecord(repo, sessionId, ts) // 分层 scope 桶
           const t = payload.type

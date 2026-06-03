@@ -1,5 +1,7 @@
-// ccusage 交叉验证：把 ccoach 自算的 token/成本与 npx ccusage / @ccusage/codex 对账。
+// ccusage 交叉验证：把 ccoach 自算的 token/成本与 npx ccusage 对账。
 // ccusage 仅作验证、不作运行时依赖（这里通过 npx 临时拉取，不进 dependencies）。
+// 注意（ccusage v20 起为 Rust 单包、默认 `all` 合并 claude+codex+其它 adapter）：分平台对账必须
+// 走子命令 `ccusage claude` / `ccusage codex`，不能用裸 `ccusage`（那是合并视图，会把 codex 算进 claude）。
 // 在线时强校验；离线/未安装时打印 SKIP 并以 0 退出（CI 在线时才强制对齐）。
 import { execFileSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
@@ -15,9 +17,9 @@ export function withinTolerance(ours: Measure, theirs: Measure): boolean {
   return Math.abs(ours.cost - theirs.cost) / denom <= 0.01
 }
 
-function runCcusage(pkg: string, args: string[]): unknown | null {
+function runCcusage(args: string[]): unknown | null {
   try {
-    const out = execFileSync('npx', ['-y', pkg, ...args], {
+    const out = execFileSync('npx', ['-y', 'ccusage@latest', ...args], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 180_000,
@@ -35,7 +37,8 @@ function ccusageTotals(j: unknown): Measure | null {
   const pick = (o: unknown): Measure | null => {
     if (!o || typeof o !== 'object') return null
     const r = o as Record<string, unknown>
-    const cost = Number(r.totalCost ?? r.cost ?? NaN)
+    // claude 子命令用 totalCost；codex 子命令用 costUSD（ccusage v20 两子命令字段形状不同）。
+    const cost = Number(r.totalCost ?? r.cost ?? r.costUSD ?? NaN)
     const tokens = Number(r.totalTokens ?? r.tokens ?? NaN)
     return Number.isFinite(cost) && Number.isFinite(tokens) ? { tokens, cost } : null
   }
@@ -67,21 +70,21 @@ function ours(platform: Platform): Measure {
 }
 
 function main(): void {
-  const checks: { name: string; pkg: string; platform: Platform }[] = [
-    { name: 'Claude Code', pkg: 'ccusage@latest', platform: 'claude-code' },
-    { name: 'Codex', pkg: '@ccusage/codex@latest', platform: 'codex' },
+  const checks: { name: string; sub: string; platform: Platform }[] = [
+    { name: 'Claude Code', sub: 'claude', platform: 'claude-code' },
+    { name: 'Codex', sub: 'codex', platform: 'codex' },
   ]
   let anyChecked = false
   let failed = false
   for (const c of checks) {
-    const raw = runCcusage(c.pkg, ['--json'])
+    const raw = runCcusage([c.sub, '--json'])
     if (!raw) {
-      console.log(`[SKIP] ${c.name}: ${c.pkg} 不可用（离线或未安装）`)
+      console.log(`[SKIP] ${c.name}: ccusage ${c.sub} 不可用（离线或未安装）`)
       continue
     }
     const theirs = ccusageTotals(raw)
     if (!theirs) {
-      console.log(`[SKIP] ${c.name}: 无法解析 ${c.pkg} 输出`)
+      console.log(`[SKIP] ${c.name}: 无法解析 ccusage ${c.sub} 输出`)
       continue
     }
     const mine = ours(c.platform)
