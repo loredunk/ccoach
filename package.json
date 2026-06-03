@@ -1,18 +1,27 @@
 {
   "name": "@loredunk/ccoach",
   "version": "0.1.0",
-  "description": "本机 AI 用量教练：只读分析 Claude Code / Codex 用量与习惯",
+  "description": "本机 AI 用量教练：只读分析 Claude Code / Codex 用量与习惯（A local AI usage coach for Claude Code / Codex）",
   "type": "module",
   "bin": { "ccoach": "./dist/cli.js" },
+  "main": "./dist/index.js",
+  "exports": { ".": "./dist/index.js" },
   "files": ["dist"],
   "engines": { "node": ">=18" },
+  "license": "MIT",
+  "keywords": ["claude-code", "codex", "ai", "usage", "tokens", "cost", "ccusage", "cli", "analytics"],
+  "repository": { "type": "git", "url": "git+https://github.com/loredunk/ccoach.git" },
+  "homepage": "https://github.com/loredunk/ccoach#readme",
+  "bugs": { "url": "https://github.com/loredunk/ccoach/issues" },
+  "publishConfig": { "access": "public" },
   "scripts": {
     "build": "tsdown",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify:ccusage": "tsx scripts/verify-ccusage.ts"
+    "verify:ccusage": "tsx scripts/verify-ccusage.ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^22",
