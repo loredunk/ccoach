@@ -17,6 +17,7 @@ cli
   .option('--by-repo', '展开全部仓库（默认仅前 8）')
   .option('--platform <platform>', '数据源：claude-code | codex | all', { default: 'all' })
   .option('--json', '输出机器可读 JSON（agent 友好）')
+  .option('--no-glossary', '省略 glossary 自描述块（省 ~2KB token）')
   .action((_filter: string[], options: Record<string, unknown>) => {
     try {
       const platform = String(options.platform ?? 'all') as Platform
@@ -37,6 +38,7 @@ cli
         new Date(),
       )
       const report = buildReport({ platform, window })
+      if (options.glossary === false) delete report.glossary // cac：--no-glossary => glossary:false
       const out = options.json ? emitJson(report) + '\n' : emitText(report, Boolean(options.byRepo))
       process.stdout.write(out)
     } catch (e) {

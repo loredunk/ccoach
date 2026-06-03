@@ -12,6 +12,13 @@ import { newPromptAcc, promptAccUpdate, promptSignals, type PromptAcc } from './
 
 const IDLE_CAP_MS = 5 * 60 * 1000
 
+// --json 输出封顶（防 token 爆炸）：上限给得宽、正常用不受影响，只截断病态规模的长尾。
+// 截断的都是按 token 排序后的尾部（低占比项），"钱花在哪"的信号不受影响。
+const REPOS_MAX = 50 // repos[] 取 token 前 N
+const USAGE_MAX = 15 // sources[]/languages[] 各取前 N
+const MT_MODELS_MAX = 10 // models_timeline 取 token 前 N 个模型
+const MT_DAYS_MAX = 31 // 每个模型 days[] 只留最近 N 天（first_day/last_day/tokens 仍为真实全量）
+
 interface RepoAgg {
   repo: string
   sessions: Set<string>
@@ -283,10 +290,10 @@ export class Aggregator {
         total_calls: this.totalCalls,
         top_commands: topCounts(shellRecord, 12),
       },
-      repos,
+      repos: repos.slice(0, REPOS_MAX), // 习惯/项目统计仍用全量 repos，仅输出列表封顶
       hours,
-      sources: usageReports(this.bySource),
-      languages: usageReports(this.byLanguage),
+      sources: usageReports(this.bySource).slice(0, USAGE_MAX),
+      languages: usageReports(this.byLanguage).slice(0, USAGE_MAX),
       git_habits: buildGitHabits(gitRecord, branchSet.size, multiBranchRepos),
       project_management: buildProjectMgmt(repoFacts),
       prompt_signals: promptSignals(this.promptAcc),
@@ -327,10 +334,11 @@ function buildModelsTimeline(byModelDay: Map<string, Map<string, ModelDayAgg>>):
       cost += da.cost
       dayCounts.push({ date: d, tokens: da.tokens })
     }
-    out.push({ model, first_day: dayKeys[0], last_day: dayKeys[dayKeys.length - 1], tokens, estimated_cost_usd: cost, days: dayCounts })
+    // days[] 只留最近 N 天封顶；first_day/last_day/tokens 仍为真实全量（时间感知信号不受影响）。
+    out.push({ model, first_day: dayKeys[0], last_day: dayKeys[dayKeys.length - 1], tokens, estimated_cost_usd: cost, days: dayCounts.slice(-MT_DAYS_MAX) })
   }
   out.sort((a, b) => (b.tokens !== a.tokens ? b.tokens - a.tokens : a.model < b.model ? -1 : a.model > b.model ? 1 : 0))
-  return out
+  return out.slice(0, MT_MODELS_MAX)
 }
 
 function humanizeDuration(ms: number): string {

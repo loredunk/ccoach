@@ -27,4 +27,17 @@ describe('Aggregator', () => {
     agg.markActive(new Date(base.getTime() + 60 * 60 * 1000))  // +60min → 不计
     expect(agg.durationSeconds()).toBe(120)
   })
+  it('--json 输出封顶防 token 爆炸（repos / models_timeline.days）', () => {
+    const agg = new Aggregator('claude-code')
+    const t0 = Date.UTC(2026, 0, 1)
+    const tok = (n: number) => ({ input: n, cached_input: 0, output: 0, reasoning_output: 0, cache_creation: 0, total: n })
+    for (let i = 0; i < 60; i++) agg.applyTokens(tok(i + 1), 'claude-opus-4-8', 'repo' + i, 's', new Date(t0))
+    for (let d = 0; d < 40; d++) agg.applyTokens(tok(1), 'gpt-5.1', 'r', 's', new Date(t0 + d * 86400000))
+    const r = agg.assemble({ fromYmd: '2026-01-01', toYmd: '2026-12-31', desc: 'd' }, 'glob')
+    expect(r.repos.length).toBeLessThanOrEqual(50) // 60 个 repo → 封顶 50
+    const mt = r.models_timeline!.find((m) => m.model === 'gpt-5.1')!
+    expect(mt.days.length).toBeLessThanOrEqual(31) // 40 天 → days[] 封顶 31
+    expect(mt.tokens).toBe(40) // 但 tokens 仍为真实全量
+    expect(mt.first_day).toBe('2026-01-01') // first_day 不受 days[] 截断影响
+  })
 })

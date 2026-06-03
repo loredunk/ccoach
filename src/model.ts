@@ -102,7 +102,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   cache_hit_rate: 'cached_input /（cached_input + 非缓存输入）的缓存命中率，两平台口径统一、恒在 0–1（Codex 下 input 含缓存，等价于 cached/input）；越高越省钱（重复上下文被缓存复用）。',
   reasoning_ratio: 'reasoning_output / output，推理 token 占输出的比例；偏高常意味任务被反复推理。',
   estimated_cost_usd: '估算成本，仅供参考、不等于实际账单。算法对齐 ccusage（按各 token 类别 × LiteLLM 参考价）。',
-  models_timeline: '每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token；用于时间感知判断：某旧模型占大头若只因新模型当时还没出现，不应判为浪费。',
+  models_timeline: '每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token；用于时间感知判断：某旧模型占大头若只因新模型当时还没出现，不应判为浪费。（防 token 爆炸：列表取 token 前 10 个模型，每个 days[] 只列最近 31 天；first_day/last_day/tokens 为真实全量。repos/sources/languages 同样按 token 取前 N。）',
   tokens: 'input/cached_input/output/reasoning_output/cache_creation/total；cached_input 是 input 的子集。',
   prompt_signals: '仅由 user prompt 派生的数值信号（长度/结构化率/文件引用率/约束率/返工率），不含任何原文。',
   error_signals: '工具失败率/中断数/API错误，及失败按工具与按白名单类别（git/test/build/permission/network/timeout/not-read/other）。仅由工具结果派生计数+类别，绝不含原始 stderr/输出/文件内容/命令全行（隐私红线细化，ADR 0016）。',
