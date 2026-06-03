@@ -22,11 +22,10 @@
 
 下面两条是已定方向。**Phase 1 已实现**：CLI 核心已用 TypeScript 重写为 `@loredunk/ccoach`（统一解析层 +
 双平台适配器 + ccusage 对账，见 `src/` 与 `docs/superpowers/`）；原 Go 版（`cmd/`、`internal/`）已交叉验证后
-**退役删除（去 Go 完成）**。**Phase 2 进行中（去 Python）**：确定性渲染/计算层（merge / scorecard / render×2）
-已改写为 skill 内的 `.mjs`，`tools/` 校验已转 TS（scorecard 回归进 vitest、`check_adrs.mjs` 跑 docs lint）；
-采集类脚本正**并入 ccoach**（[ADR 0018](docs/adr/0018-cli-absorbs-collection-prompt-preview.md)：块 A 行为字段已落地——
-`tools.by_name`/`categories`/`hours.count`/`file_languages` + Claude 行为改吃 `ccoach report --platform claude-code --json`；
-块 B `--scope`、块 C `ccoach sessions` opt-in 预览待续）。动手前读对应 ADR。
+**退役删除（去 Go 完成）**。**Phase 2 已完成（去 Python）**：确定性渲染/计算层（merge / scorecard / render×2）已改写为 skill 内的 `.mjs`，
+`tools/` 校验转 TS（scorecard 回归进 vitest、`check_adrs.mjs` 跑 docs lint）；采集层**并入 ccoach**
+（[ADR 0018](docs/adr/0018-cli-absorbs-collection-prompt-preview.md)：`ccoach report` 行为字段 + `--scope` 分层桶 + `ccoach sessions` opt-in 单会话 redacted 预览）。
+**全仓库零 Python、零 Go。** 动手前读对应 ADR。
 
 ### 1. CLI 迁移到 Node/TypeScript + 自建统一解析层
 
@@ -59,8 +58,7 @@
   `pricing.ts`（双平台计价）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `emit/{json,text}.ts`。
 - `test/` — vitest 单测 + 两平台 JSONL fixture（含 `test/fixtures/scorecard/`）；`test/scorecard.test.ts` 成绩卡回归
   （取代 `tools/test_scorecard.py`）；`scripts/verify-ccusage.ts` — 与 ccusage 对账（接入 CI）。
-- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；渲染/计算层（`*.mjs`）已去 Python，
-  采集类脚本（`*.py`）去 Python 待续。
+- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；脚本全部 `.mjs`（渲染/计算）+ 采集并入 ccoach，**skill 内无 `.py`**。
 - `tools/` — 校验脚本（`check_adrs.mjs`，原 `check_adrs.py`；scorecard 回归已并入 vitest）。
 - `docs/` — PRD / ADR / TODO（含 `superpowers/` 设计与实现计划），见下。
 - `README.md`（英文，默认）/ `README_CN.md`（中文）。

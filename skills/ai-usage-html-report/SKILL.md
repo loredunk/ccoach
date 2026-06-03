@@ -4,7 +4,7 @@ description: Generate an enriched dual-platform (Claude Code + Codex) HTML repor
 when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage across Claude Code and Codex — for example "how much did I spend on Claude Code / Codex", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my Claude Code and Codex usage", "which projects burned the most tokens", "compare my Claude Code vs Codex usage", "review my most expensive or unclear Codex sessions", "analyze my AI coding habits", or an explicit /ai-usage-html-report invocation.'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
-allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(python3 *) Bash(ccusage *)
+allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(ccusage *)
 ---
 
 # AI Usage HTML Report (Claude Code + Codex)
@@ -83,14 +83,14 @@ Use this when the user wants to find expensive or unclear Codex sessions.
 1. Generate/read `/tmp/codex-usage-report.json`.
 2. Identify candidate projects from `repos`, sorted by token count, estimated cost, and session count.
 3. Show the user a short candidate list and ask which project to inspect. Do not read prompt contents yet.
-4. Generate session candidates for the selected project:
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/session_drilldown.py --days N --repo REPO --top 20 > /tmp/codex-session-candidates.json`
-   - Or for one day: `python3 ${CLAUDE_SKILL_DIR}/scripts/session_drilldown.py --date YYYY-MM-DD --repo REPO --top 20 > /tmp/codex-session-candidates.json`
+4. Generate session candidates for the selected project (numeric only, zero prompt text):
+   - `ccoach sessions --platform codex --days N --repo REPO --top 20 > /tmp/codex-session-candidates.json`
+   - Or for one day: `ccoach sessions --platform codex --date YYYY-MM-DD --repo REPO --top 20 > /tmp/codex-session-candidates.json`
 5. Summarize the candidate sessions by token count, tools, time span, model, source, branch, and rollout path.
 6. Ask the user to choose a session before doing any prompt-content review.
-7. Only after explicit user approval, rerun the script for the selected session with user prompts included:
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/session_drilldown.py --rollout /path/to/rollout.jsonl --include-user-prompts > /tmp/codex-session-review-source.json`
-   - Or `python3 ${CLAUDE_SKILL_DIR}/scripts/session_drilldown.py --session-id SESSION_ID --include-user-prompts > /tmp/codex-session-review-source.json`
+7. Only after explicit user approval, rerun for the selected session with user prompts included (Codex requires an explicit `--id` or `--rollout`):
+   - `ccoach sessions --platform codex --rollout /path/to/rollout.jsonl --include-user-prompts > /tmp/codex-session-review-source.json`
+   - Or `ccoach sessions --platform codex --id SESSION_ID --include-user-prompts > /tmp/codex-session-review-source.json`
 8. Read `references/session-prompt-review.md`, then summarize the session review findings. Fold the key diagnoses into the `insights` strings of `/tmp/ai-usage-insights.json` (or, in the Codex-only fallback, into `session_reviews` of `/tmp/codex-usage-insights.json` per the schema).
 9. Render the HTML again.
 
@@ -98,9 +98,9 @@ Use this when the user wants to find expensive or unclear Codex sessions.
 
 The symmetric counterpart for Claude Code. The data owner has granted **standing local authorization** to read their own prompts by default (ADR 0015), so the daily report runs this step automatically — no per-run approval gate. It is still **single-session** (the top-token session, or one the user names), redacted, local-only, and you must still **paraphrase rather than quote**.
 
-1. By default, surface the highest-token session's redacted prompts + per-prompt signals in one call (no `--session-id` needed — it auto-selects the top session):
-   - `python3 ${CLAUDE_SKILL_DIR}/scripts/claude_session_prompts.py --since <START> --include-user-prompts > /tmp/cc-session-review-source.json`
-   - To target a specific session instead, list candidates first (`--top 20`, no `--include-user-prompts` → numeric only, zero prompt text), then pass `--session-id SESSION_ID --include-user-prompts`.
+1. By default, surface the highest-token session's redacted prompts + per-prompt signals in one call (no `--id` needed — it auto-selects the top-token session):
+   - `ccoach sessions --platform claude-code --since <START> --include-user-prompts > /tmp/cc-session-review-source.json`
+   - To target a specific session instead, list candidates first (`ccoach sessions --platform claude-code --top 20`, no `--include-user-prompts` → numeric only, zero prompt text), then pass `--id SESSION_ID --include-user-prompts`.
    - Output is a single session under `selected_session.prompts[]` (each `{idx, timestamp, signals, preview}`); secrets/home/emails/IPs are redacted and truncated. Never an all-sessions dump.
 2. Read `references/session-prompt-review.md`, then write the content-layer review into the `recommendations`/`insights` of `/tmp/ai-usage-insights.json` (rate context/direction/scope/verification; give a better first prompt + follow-up). Paraphrase — never paste `preview` verbatim, and keep the shareable scorecard aggregate-only.
 3. Render the HTML again.
@@ -115,7 +115,7 @@ Pick the scope from what the user asks (ADR 0005):
 - **Project**: one project across its sessions. `ccoach report --scope project --json` emits `projects[]` (keyed by cwd basename), either platform.
 - **Session**: the current/just-finished session. `ccoach report --scope session --json` emits `sessions_detail[]`; if invoked mid-session, analyze the live session directly.
 
-For deeper per-session drilldown (model/source/branch/rollout path + opt-in redacted prompt review), see the drilldown sections below (Codex `session_drilldown.py`, Claude `claude_session_prompts.py` — moving to `ccoach sessions`).
+For deeper per-session drilldown (model/source/branch/rollout path + opt-in redacted prompt review), see the drilldown sections below (`ccoach sessions --platform codex|claude-code`).
 
 Signal model for every scope: analyze **user prompts + permissions + tool calls only — never assistant replies**. User-prompt analysis is numeric (`prompt_signals`); if you ever quote a prompt (Codex opt-in drilldown only), paraphrase + redact (see `references/session-prompt-review.md`). Global scope stays purely aggregate (no prompt text).
 

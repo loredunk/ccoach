@@ -87,6 +87,28 @@ export function promptAccUpdate(acc: PromptAcc, rawText: unknown): void {
   }
 }
 
+// 单条 prompt 的布尔信号（与全局聚合同一词表/谓词，单一真相源）。入参应为已 strip 的文本，
+// 瞬时使用——只派生布尔/长度，绝不存储原文。
+export interface PromptFlags {
+  len: number
+  structured: boolean
+  file_ref: boolean
+  constraint: boolean
+  correction: boolean
+}
+export function promptFlags(text: string): PromptFlags {
+  const low = text.toLowerCase()
+  return {
+    len: [...text].length,
+    structured: text.includes('```') || LIST_RE.test(text),
+    file_ref: FILE_REF_RE.test(text),
+    constraint:
+      CONSTRAINT_WORDS_EN.some((w) => low.includes(w)) || CONSTRAINT_WORDS_ZH.some((w) => text.includes(w)),
+    correction:
+      CORRECTION_STARTS_EN.some((w) => low.startsWith(w)) || CORRECTION_STARTS_ZH.some((w) => text.startsWith(w)),
+  }
+}
+
 export function promptSignals(acc: PromptAcc): PromptSignals {
   const n = acc.count
   if (!n) {

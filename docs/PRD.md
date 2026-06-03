@@ -160,7 +160,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 | --- | --- | --- |
 | **会话级 session** | 当前这次会话 | 在会话中插入 skill 即时分析；agent 已持有当前会话上下文 |
 | **项目级 project** | 单个项目跨会话 | Claude Code：`~/.claude/projects/<cwd 编码目录>/`；Codex：按 repo/cwd 过滤 rollout |
-| **全局级 global** | 跨所有项目 / 时间窗口 | 复用 `collect_claude_behavior.py` + `ccoach report` |
+| **全局级 global** | 跨所有项目 / 时间窗口 | `ccoach report --json`（采集已并入 CLI，见 ADR 0018；`--scope project/session` 出分层桶，`ccoach sessions` 做会话钻取）|
 
 **信号选择**：分析只基于 **user prompt + permission + tool 调用**，**不读取 assistant 回复**
 （回复体量大、对「人如何驱动工具」诊断价值低，去掉后上下文显著变小，会话级「插入即分析」才可行）。

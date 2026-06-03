@@ -41,7 +41,7 @@ skill，而非新建或拆分）。
 - **会话级 / 项目级**：**可读 user prompt**，但限定：仅本机、用户发起、**转述 + 脱敏**、
   绝不逐字成片堆叠、绝不读 assistant 回复。复用 [`references/session-prompt-review.md`](../../skills/ai-usage-html-report/references/session-prompt-review.md)
   的脱敏与改写框架。
-- **全局级**：**保持纯聚合**，沿用 [`scripts/collect_claude_behavior.py`](../../skills/ai-usage-html-report/scripts/collect_claude_behavior.py)
+- **全局级**：**保持纯聚合**，沿用 `ccoach report --json`（原 `scripts/collect_claude_behavior.py`，已并入 CLI，见 [ADR 0018](0018-cli-absorbs-collection-prompt-preview.md)）
   的零 prompt 文本策略（只出计数/类别/扩展名/仓库 basename 等聚合量）。
 - **理由**：全局层不需要 prompt 文本就能给统计与趋势；只有要诊断「提示质量」时（会话/项目层）
   才需要 user prompt，且必须脱敏转述。这与现有 skill「Claude Code 纯聚合、Codex 选定会话才按需读
