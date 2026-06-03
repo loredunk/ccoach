@@ -55,10 +55,10 @@
 
 - `src/` — **TS CLI（Phase 1，当前实现）**：`cli.ts`（cac）/ `index.ts`（`buildReport` + 平台合并）/
   `parsers/{claude-code,codex}.ts`（双平台适配器）/ `aggregate.ts`（平台无关聚合）/ `model.ts`（统一结构 + glossary）/
-  `pricing.ts`（双平台计价）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `emit/{json,text}.ts`。
+  `pricing.ts`（双平台**离线 fallback** 价表，非权威；权威价走 skill 层联网官方价，ADR 0019）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `emit/{json,text}.ts`。
 - `test/` — vitest 单测 + 两平台 JSONL fixture（含 `test/fixtures/scorecard/`）；`test/scorecard.test.ts` 成绩卡回归
   （取代 `tools/test_scorecard.py`）；`scripts/verify-ccusage.ts` — 与 ccusage 对账（接入 CI）。
-- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；脚本全部 `.mjs`（渲染/计算）+ 采集并入 ccoach，**skill 内无 `.py`**。
+- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；脚本全部 `.mjs`（merge / `apply_pricing`（联网官方价计成本，ADR 0019）/ scorecard / render×2）+ 采集并入 ccoach，**skill 内无 `.py`**。
 - `tools/` — 校验脚本（`check_adrs.mjs`，原 `check_adrs.py`；scorecard 回归已并入 vitest）。
 - `docs/` — PRD / ADR / TODO（含 `superpowers/` 设计与实现计划），见下。
 - `README.md`（英文，默认）/ `README_CN.md`（中文）。
@@ -82,4 +82,5 @@
   仅主会话、走去重。
 - user prompt 仅在会话 / 项目层、**转述 + 脱敏**后使用；全局层 / 可分享成绩卡纯聚合、零 prompt 原文。
 - **不输出配额百分比**（CLI 下 `rate_limits` 恒 null，配额是账号级 / 跨机器）；成本为**估算值**，非实际账单。
+  CLI 只出 token/模型（离线权威）+ 一个离线 fallback 估算；**权威成本由 skill 层按实际模型名联网查官方定价**后计算（[ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)），不用写死价表。
 - 只反映**本机**，不跨机器汇总。

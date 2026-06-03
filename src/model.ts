@@ -26,6 +26,14 @@ export interface ModelTimeline {
   estimated_cost_usd: number
   days: ModelDayCount[]
 }
+// 每个模型的全窗口 token 分桶——供 skill 层联网查官方价后自行计价（计价公式按模型族不同：
+// Claude 互斥桶 vs Codex cached⊆input，需要分桶才能算）。estimated_cost_usd 仅离线 fallback。
+export interface ModelTokenBreakdown {
+  model: string
+  tokens: Tokens             // 全窗口 input/cached_input/output/reasoning_output/cache_creation/total
+  estimated_cost_usd: number // 离线 fallback 估算（仅在 skill 未联网查价时用）
+  priced: boolean            // 离线价表是否命中（与 unpriced_models 互补）
+}
 export interface RepoReport {
   repo: string; branches?: string[]; sessions: number; tokens: number
   estimated_cost_usd: number; language?: string
@@ -94,6 +102,7 @@ export interface Report {
   models: string[]
   unpriced_models?: string[]
   models_timeline?: ModelTimeline[]
+  model_tokens?: ModelTokenBreakdown[] // 每模型全窗口 token 分桶；供 skill 层用联网官方价计价
   tools: {
     shell_calls: number; web_searches: number; file_changes: number; total_calls: number
     top_commands: CommandCount[]
@@ -123,8 +132,9 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   _about: '仅本机数据，不跨机器汇总；不含任何账户级配额百分比（CLI 下 rate_limits 恒为 null）。',
   cache_hit_rate: 'cached_input /（cached_input + 非缓存输入）的缓存命中率，两平台口径统一、恒在 0–1（Codex 下 input 含缓存，等价于 cached/input）；越高越省钱（重复上下文被缓存复用）。',
   reasoning_ratio: 'reasoning_output / output，推理 token 占输出的比例；偏高常意味任务被反复推理。',
-  estimated_cost_usd: '估算成本，仅供参考、不等于实际账单。算法对齐 ccusage（按各 token 类别 × LiteLLM 参考价）。',
+  estimated_cost_usd: '离线 best-effort fallback 估算，仅供参考、不等于实际账单。权威成本由 skill 层联网查询各模型官方定价后计算覆盖；本字段仅在未联网查价时作兜底（用内置离线 fallback 价表）。',
   models_timeline: '每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token；用于时间感知判断：某旧模型占大头若只因新模型当时还没出现，不应判为浪费。（防 token 爆炸：列表取 token 前 10 个模型，每个 days[] 只列最近 31 天；first_day/last_day/tokens 为真实全量。repos/sources/languages 同样按 token 取前 N。）',
+  model_tokens: '每个模型的全窗口 token 分桶（input/cached_input/output/reasoning_output/cache_creation/total）+ 离线 fallback 估算成本与 priced 标记。供 skill 层按实际模型名联网查官方定价后自行计价（Claude 互斥桶 vs Codex cached⊆input 公式不同，必须分桶）。按 token 取前 10 个模型。',
   tokens: 'input/cached_input/output/reasoning_output/cache_creation/total；cached_input 是 input 的子集。',
   prompt_signals: '仅由 user prompt 派生的数值信号（长度/结构化率/文件引用率/约束率/返工率），不含任何原文。',
   error_signals: '工具失败率/中断数/API错误，及失败按工具与按白名单类别（git/test/build/permission/network/timeout/not-read/other）。仅由工具结果派生计数+类别，绝不含原始 stderr/输出/文件内容/命令全行（隐私红线细化，ADR 0016）。',

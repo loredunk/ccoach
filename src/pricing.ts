@@ -4,17 +4,17 @@ import { type Tokens } from './model.js'
 // “该家族的 input/cached_input/cache_creation 是互斥桶”（disjoint），据此切换计费口径。
 export interface Price {
   input: number
-  cachedInput: number   // 缓存读取价（LiteLLM cache_read_input_token_cost）
+  cachedInput: number   // 缓存读取价（per-million USD）
   output: number        // 已含 reasoning（两平台 output 都把 reasoning 计入）
   cacheCreation?: number // 仅 Claude：缓存写入价；存在=>disjoint 口径
 }
 
-// 最长前缀匹配；更具体的 key（如 gpt-5.1-codex-mini）胜过家族默认（gpt-5）。
-// Codex 13 条 VERBATIM 移植自 internal/codexreport/pricing.go（USD / 1e6 token，
-// 对齐 ccusage 取自 LiteLLM model_prices_and_context_window.json，2026-06-02 同步）。
-// Claude 3 条为估算价，同步自 LiteLLM/Anthropic 列表价（cache_read=0.1×input、
-// cache_write=1.25×input），由 scripts/verify-ccusage.ts（Task 12）交叉验证；
-// 较旧的 claude-3-* 家族 Phase 1 故意不列（会被报告为未计价 / unpriced）。
+// ⚠️ 这是 CLI 的**可选离线 fallback 价表**，非权威来源。权威成本由 skill 层按报告里
+// 实际出现的模型名联网查询官方定价后计算（apply_pricing.mjs，ADR 0019）；本表仅在未联网
+// 查价时给一个 best-effort 估算（CLI 单独离线跑、或某模型查不到官方价时兜底）。
+// 模型会更新，本表难免滞后——别把它当账单依据。
+// 最长前缀匹配；更具体的 key（如 gpt-5.1-codex-mini）胜过家族默认（gpt-5）。USD / 1e6 token。
+// 较旧的 claude-3-* 家族故意不列（会被报告为未计价 / unpriced，交给 skill 层联网查）。
 const priceTable: { prefix: string; p: Price }[] = [
   { prefix: 'gpt-5.5', p: { input: 5.0, cachedInput: 0.5, output: 30.0 } },
   { prefix: 'gpt-5.4-mini', p: { input: 0.75, cachedInput: 0.075, output: 4.5 } },

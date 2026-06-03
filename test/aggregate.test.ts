@@ -8,11 +8,20 @@ describe('Aggregator', () => {
     const t = new Date('2026-06-02T03:00:00Z')
     agg.applyTokens({ input: 100, cached_input: 40, output: 50, reasoning_output: 0,
       cache_creation: 0, total: 150 }, 'claude-opus-4-8', 'ccoach', 's1', t)
+    agg.applyTokens({ input: 10, cached_input: 5, output: 8, reasoning_output: 2,
+      cache_creation: 3, total: 21 }, 'gpt-5.4', 'ccoach', 's1', t)
     agg.touchSession('s1')
     const r = agg.assemble({ fromYmd: '2026-06-02', toYmd: '2026-06-02', desc: '2026-06-02' }, 'glob')
-    expect(r.tokens.input).toBe(100)
-    expect(r.tokens.total).toBe(150)
-    expect(r.cache_hit_rate).toBeCloseTo(40 / 140, 6)   // 统一口径：cached/(cached+非缓存输入)
+    expect(r.tokens.input).toBe(110)
+    expect(r.tokens.total).toBe(171)
+    // model_tokens 每类桶之和 == 顶层 tokens（供 skill 层联网官方价计价的基石，ADR 0019）
+    const mt = r.model_tokens!
+    for (const k of ['input', 'cached_input', 'output', 'reasoning_output', 'cache_creation', 'total'] as const) {
+      expect(mt.reduce((a, m) => a + m.tokens[k], 0)).toBe(r.tokens[k])
+    }
+    expect(mt.find((m) => m.model === 'claude-opus-4-8')!.priced).toBe(true)
+    // 统一口径 cached/(cached+非缓存输入)：claude 互斥桶 fresh=100 + codex fresh=(10-5)=5；cached=40+5
+    expect(r.cache_hit_rate).toBeCloseTo(45 / 150, 6)
     expect(r.sessions).toBe(1)
     expect(r.repos[0].repo).toBe('ccoach')
     expect(r.estimated_cost_usd).toBeGreaterThan(0)

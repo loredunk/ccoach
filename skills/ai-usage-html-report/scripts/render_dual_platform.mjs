@@ -79,28 +79,37 @@ function compareMetric(label, a, b, fmt = comma, aName = 'Claude Code', bName = 
   )
 }
 
+// Unified per-model table. Both platforms now carry { model, tokens:{...}, cost }
+// (cost from official online prices via apply_pricing). Codex adds a reasoning column.
 function modelTable(models, kind) {
   const rows = []
-  if (kind === 'claude') {
-    rows.push("<tr><th>模型</th><th>成本</th><th>输入</th><th>输出</th><th>缓存读</th></tr>")
-    for (const m of models) {
-      rows.push(
-        `<tr><td><b>${esc(m.model)}</b></td><td>${money(m.cost)}</td>` +
-          `<td>${comma(m.input)}</td><td>${comma(m.output)}</td>` +
-          `<td>${comma(m.cache_read)}</td></tr>`,
-      )
-    }
-  } else {
-    rows.push("<tr><th>模型</th><th>输入</th><th>输出</th><th>缓存输入</th><th>reasoning</th></tr>")
-    for (const m of models) {
-      rows.push(
-        `<tr><td><b>${esc(m.model)}</b></td>` +
-          `<td>${comma(m.input)}</td><td>${comma(m.output)}</td>` +
-          `<td>${comma(m.cached)}</td><td>${comma(m.reasoning)}</td></tr>`,
-      )
-    }
+  const head = kind === 'codex'
+    ? "<tr><th>模型</th><th>成本</th><th>输入</th><th>输出</th><th>缓存输入</th><th>reasoning</th></tr>"
+    : "<tr><th>模型</th><th>成本</th><th>输入</th><th>输出</th><th>缓存读</th></tr>"
+  rows.push(head)
+  for (const m of models ?? []) {
+    const t = m.tokens ?? {}
+    const cells = kind === 'codex'
+      ? `<td>${comma(t.input)}</td><td>${comma(t.output)}</td><td>${comma(t.cached_input)}</td><td>${comma(t.reasoning_output)}</td>`
+      : `<td>${comma(t.input)}</td><td>${comma(t.output)}</td><td>${comma(t.cached_input)}</td>`
+    rows.push(`<tr><td><b>${esc(m.model)}</b></td><td>${money(m.cost)}</td>${cells}</tr>`)
   }
   return '<table>' + rows.join('') + '</table>'
+}
+
+// Window range label that guards an empty date_range (platform with no activity in
+// the requested window — e.g. Codex when it wasn't used during the window).
+function rangeLabel(dr) {
+  return dr && dr.length ? `${dr[0]}→${dr[dr.length - 1]}` : '本窗口内无活动'
+}
+// Per-platform cost note reflecting the official-online pricing basis.
+function costNote(plat) {
+  if (plat.cost_is_real === true) return '成本：官方定价（联网查询）'
+  if (plat.cost_is_real === 'partial') {
+    const n = (plat.unpriced_models ?? []).length
+    return `成本：官方定价（${n} 个模型未查到价，回退离线估算）`
+  }
+  return '成本：离线 fallback 估算'
 }
 
 // Horizontal mini bar list for top_commands / git / languages / repos.
@@ -267,7 +276,10 @@ function render(data, insights, scorecard = null) {
     CSS,
     '</style></head><body><main>',
     `<header><h1>${esc(title)}</h1>` +
-      `<p>生成于 ${esc(data.generated_at)} · 数据来源：ccusage(Claude Code, 离线 LiteLLM 定价) + ccoach/ccusage(Codex)</p></header>`,
+      `<p><b>统计窗口：${esc(data.window?.desc ?? data.generated_at)}</b> · 生成于 ${esc(data.generated_at)}</p>` +
+      `<p class='muted'>数据来源：ccoach（本地离线解析，token 与模型为权威事实）` +
+      (data.cost?.priced_at ? ` · 成本：官方定价（联网查询于 ${esc(data.cost.priced_at)}）` : ' · 成本：离线 fallback 估算') +
+      `</p></header>`,
   ]
 
   // shareable cover scorecard (top of the report, screenshot-friendly)
@@ -275,7 +287,7 @@ function render(data, insights, scorecard = null) {
 
   // combined headline metrics
   p.push("<section class='metrics'>")
-  p.push(metric('合计成本', money(comb.total_cost_usd), '两平台真实/估算成本'))
+  p.push(metric('合计成本', money(comb.total_cost_usd), '官方定价成本（联网查询）'))
   p.push(metric('合计 Token', comma(comb.total_tokens)))
   p.push(metric('Claude Code 成本', money(cc.cost_usd), `${cc.active_days} 活跃天`))
   p.push(metric('Codex 成本', money(cx.cost_usd), `${cx.active_days} 活跃天`))
@@ -357,8 +369,8 @@ function render(data, insights, scorecard = null) {
   // Claude Code panel
   p.push("<div class='panel'><h2>Claude Code</h2>")
   p.push(
-    `<p class='muted'>${esc(cc.source)} · ${cc.date_range[0]}→${cc.date_range[cc.date_range.length - 1]} · ` +
-      `${cc.sessions} 会话 · 成本真实</p>`,
+    `<p class='muted'>${esc(cc.source)} · ${rangeLabel(cc.date_range)} · ` +
+      `${cc.sessions} 会话 · ${costNote(cc)}</p>`,
   )
   p.push(sparkline(cc.daily_series, '#0f766e'))
   p.push('<h3>模型分布</h3>')
@@ -375,24 +387,19 @@ function render(data, insights, scorecard = null) {
 
   // Codex panel
   p.push("<div class='panel'><h2>Codex</h2>")
-  const af = cx.codex_today
-  const emptyNote = af.empty ? '（ccoach 今日报告为空：今天无 Codex 活动）' : ''
+  const cxEmpty = (cx.tokens?.total ?? 0) === 0
   p.push(
-    `<p class='muted'>${esc(cx.source)} · ${cx.date_range[0]}→${cx.date_range[cx.date_range.length - 1]} · ` +
-      `成本：部分按日估算（per-model 缺定价）${esc(emptyNote)}</p>`,
+    `<p class='muted'>${esc(cx.source)} · ${rangeLabel(cx.date_range)} · ${costNote(cx)}</p>`,
   )
-  p.push(sparkline(cx.daily_series, '#b45309'))
-  p.push('<h3>模型分布</h3>')
-  p.push(modelTable(cx.models, 'codex'))
-  p.push(`<h3>ccoach 今日快照（${esc(af.generated_for)} ${esc(af.timezone)}）</h3>`)
-  p.push(
-    `<p>会话 <b>${af.sessions}</b> · token <b>${comma((af.tokens ?? {}).total ?? 0)}</b> · ` +
-      `成本 <b>${money(af.cost_usd)}</b> · 缓存命中 <b>${pct(af.cache_hit_rate)}</b></p>`,
-  )
-  if (af.empty) {
+  if (cxEmpty) {
+    p.push("<p class='muted'>本窗口内无 Codex 活动（该平台在所选统计窗口里没有会话）。</p>")
+  } else {
+    p.push(sparkline(cx.daily_series, '#b45309'))
+    p.push('<h3>模型分布</h3>')
+    p.push(modelTable(cx.models, 'codex'))
     p.push(
-      "<p class='muted'>说明：ccoach <code>report --json</code> 只统计当天；" +
-        '今天无 Codex 会话，故快照为 0。历史 Codex 数据由 ccusage codex 提供（上方）。</p>',
+      `<p class='muted'>token <b>${comma((cx.tokens ?? {}).total ?? 0)}</b> · ` +
+        `成本 <b>${money(cx.cost_usd)}</b> · 缓存命中 <b>${pct(cx.cache_hit_rate)}</b></p>`,
     )
   }
   p.push('</div>')
@@ -424,19 +431,21 @@ function render(data, insights, scorecard = null) {
   // data provenance / privacy
   p.push("<section class='panel'><h2>数据来源与隐私</h2><ul>")
   p.push(
-    '<li>Claude Code：<code>ccusage claude daily/session --json --offline --breakdown</code>，' +
-      '成本由 ccusage 内置 LiteLLM 定价离线计算（真实）。</li>',
+    '<li><b>Token 与模型</b>（权威本地事实）：由 <code>ccoach report --json</code> 离线解析；' +
+      'Claude Code 的 per-model token 归属另用 <code>ccusage claude daily --breakdown</code> 交叉核对。</li>',
   )
   p.push(
-    '<li>Codex：<code>ccoach report --json</code>（当天快照）+ ' +
-      '<code>ccusage codex daily --json --offline</code>（历史）。Codex 成本为按日估算，' +
-      'ccusage 对 Codex per-model 不输出 costUSD。</li>',
+    '<li><b>成本</b>：不再用第三方内置价表。由本 skill 按报告里<b>实际出现的每个模型名</b>联网查询其' +
+      '<b>官方 API 定价</b>（含接入的第三方模型），再用各模型 token 分桶确定性计算' +
+      `${data.cost?.priced_at ? `（查询于 ${esc(data.cost.priced_at)}）` : ''}。` +
+      '查不到官方价的模型回退到离线 fallback 估算并标注。成本为估算、非账单。</li>',
   )
   p.push(
     '<li>隐私：用量为聚合 token/成本/模型名/项目目录名。<b>会读取你本人的 user prompt</b> ' +
       '用于习惯与质量评级（本机长期授权）——但读取前一律<b>脱敏</b>（密钥/home 目录/绝对路径/邮箱/IP）' +
       '并截断，报告只写<b>转述与数值信号、不嵌入 prompt 原文</b>；可分享成绩卡纯聚合、零原文。' +
-      '绝不读取助手回复 / 思考 / 工具结果 / system 提示 / 文件内容。全程本地，ccusage 离线不联网、不上传。</li>',
+      '绝不读取助手回复 / 思考 / 工具结果 / system 提示 / 文件内容。ccoach 解析全程本地离线；' +
+      '仅本 skill 在查询官方定价时联网（只发模型名、不发任何用量或 prompt）。</li>',
   )
   p.push('</ul></section>')
 

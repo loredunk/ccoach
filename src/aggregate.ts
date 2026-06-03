@@ -2,7 +2,8 @@ import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
   type ReworkSignals, type EnvironmentSignals, type FileLanguage,
   type ScopeBucket, type ProjectScope, type SessionScope,
-  type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY, emptyTokens,
+  type ModelTimeline, type ModelDayCount, type ModelTokenBreakdown,
+  REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
 import { type Window, localYmd } from './window.js'
 import { estimateCost, normalizeModel, disjointInputBuckets } from './pricing.js'
@@ -32,7 +33,11 @@ interface RepoAgg {
   hasCI: boolean
 }
 interface UsageAgg { name: string; tokens: number; sessions: Set<string> }
-interface ModelDayAgg { tokens: number; cost: number }
+// per-model per-day 聚合：tokens/cost 供 models_timeline；五类桶供 model_tokens（skill 层计价用）。
+interface ModelDayAgg {
+  tokens: number; cost: number
+  input: number; cached_input: number; output: number; reasoning_output: number; cache_creation: number
+}
 
 export type Scope = 'global' | 'project' | 'session'
 // 分层 scope 桶（按 repo 或 sessionId）：只攒派生数值/计数 + prompt 数值信号，绝不存 prompt 原文。
@@ -172,7 +177,7 @@ export class Aggregator {
     r.cost += usd
     if (session) r.sessions.add(session)
     if (branch) r.branches.add(branch)
-    if (nm) this.applyModelDay(nm, ts, d.total, usd)
+    if (nm) this.applyModelDay(nm, ts, d, usd)
     this.byHour[ts.getHours()] += d.total
     this.byHourCount[ts.getHours()]++
     if (this.curBucket) {
@@ -182,14 +187,19 @@ export class Aggregator {
     }
   }
 
-  private applyModelDay(model: string, ts: Date, tokens: number, cost: number): void {
+  private applyModelDay(model: string, ts: Date, d: Tokens, cost: number): void {
     const day = localYmd(ts)
     let days = this.byModelDay.get(model)
     if (!days) { days = new Map(); this.byModelDay.set(model, days) }
     let md = days.get(day)
-    if (!md) { md = { tokens: 0, cost: 0 }; days.set(day, md) }
-    md.tokens += tokens
+    if (!md) { md = { tokens: 0, cost: 0, input: 0, cached_input: 0, output: 0, reasoning_output: 0, cache_creation: 0 }; days.set(day, md) }
+    md.tokens += d.total
     md.cost += cost
+    md.input += d.input
+    md.cached_input += d.cached_input
+    md.output += d.output
+    md.reasoning_output += d.reasoning_output
+    md.cache_creation += d.cache_creation
   }
 
   applyTool(kind: ToolKind, command?: string): void {
@@ -446,7 +456,10 @@ export class Aggregator {
       report.scope = 'global'
     }
     if (this.missingPrice.size) report.unpriced_models = [...this.missingPrice].sort()
-    if (this.byModelDay.size) report.models_timeline = buildModelsTimeline(this.byModelDay)
+    if (this.byModelDay.size) {
+      report.models_timeline = buildModelsTimeline(this.byModelDay)
+      report.model_tokens = buildModelTokens(this.byModelDay, this.missingPrice)
+    }
     return report
   }
 }
@@ -474,6 +487,27 @@ function buildModelsTimeline(byModelDay: Map<string, Map<string, ModelDayAgg>>):
     out.push({ model, first_day: dayKeys[0], last_day: dayKeys[dayKeys.length - 1], tokens, estimated_cost_usd: cost, days: dayCounts.slice(-MT_DAYS_MAX) })
   }
   out.sort((a, b) => (b.tokens !== a.tokens ? b.tokens - a.tokens : a.model < b.model ? -1 : a.model > b.model ? 1 : 0))
+  return out.slice(0, MT_MODELS_MAX)
+}
+
+// 每模型全窗口 token 分桶（跨天求和）+ 离线 fallback 成本与 priced 标记；按 token 取前 N。
+function buildModelTokens(byModelDay: Map<string, Map<string, ModelDayAgg>>, missingPrice: Set<string>): ModelTokenBreakdown[] {
+  const out: ModelTokenBreakdown[] = []
+  for (const [model, days] of byModelDay) {
+    const t = emptyTokens()
+    let cost = 0
+    for (const md of days.values()) {
+      t.input += md.input
+      t.cached_input += md.cached_input
+      t.output += md.output
+      t.reasoning_output += md.reasoning_output
+      t.cache_creation += md.cache_creation
+      t.total += md.tokens
+      cost += md.cost
+    }
+    out.push({ model, tokens: t, estimated_cost_usd: cost, priced: !missingPrice.has(model) })
+  }
+  out.sort((a, b) => (b.tokens.total !== a.tokens.total ? b.tokens.total - a.tokens.total : a.model < b.model ? -1 : a.model > b.model ? 1 : 0))
   return out.slice(0, MT_MODELS_MAX)
 }
 
