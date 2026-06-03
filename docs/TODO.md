@@ -113,7 +113,7 @@
 - [~]（进行中）**采集类并入 ccoach**（决策见 [`adr/0018`](adr/0018-cli-absorbs-collection-prompt-preview.md)，取代「照搬 .mjs」）：
   - [x] **块 A · 行为字段**：`Report` 增补可选 `tools.by_name` / `tools.categories` / `hours.count` / `file_languages`（契约兼容）；
         Claude 适配器全量计数 + 分类工具（修旧版漏计）；`merge_dual_platform.mjs` 与 SKILL 的 Claude 行为改吃 `ccoach report --platform claude-code --json`。
-  - [ ] **块 B · scope**：`ccoach report --scope {global,project,session}` → `projects[]` / `sessions_detail[]`，取代 `collect_claude_behavior --scope`。
+  - [x] **块 B · scope**：`ccoach report --scope {global,project,session}` → `projects[]` / `sessions_detail[]`（每桶 tokens/tool_calls/cache_hit_rate/categories/git_top/prompt_signals），两平台；取代 `collect_claude_behavior --scope`。SKILL「Analysis scopes」改指 ccoach。
   - [ ] **块 C · 会话钻取/预览**：`ccoach sessions`（候选清单 + opt-in 单会话 redacted 预览）取代 `session_drilldown` / `claude_session_prompts`；删 3 个 `.py`、去掉 `Bash(python3 *)`。
 
 ## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）

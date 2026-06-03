@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { Aggregator } from '../aggregate.js'
+import { Aggregator, type Scope } from '../aggregate.js'
 import { inLocalRange, type Window } from '../window.js'
 import { repoName } from '../text.js'
 import { classifyError } from '../errors.js'
@@ -117,8 +117,8 @@ function isSubagentRollout(lines: string[]): boolean {
   return false
 }
 
-export function parseCodex(home: string, window: Window): Report {
-  const agg = new Aggregator('codex')
+export function parseCodex(home: string, window: Window, scope: Scope = 'global'): Report {
+  const agg = new Aggregator('codex', scope)
   feedCodex(agg, home, window)
   return agg.assemble(window, 'glob')
 }
@@ -185,6 +185,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
             input: delta.input, cached_input: delta.cached, output: delta.output,
             reasoning_output: delta.reasoning, cache_creation: 0, total: delta.total,
           }
+          agg.beginRecord(repo, sessionId, ts) // 分层 scope 桶（project=repo / session=sessionId）
           agg.applyTokens(tokens, curModel, repo, sessionId, ts)
           threadTouched = true
           agg.markActive(ts)
@@ -192,6 +193,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
         }
         case 'response_item': {
           if (Number.isNaN(ts.getTime()) || !inLocalRange(ts, window)) break
+          agg.beginRecord(repo, sessionId, ts) // 分层 scope 桶
           const t = payload.type
           if (t === 'function_call') {
             const name = payload.name

@@ -43,6 +43,17 @@ export interface ProjectMgmtReport {
   repos_with_tests: number; repos_with_build_system: number; repos_with_ci: number
   signals?: string[]
 }
+// 分层 scope 桶（--scope project/session）：每桶只含派生数值/计数 + prompt 数值信号，绝不含 prompt 原文。
+export interface ScopeBucket {
+  tokens: number
+  tool_calls: number
+  cache_hit_rate: number
+  categories: Record<string, number>
+  git_top: CommandCount[]
+  prompt_signals: PromptSignals
+}
+export interface ProjectScope extends ScopeBucket { repo: string; sessions: number }
+export interface SessionScope extends ScopeBucket { session_id: string; repo: string; duration_seconds: number }
 // 错误/卡顿信号——只由工具结果派生的数值与白名单类别，绝不含原始 stderr/输出/文件内容（ADR 0016）。
 export interface ErrorSignals {
   tool_calls: number            // 观测到的 tool_result 总数（分母）
@@ -102,6 +113,9 @@ export interface Report {
   skills?: CommandCount[]
   environment?: EnvironmentSignals
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
+  scope?: string              // "global" | "project" | "session"
+  projects?: ProjectScope[]   // --scope project：每项目跨会话的派生信号桶
+  sessions_detail?: SessionScope[] // --scope session：每会话的派生信号桶
   glossary?: Record<string, string>
 }
 
@@ -123,5 +137,8 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   'tools.categories': '工具类别计数 shell/web/file/search/mcp/other（纯计数，无内容）。',
   file_languages: '按读写/编辑文件的扩展名派生的语言文件数（仅扩展名映射语言，绝不含路径/文件内容）。',
   'hours.count': '该时段的活跃事件数（与 tokens 并列；用于活跃度热力，不含内容）。',
+  scope: '分析层级：global（默认，跨项目聚合）/ project（额外给 projects[]）/ session（额外给 sessions_detail[]）。',
+  projects: '每项目跨会话的派生信号桶（tokens/tool_calls/cache_hit_rate/categories/git_top/prompt_signals）；仅 --scope project。',
+  sessions_detail: '每会话的派生信号桶（含 session_id/duration_seconds 等）；仅 --scope session；不含 prompt 原文。',
   duration: '活跃时长（相邻事件间隔 ≤5 分钟才计入），非墙钟跨度。',
 }

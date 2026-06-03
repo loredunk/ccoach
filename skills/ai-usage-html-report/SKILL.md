@@ -111,9 +111,11 @@ The symmetric counterpart for Claude Code. The data owner has granted **standing
 
 Pick the scope from what the user asks (ADR 0005):
 
-- **Global** (default): cross-project overview. `collect_claude_behavior.py` (no `--scope`) + `ccoach report --json`.
-- **Project**: one project across its sessions. `collect_claude_behavior.py --scope project` (keyed by cwd basename under `~/.claude/projects/`); Codex side use `session_drilldown.py --repo <name>`.
-- **Session**: the current/just-finished session. `collect_claude_behavior.py --scope session` emits `sessions_detail[]`; if the skill is invoked mid-session, analyze the live session directly.
+- **Global** (default): cross-project overview. `ccoach report --json` (per platform via `--platform`).
+- **Project**: one project across its sessions. `ccoach report --scope project --json` emits `projects[]` (keyed by cwd basename), either platform.
+- **Session**: the current/just-finished session. `ccoach report --scope session --json` emits `sessions_detail[]`; if invoked mid-session, analyze the live session directly.
+
+For deeper per-session drilldown (model/source/branch/rollout path + opt-in redacted prompt review), see the drilldown sections below (Codex `session_drilldown.py`, Claude `claude_session_prompts.py` — moving to `ccoach sessions`).
 
 Signal model for every scope: analyze **user prompts + permissions + tool calls only — never assistant replies**. User-prompt analysis is numeric (`prompt_signals`); if you ever quote a prompt (Codex opt-in drilldown only), paraphrase + redact (see `references/session-prompt-review.md`). Global scope stays purely aggregate (no prompt text).
 

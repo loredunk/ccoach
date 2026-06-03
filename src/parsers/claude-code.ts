@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { Aggregator } from '../aggregate.js'
+import { Aggregator, type Scope } from '../aggregate.js'
 import { inLocalRange, type Window } from '../window.js'
 import { repoName, extOf } from '../text.js'
 import { classifyError } from '../errors.js'
@@ -43,8 +43,8 @@ function userText(message: any): string {
   return parts.join('\n')
 }
 
-export function parseClaudeCode(dir: string, window: Window): Report {
-  const agg = new Aggregator('claude-code')
+export function parseClaudeCode(dir: string, window: Window, scope: Scope = 'global'): Report {
+  const agg = new Aggregator('claude-code', scope)
   feedClaudeCode(agg, dir, window)
   return agg.assemble(window, 'glob')
 }
@@ -116,6 +116,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       if (typeof rec.attributionSkill === 'string') agg.applySkill(rec.attributionSkill)
       if (rec.type === 'attachment') agg.markAttachment()
       if (sidechain) agg.markSubagentMessage()
+
+      // 分层 scope：设当前桶（project=repo / session=sessionId）；sidechain 不进会话桶（与会话计数口径一致）。
+      agg.beginRecord(repo, sidechain ? '' : session, ts)
 
       if (rec.type === 'user') {
         // prompt 信号只反映"人类本人"的 prompt：sidechain（子代理）user 文本是 agent 生成的

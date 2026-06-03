@@ -1,6 +1,7 @@
 import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
   type ReworkSignals, type EnvironmentSignals, type FileLanguage,
+  type ScopeBucket, type ProjectScope, type SessionScope,
   type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
 import { type Window, localYmd } from './window.js'
@@ -32,6 +33,23 @@ interface RepoAgg {
 }
 interface UsageAgg { name: string; tokens: number; sessions: Set<string> }
 interface ModelDayAgg { tokens: number; cost: number }
+
+export type Scope = 'global' | 'project' | 'session'
+// 分层 scope 桶（按 repo 或 sessionId）：只攒派生数值/计数 + prompt 数值信号，绝不存 prompt 原文。
+interface GroupAcc {
+  key: string
+  repo: string
+  sessions: Set<string>
+  tokens: number
+  cacheRead: number
+  input: number
+  toolCalls: number
+  cat: Map<string, number>
+  git: Map<string, number>
+  prompt: PromptAcc
+  first: number | null
+  last: number | null
+}
 
 export type ToolKind = 'shell' | 'web' | 'file' | 'search' | 'mcp' | 'other'
 
@@ -80,9 +98,43 @@ export class Aggregator {
   private permModes = new Map<string, number>()
   private attachments = 0
   private subagentMsgs = 0
+  // 分层 scope（默认 global）：!=global 时按桶攒派生信号，每条记录前由适配器 beginRecord 设当前桶。
+  private scope: Scope
+  private groups = new Map<string, GroupAcc>()
+  private curBucket: GroupAcc | null = null
 
-  constructor(platform: string) {
+  constructor(platform: string, scope: Scope = 'global') {
     this.platform = platform
+    this.scope = scope
+  }
+
+  // 适配器在处理每条记录前调用，按 scope 选当前桶（project=repo / session=sessionId）。
+  // sidechain/无键记录传空 → curBucket=null（与全局口径一致：不把子代理/无主记录计进桶）。
+  beginRecord(repo: string, session: string, ts: Date | null): void {
+    this.curBucket = null
+    if (this.scope === 'global') return
+    let key: string
+    if (this.scope === 'session') {
+      if (!session) return
+      key = session
+    } else {
+      const r = (repo ?? '').trim()
+      if (!r || r === '(unknown)') return
+      key = r
+    }
+    let g = this.groups.get(key)
+    if (!g) {
+      g = { key, repo: this.scope === 'session' ? '(unknown)' : key, sessions: new Set(), tokens: 0, cacheRead: 0, input: 0, toolCalls: 0, cat: new Map(), git: new Map(), prompt: newPromptAcc(), first: null, last: null }
+      this.groups.set(key, g)
+    }
+    if (this.scope === 'session' && repo && repo !== '(unknown)' && g.repo === '(unknown)') g.repo = repo
+    if (this.scope === 'project' && session) g.sessions.add(session)
+    if (ts && !Number.isNaN(ts.getTime())) {
+      const t = ts.getTime()
+      if (g.first === null || t < g.first) g.first = t
+      if (g.last === null || t > g.last) g.last = t
+    }
+    this.curBucket = g
   }
 
   private repoFor(repo: string): RepoAgg {
@@ -123,6 +175,11 @@ export class Aggregator {
     if (nm) this.applyModelDay(nm, ts, d.total, usd)
     this.byHour[ts.getHours()] += d.total
     this.byHourCount[ts.getHours()]++
+    if (this.curBucket) {
+      this.curBucket.tokens += d.total
+      this.curBucket.cacheRead += d.cached_input
+      this.curBucket.input += d.input
+    }
   }
 
   private applyModelDay(model: string, ts: Date, tokens: number, cost: number): void {
@@ -152,6 +209,14 @@ export class Aggregator {
       this.fileChanges++
     }
     // 'search'/'mcp'/'other'：仅计入 totalCalls + categories（如 Glob/Grep、mcp__*、Codex 通用 call）
+    if (this.curBucket) {
+      this.curBucket.toolCalls++
+      this.curBucket.cat.set(kind, (this.curBucket.cat.get(kind) ?? 0) + 1)
+      if (kind === 'shell' && command) {
+        const gs = gitSubcommand(command)
+        if (gs) this.curBucket.git.set(gs, (this.curBucket.git.get(gs) ?? 0) + 1)
+      }
+    }
   }
 
   // 各工具名计数（仅工具名，绝不含命令行/参数；隐私同 skills/environment 标签）。
@@ -190,7 +255,10 @@ export class Aggregator {
     if (facts.hasCI) r.hasCI = true
   }
 
-  applyPrompt(text: string): void { promptAccUpdate(this.promptAcc, text) }
+  applyPrompt(text: string): void {
+    promptAccUpdate(this.promptAcc, text)
+    if (this.curBucket) promptAccUpdate(this.curBucket.prompt, text)
+  }
 
   // 工具结果（错误/卡顿信号）：category 已由适配器瞬时分类成白名单标签，聚合器只存计数、不见原文。
   applyToolResult(toolName: string, isError: boolean, category: string | null): void {
@@ -342,6 +410,40 @@ export class Aggregator {
       if (this.versions.size) env.claude_versions = [...this.versions].sort()
       if (this.permModes.size) env.permission_modes = topCounts(permRec, 8)
       report.environment = env
+    }
+    if (this.scope !== 'global') {
+      report.scope = this.scope
+      const toBucket = (g: GroupAcc): ScopeBucket => {
+        const denom = g.cacheRead + g.input
+        const cat: Record<string, number> = {}
+        for (const [k, v] of g.cat) cat[k] = v
+        const gitRec: Record<string, number> = {}
+        for (const [k, v] of g.git) gitRec[k] = v
+        return {
+          tokens: g.tokens,
+          tool_calls: g.toolCalls,
+          cache_hit_rate: denom > 0 ? Math.round((g.cacheRead / denom) * 1e4) / 1e4 : 0,
+          categories: cat,
+          git_top: topCounts(gitRec, 6),
+          prompt_signals: promptSignals(g.prompt),
+        }
+      }
+      if (this.scope === 'project') {
+        report.projects = [...this.groups.values()]
+          .map((g): ProjectScope => ({ repo: g.key, sessions: g.sessions.size, ...toBucket(g) }))
+          .sort((a, b) => b.tokens - a.tokens)
+      } else {
+        report.sessions_detail = [...this.groups.values()]
+          .map((g): SessionScope => ({
+            session_id: g.key,
+            repo: g.repo,
+            duration_seconds: g.first !== null && g.last !== null ? Math.floor((g.last - g.first) / 1000) : 0,
+            ...toBucket(g),
+          }))
+          .sort((a, b) => b.tokens - a.tokens)
+      }
+    } else {
+      report.scope = 'global'
     }
     if (this.missingPrice.size) report.unpriced_models = [...this.missingPrice].sort()
     if (this.byModelDay.size) report.models_timeline = buildModelsTimeline(this.byModelDay)

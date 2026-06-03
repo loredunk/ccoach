@@ -43,4 +43,25 @@ describe('parseClaudeCode', () => {
     expect(r.file_languages).toEqual([{ name: 'TypeScript', files: 1 }]) // Edit src/main.ts → ts
     expect(JSON.stringify(r)).not.toContain('main.ts') // file_languages 只留扩展名映射，不含路径/文件名
   })
+  it('--scope project / session 产出派生信号桶（scope 并入 ccoach），不含 prompt 原文', () => {
+    const proj = parseClaudeCode('test/fixtures/claude', window, 'project')
+    expect(proj.scope).toBe('project')
+    expect(proj.projects).toHaveLength(1)
+    const p = proj.projects![0]
+    expect(p).toMatchObject({
+      repo: 'ccoach', sessions: 1, tokens: 500 /* 主 200 + 子代理 300：项目桶含 sidechain token */,
+      tool_calls: 2, categories: { shell: 1, file: 1 }, git_top: [{ command: 'commit', count: 1 }],
+    })
+    expect(p.prompt_signals.prompts).toBe(1)
+
+    const sess = parseClaudeCode('test/fixtures/claude', window, 'session')
+    expect(sess.scope).toBe('session')
+    expect(sess.sessions_detail).toHaveLength(1)
+    const s = sess.sessions_detail![0]
+    expect(s).toMatchObject({
+      session_id: 's1', repo: 'ccoach', tokens: 200 /* 会话桶不含 sidechain */,
+      tool_calls: 2, duration_seconds: 5 /* 03:00:00 → 03:00:05 */,
+    })
+    expect(JSON.stringify(sess)).not.toContain('保留测试') // scope 桶绝不含 prompt 原文
+  })
 })
