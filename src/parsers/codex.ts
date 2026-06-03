@@ -44,6 +44,9 @@ function satSub(a: CodexTokens, b: CodexTokens): CodexTokens {
   const s = (x: number, y: number) => (x < y ? 0 : x - y)
   return { input: s(a.input, b.input), cached: s(a.cached, b.cached), output: s(a.output, b.output), reasoning: s(a.reasoning, b.reasoning), total: s(a.total, b.total) }
 }
+function addCodex(a: CodexTokens, b: CodexTokens): CodexTokens {
+  return { input: a.input + b.input, cached: a.cached + b.cached, output: a.output + b.output, reasoning: a.reasoning + b.reasoning, total: a.total + b.total }
+}
 
 // 移植 sourceKey
 function sourceKey(source: string): string {
@@ -78,14 +81,17 @@ function normalizedCommandLine(args: string): string {
   return stripShellWrapper(commandLine(args).split(/\s+/).filter(Boolean)).join(' ')
 }
 
-// 子代理：session_meta payload 含 subagent/thread_spawn → 整文件跳过
+// 子代理：session_meta payload 含 subagent/thread_spawn → 整文件跳过。
+// 先剔除 cwd 等路径字段再做子串匹配，避免仓库路径里恰好含 'subagent' 而误判整文件。
 function isSubagentRollout(lines: string[]): boolean {
   for (const line of lines) {
     const t = line.trim(); if (!t) continue
     let rec: any
     try { rec = JSON.parse(t) } catch { continue }
     if (rec?.type === 'session_meta') {
-      const s = JSON.stringify(rec.payload ?? {})
+      const probe = { ...(rec.payload ?? {}) }
+      delete probe.cwd
+      const s = JSON.stringify(probe)
       return s.includes('subagent') || s.includes('thread_spawn')
     }
   }
@@ -94,6 +100,12 @@ function isSubagentRollout(lines: string[]): boolean {
 
 export function parseCodex(home: string, window: Window): Report {
   const agg = new Aggregator('codex')
+  feedCodex(agg, home, window)
+  return agg.assemble(window, 'glob')
+}
+
+// 把 Codex 用量喂进（可共享的）聚合器——--platform all 时与 Claude 喂同一个 agg。
+export function feedCodex(agg: Aggregator, home: string, window: Window): void {
   for (const file of globRollouts(home)) {
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
@@ -129,10 +141,17 @@ export function parseCodex(home: string, window: Window): Report {
           const info = payload.info
           if (!info) break
           let delta: CodexTokens
-          if (info.last_token_usage) delta = fromCodex(info.last_token_usage)
-          else if (info.total_token_usage) delta = satSub(fromCodex(info.total_token_usage), prevTotal)
-          else break
-          if (info.total_token_usage) prevTotal = fromCodex(info.total_token_usage)
+          if (info.last_token_usage) {
+            delta = fromCodex(info.last_token_usage)
+            // 维持 prevTotal 为运行累计：有 total 用 total，否则按 last 增量推进；
+            // 否则之后的 total-only 事件会用过期基线 satSub，把这些 token 重复计入。
+            prevTotal = info.total_token_usage ? fromCodex(info.total_token_usage) : addCodex(prevTotal, delta)
+          } else if (info.total_token_usage) {
+            delta = satSub(fromCodex(info.total_token_usage), prevTotal)
+            prevTotal = fromCodex(info.total_token_usage)
+          } else {
+            break
+          }
           if (delta.cached > delta.input) delta.cached = delta.input
           if (delta.total <= 0) delta.total = delta.input + delta.output
           if (delta.input <= 0 && delta.cached <= 0 && delta.output <= 0 && delta.reasoning <= 0) break
@@ -169,5 +188,4 @@ export function parseCodex(home: string, window: Window): Report {
     }
     if (threadTouched) agg.touchSession(sessionId)
   }
-  return agg.assemble(window, 'glob')
 }

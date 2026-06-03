@@ -9,16 +9,17 @@ export const GIT_SUBCMDS: Set<string> = new Set([
   'rev-parse', 'remote', 'init', 'blame',
 ])
 
-// 取可执行名：跳过 UPPERCASE 的 VAR=val 环境前缀，返回 basename。
+// 取可执行名：跳过 VAR=val 环境前缀（大小写均跳，防止 token=ghp_xxx 之类把密钥值带进 top_commands），
+// 返回 basename。
 export function firstToken(cmd: string): string {
   if (typeof cmd !== 'string') return ''
   cmd = cmd.trim()
   for (const part of cmd.split(/\s+/).filter(Boolean)) {
     if (part.includes('=') && !/^[-/.]/.test(part)) {
       const name = part.split('=', 1)[0]
-      // Python name.replace("_","").isalnum()：去下划线后非空且全为 [A-Za-z0-9]。
-      const stripped = name.replace(/_/g, '')
-      if (stripped && /^[A-Za-z0-9]+$/.test(stripped) && name === name.toUpperCase()) {
+      // 合法 shell 标识符的赋值前缀（FOO=、gh_token= 等）一律跳过——不限大小写，
+      // 否则小写前缀会让整段 name=value（含密钥值）原样进入命令名，违反隐私红线。
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
         continue
       }
     }

@@ -6,6 +6,9 @@ describe('text utils（隐私安全）', () => {
   it('firstToken 取可执行名、剥 env 前缀与路径', () => {
     expect(firstToken('FOO=bar /usr/bin/rg -n secret')).toBe('rg')
     expect(firstToken('git commit -m "x"')).toBe('git')
+    // 小写 env 前缀也要跳过，绝不把 name=value（含密钥值）带进命令名
+    expect(firstToken('gh_token=ghp_secret123 gh pr create')).toBe('gh')
+    expect(firstToken('x=1 ls')).toBe('ls')
   })
   it('gitSubcommand 只认白名单、未知不泄露', () => {
     expect(gitSubcommand('git commit -m x')).toBe('commit')

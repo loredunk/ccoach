@@ -19,4 +19,10 @@ describe('parseCodex（glob）', () => {
     const r = parseCodex('test/fixtures/codex', window)
     expect(r.tokens.input).toBe(100) // subagent 的用量未计入
   })
+  it('混合 last-only / total-only 事件不重复计数（prevTotal 推进）', () => {
+    // last=10，再来一个仅 total=15 的事件：应得 10 + (15-10) = 15，而非 10 + 15 = 25。
+    const r = parseCodex('test/fixtures/codex-mixed', window)
+    expect(r.tokens.input).toBe(15)
+    expect(r.tokens.total).toBe(15)
+  })
 })

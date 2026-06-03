@@ -44,6 +44,13 @@ export function normalizeModel(model: string): string {
   return m
 }
 
+// Claude 家族的 input / cached_input / cache_creation 是互斥桶（input 不含缓存）；
+// Codex/gpt 的 input 含 cached（需相减得到非缓存输入）。按"模型"而非"聚合器平台"判定，
+// 这样单平台与 --platform all（混合模型）用同一套统一 cache_hit_rate 口径。
+export function disjointInputBuckets(model: string): boolean {
+  return normalizeModel(model).startsWith('claude')
+}
+
 export function lookupPrice(model: string): { price: Price; found: boolean } {
   const m = normalizeModel(model)
   let bestLen = -1

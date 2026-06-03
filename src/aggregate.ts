@@ -1,9 +1,9 @@
 import {
   type Tokens, type Report, type RepoReport, type UsageReport,
-  type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY,
+  type ModelTimeline, type ModelDayCount, REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
 import { type Window, localYmd } from './window.js'
-import { estimateCost, normalizeModel } from './pricing.js'
+import { estimateCost, normalizeModel, disjointInputBuckets } from './pricing.js'
 import { firstToken, gitSubcommand } from './text.js'
 import { buildGitHabits, buildProjectMgmt, topCounts, type RepoFacts } from './habits.js'
 import { dominantLanguage } from './language.js'
@@ -27,14 +27,10 @@ interface ModelDayAgg { tokens: number; cost: number }
 
 export type ToolKind = 'shell' | 'web' | 'file' | 'other'
 
-function emptyTokensLocal(): Tokens {
-  return { input: 0, cached_input: 0, output: 0, reasoning_output: 0, cache_creation: 0, total: 0 }
-}
-
 // 平台无关聚合器：适配器把每条事件喂进来，assemble 出统一 Report。
 export class Aggregator {
   private platform: string
-  private tokens: Tokens = emptyTokensLocal()
+  private tokens: Tokens = emptyTokens()
   private cost = 0
   private freshInput = 0 // 非缓存输入累计，仅用于统一 cache_hit_rate
   private shellCalls = 0
@@ -84,10 +80,11 @@ export class Aggregator {
       this.modelsSeen.add(nm)
       if (!priced && model.trim() !== '') this.missingPrice.add(nm)
     }
-    // 统一 cache_hit_rate 的"非缓存输入"：Codex 下 input 含 cached 需相减；Claude 下 input 即非缓存。
-    this.freshInput += this.platform === 'codex'
-      ? Math.max(0, d.input - Math.min(d.cached_input, d.input))
-      : d.input
+    // 统一 cache_hit_rate 的"非缓存输入"：按"模型"判定（Claude 互斥桶 input 即非缓存；
+    // Codex/gpt 的 input 含 cached 需相减）。按模型而非聚合器平台，故 --platform all 的混合聚合也正确。
+    this.freshInput += disjointInputBuckets(model)
+      ? d.input
+      : Math.max(0, d.input - Math.min(d.cached_input, d.input))
     const r = this.repoFor(repo)
     r.tokens += d.total
     r.cost += usd
@@ -267,6 +264,10 @@ function localTimezone(): string {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   const offsetMin = -new Date().getTimezoneOffset()
   const sign = offsetMin >= 0 ? '+' : '-'
-  const hours = Math.trunc(Math.abs(offsetMin) / 60)
-  return `${tz} (UTC${sign}${hours})`
+  const abs = Math.abs(offsetMin)
+  const hours = Math.trunc(abs / 60)
+  const mins = abs % 60
+  // 半/刻钟时区（如 UTC+5:30 印度、+5:45 尼泊尔）也要正确显示分钟，不能截断。
+  const off = mins ? `${hours}:${String(mins).padStart(2, '0')}` : `${hours}`
+  return `${tz} (UTC${sign}${off})`
 }

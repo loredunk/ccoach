@@ -42,21 +42,19 @@ function ccusageTotals(j: unknown): Measure | null {
   const fromTotals = pick(obj.totals)
   if (fromTotals) return fromTotals
   const daily = Array.isArray(obj.daily) ? obj.daily : null
-  if (daily) {
+  if (daily && daily.length > 0) {
     let tokens = 0
     let cost = 0
-    let ok = false
     for (const d of daily) {
       const row = d as Record<string, unknown>
       const tk = Number(row.totalTokens ?? NaN)
       const c = Number(row.totalCost ?? NaN)
-      if (Number.isFinite(tk) && Number.isFinite(c)) {
-        tokens += tk
-        cost += c
-        ok = true
-      }
+      // 任一行不完整就放弃整段累加（返回 null → 上层 SKIP），绝不拿部分和去做"严格相等"比较。
+      if (!Number.isFinite(tk) || !Number.isFinite(c)) return null
+      tokens += tk
+      cost += c
     }
-    if (ok) return { tokens, cost }
+    return { tokens, cost }
   }
   return null
 }

@@ -44,9 +44,15 @@ function userText(message: any): string {
 
 export function parseClaudeCode(dir: string, window: Window): Report {
   const agg = new Aggregator('claude-code')
-  // 跨文件去重（对齐 ccusage）：会话 resume/fork 会把同一条消息复制进多个 JSONL，
-  // 不去重会把用量成倍高估。assistant 用 message.id:requestId，其它用 uuid 作稳定标识。
-  // 复制条目时间戳一致，故"先去重再过滤窗口"不会误伤跨窗口的同一消息。
+  feedClaudeCode(agg, dir, window)
+  return agg.assemble(window, 'glob')
+}
+
+// 把 Claude Code 用量喂进（可共享的）聚合器——--platform all 时两平台喂同一个 agg，
+// 避免合并两份已成形报告时的重复截断/重复计数。
+export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): void {
+  // 跨文件去重（对齐 ccusage）：会话 resume/fork 会把同一条消息复制进多个 JSONL，不去重会把
+  // 用量成倍高估。assistant 用 message.id:requestId、其它用 uuid 作稳定标识。
   const seen = new Set<string>()
   for (const file of walkJsonl(dir)) {
     agg.resetActive() // 每个文件独立计活跃时长，避免跨文件桥接
@@ -57,6 +63,14 @@ export function parseClaudeCode(dir: string, window: Window): Report {
       if (!trimmed) continue
       let rec: any
       try { rec = JSON.parse(trimmed) } catch { continue }
+
+      // 先过滤窗口，再去重——若先去重，窗口外的复制条目会把 key 抢先放进 seen，
+      // 导致另一文件里窗口内的同一消息被误删、用量丢失。
+      const tsRaw = rec?.timestamp
+      if (typeof tsRaw !== 'string') continue
+      const ts = new Date(tsRaw)
+      if (Number.isNaN(ts.getTime())) continue
+      if (!inLocalRange(ts, window)) continue
 
       const msgId = rec?.message?.id
       const dedupKey =
@@ -69,12 +83,6 @@ export function parseClaudeCode(dir: string, window: Window): Report {
         if (seen.has(dedupKey)) continue
         seen.add(dedupKey)
       }
-
-      const tsRaw = rec?.timestamp
-      if (typeof tsRaw !== 'string') continue
-      const ts = new Date(tsRaw)
-      if (Number.isNaN(ts.getTime())) continue
-      if (!inLocalRange(ts, window)) continue
 
       const sidechain = rec?.isSidechain === true
       const session = typeof rec.sessionId === 'string' ? rec.sessionId : ''
@@ -104,11 +112,11 @@ export function parseClaudeCode(dir: string, window: Window): Report {
         // 用量/成本计入全部（含 sidechain 子代理），与 ccusage 一致；sidechain 不计入会话数，
         // 故 session 传空避免污染按仓库会话数。
         agg.applyTokens(tokens, model, repo, sidechain ? '' : session, ts, branch)
-        agg.markActive(ts)
         if (!sidechain) {
-          // 工具/git 习惯只反映主会话（用户驱动）：子代理内部工具调用不计入"用户习惯"，
-          // 也避免泄露子代理命令。
+          // 工具/git/会话/活跃时长只反映主会话（用户驱动）：子代理内部工具不计入"用户习惯"，
+          // 也避免泄露子代理命令；且 sidechain 时间戳与主会话交错，markActive 计入会虚增活跃时长。
           agg.touchSession(session)
+          agg.markActive(ts)
           const blocks = Array.isArray(msg.content) ? msg.content : []
           for (const b of blocks) {
             if (!b || b.type !== 'tool_use') continue
@@ -127,5 +135,4 @@ export function parseClaudeCode(dir: string, window: Window): Report {
       }
     }
   }
-  return agg.assemble(window, 'glob')
 }
