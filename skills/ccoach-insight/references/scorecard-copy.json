@@ -1,5 +1,5 @@
 {
-  "_about": "Hand-localized fixed copy for the scorecard (ADR 0009). Tiers are high->low. Roasts tease changeable HABITS, never the person or their ability (ADR 0008). en_roast is idiomatic native English, not a literal translation. The 'title'/personality summary paragraph is NOT here — the model writes it in the user's language (ADR 0008 D3). To add a locale: add {LANG}_name/{LANG}_roast to every tier and a ui.{LANG} block; scorecard.mjs reads them generically and falls back to the default language.",
+  "_about": "Copy for the scorecard. Tiers are high->low. The tier NAMES ({LANG}_name) + ui labels are the fixed, deterministic identity (don't run-to-run vary them). The {LANG}_roast lines are the SAFE DEFAULT/FALLBACK + a tone EXEMPLAR: at runtime the model rewrites axes[].roast in the user's language, idiomatic and aggregate-grounded (ADR 0029), so you needn't hand-localize roasts into every language. Roasts tease changeable HABITS, never the person/ability, and never quote prompt text (ADR 0008). The 'title'/personality summary is model-written (ADR 0008 D3). To add a tier-name locale: add {LANG}_name (and optionally {LANG}_roast) to every tier and a ui.{LANG} block; scorecard.mjs reads them generically and falls back to the default language.",
   "ui": {
     "zh": {
       "report_title": "AI 用量教练报告",

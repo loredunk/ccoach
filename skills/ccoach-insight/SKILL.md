@@ -78,10 +78,16 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
    - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization (ADR 0015); skip it only if the user opts out.
 6. (Optional) Build the shareable **scorecard** (see "Shareable scorecard" below):
    - `node ${CLAUDE_SKILL_DIR}/scripts/scorecard.mjs --data /tmp/ai-usage.json --lang en --output /tmp/scorecard.json`
-   - **Default language is English** (ADR 0025); pass `--lang zh` (or another supported locale)
-     to match the user's language. Then write the personality-summary sentence yourself
-     (in that language) into the insights `executive_summary` — the fixed tier names / roasts
-     come from the localized copy table, not from you.
+   - **Default language is English** (ADR 0025); pass `--lang zh` (or another supported locale) to match the user.
+   - The **tier scores and tier names** come from `scorecard.mjs` + the copy table — **do not change the names**
+     (stable, recognizable, shareable identity; unsupported locales fall back to English).
+   - **Roast lines are yours to write (ADR 0029).** `scorecard.json` ships a safe fixture roast per axis as the
+     default/fallback; you SHOULD **rewrite each `axes[].roast` in `/tmp/scorecard.json`** (before step 7) into the
+     **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules:
+     tease **changeable habits, never the person/ability** (ADR 0008); **aggregate-only — never quote or imply prompt
+     text** (the shareable card stays zero-raw-text); one short punchy line per axis; ground it in the real aggregate
+     numbers when it lands harder (e.g. cost/tokens/late-night share). If you don't rewrite, the fixture roast renders.
+   - Also write the personality-summary sentence yourself (in that language) into the insights `executive_summary`.
 7. Render HTML (run step 4.5 `apply_pricing.mjs` first so cost is the official-online figure, not the offline fallback):
    - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ai-usage-report.html`
    - The whole report skeleton is localized from `references/report-copy.json` (default English; ADR 0025). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
@@ -160,11 +166,11 @@ price table (models change; a stale snapshot drifts). The CLI stays offline and 
 
 ## Shareable scorecard
 
-`scripts/scorecard.mjs` grades four independent axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier labels + roast lines from `references/scorecard-copy.json` (hand-localized zh/en, ADR 0008/0009). The report skeleton itself is localized from `references/report-copy.json` (ADR 0025). The renderer shows the scorecard as a screenshot-friendly cover card.
+`scripts/scorecard.mjs` deterministically grades four axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier indices + tier names + a fixture roast from `references/scorecard-copy.json` (ADR 0008/0009). The report skeleton is localized from `references/report-copy.json` (ADR 0025). The renderer shows the scorecard as a screenshot-friendly cover card.
 
-- Tiers/roasts/UI labels are **fixed localized copy** (the tables) — do not translate them yourself; **default English**, pass `--lang zh` (or another supported locale) to match the user. To add a locale, add its key to both copy JSONs (hand-localize per ADR 0009; missing keys fall back to the default language).
-- The personality-summary sentence and any deeper roast IS yours to write, in the user's language.
-- Tone: tease changeable **habits**, never ability or the person. The relative rank ("beats X%") is a local **estimate** — keep it labelled as such.
+- **Deterministic, fixed**: the tier *score* and the tier *name* (UI labels too) come from `scorecard.mjs` + the copy tables — **don't change names yourself**; **default English**, pass `--lang zh` (or another locale) to match the user. To add a tier-name locale, add its keys to the copy tables (missing keys fall back to the default language).
+- **Model-authored (ADR 0029)**: the **axis roast lines** AND the personality-summary sentence are **yours to write in the user's language**. The fixture roast in `scorecard.json` is a safe default/fallback + your tone exemplar — rewrite `axes[].roast` (idiomatic, fresh, one line) before rendering; leave it for the fixture default. This is where the LLM's per-language idiom shines, so you don't have to hand-localize roasts into every language.
+- Tone: tease changeable **habits**, never ability or the person (ADR 0008). **Aggregate-only**: roasts may use aggregate numbers (cost/tokens/hours/tier) but **never prompt text** — the shareable card stays zero-raw-text. The relative rank ("beats X%") is a local **estimate** — keep it labelled.
 - Privacy is a selling point: state that all analysis is local and prompt content never leaves the machine.
 
 ## Analysis Guidance
