@@ -60,7 +60,8 @@ describe('render：新区块进 HTML（官方 + 中转两路）', () => {
       const outPath = path.join(dir, 'out.html')
       writeFileSync(dataPath, JSON.stringify(merged))
       writeFileSync(insPath, JSON.stringify({ executive_summary: 'x', insights: [], recommendations: [] }))
-      execFileSync('node', [RENDER, '--data', dataPath, '--insights', insPath, '--output', outPath])
+      // 用 --lang zh 渲染：本测试断言中文标签，默认语言已翻英（ADR 0025），故显式指定 zh。
+      execFileSync('node', [RENDER, '--data', dataPath, '--insights', insPath, '--lang', 'zh', '--output', outPath])
       return readFileSync(outPath, 'utf8')
     } finally {
       rmSync(dir, { recursive: true, force: true })

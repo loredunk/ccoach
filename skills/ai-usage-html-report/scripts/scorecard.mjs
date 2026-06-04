@@ -144,8 +144,8 @@ function pick(copy, axisKey, idx, lang) {
 }
 
 export function build(data, copy, lang) {
-  lang = lang === 'en' ? 'en' : 'zh'
-  const ui = copy.ui[lang] ?? copy.ui.zh
+  lang = lang === 'zh' ? 'zh' : 'en' // 默认英文（ADR 0025）；只在显式 zh 时用中文
+  const ui = copy.ui[lang] ?? copy.ui.en ?? copy.ui.zh
   const platforms = data.platforms ?? {}
   const cc = platforms.claude_code ?? {}
   const combined = data.combined ?? {}
@@ -197,7 +197,7 @@ function main() {
     process.stderr.write('missing --data (merged dual-platform JSON)\n')
     process.exit(2)
   }
-  const lang = a.lang === 'en' ? 'en' : 'zh'
+  const lang = a.lang === 'zh' ? 'zh' : 'en' // 默认英文（ADR 0025）
   const data = load(a.data)
   const copy = load(a.copy ?? DEFAULT_COPY)
   const card = build(data, copy, lang)

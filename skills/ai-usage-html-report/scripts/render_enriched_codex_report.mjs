@@ -2,14 +2,33 @@
 // Render a Codex-only enriched HTML report from `ccoach report --json` data plus
 // an AI-written insights file. Used as the fallback when ccusage is unavailable.
 //
-//   --report <ccoach-report.json> --insights <insights.json> --output <out.html>
+//   --report <ccoach-report.json> --insights <insights.json> --output <out.html> [--lang en|zh]
 //
-// Self-contained: pure Node ≥18 (ESM, no external libs, no network).
+// Skeleton copy is localized via references/report-copy.json (`enriched` section), default English
+// (ADR 0025). Self-contained: pure Node ≥18 (ESM, no external libs, no network).
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
+const HERE = path.dirname(fileURLToPath(import.meta.url))
+const DEFAULT_COPY = path.join(HERE, '..', 'references', 'report-copy.json')
+
 const load = (p) => JSON.parse(readFileSync(p, 'utf8'))
+
+// i18n (ADR 0025): skeleton copy from references/report-copy.json `enriched` section, default English.
+let I18N = {}
+let I18N_DEF = {}
+function setI18n(copy, lang) {
+  const en = (copy && copy.enriched) || {}
+  const def = (copy && copy.default) || 'en'
+  I18N_DEF = en[def] || {}
+  I18N = (lang && en[lang]) || I18N_DEF
+}
+function tr(key, vars) {
+  let s = I18N[key] != null ? I18N[key] : I18N_DEF[key] != null ? I18N_DEF[key] : key
+  if (vars) s = String(s).replace(/\{(\w+)\}/g, (_, k) => (vars[k] != null ? String(vars[k]) : ''))
+  return s
+}
 
 function parseArgs(argv) {
   const o = {}
@@ -65,7 +84,7 @@ function metric(label, value) {
 }
 
 function usageTable(title, rows, total) {
-  const out = [`<div class='panel'><h2>按${esc(title)}</h2><table><tbody>`]
+  const out = [`<div class='panel'><h2>${esc(tr('table_by', { title }))}</h2><table><tbody>`]
   for (const row of rows) {
     let share = 0.0
     if (total) share = (Number(row.tokens ?? 0) / Number(total)) * 100
@@ -78,11 +97,12 @@ function usageTable(title, rows, total) {
 }
 
 function signalList(items) {
-  if (!items || !items.length) return "<p class='muted'>暂无明显信号</p>"
+  if (!items || !items.length) return `<p class='muted'>${esc(tr('no_signals'))}</p>`
   return '<ul>' + items.map((item) => `<li>${esc(item)}</li>`).join('') + '</ul>'
 }
 
-function render(report, insights) {
+function render(report, insights, copy = null, lang = null) {
+  setI18n(copy ?? { enriched: { en: {} }, default: 'en' }, lang)
   const tokens = report.tokens ?? {}
   const tools = report.tools ?? {}
   const repos = report.repos ?? []
@@ -91,11 +111,12 @@ function render(report, insights) {
   const git = report.git_habits ?? {}
   const project = report.project_management ?? {}
 
-  const title = insights.title || 'Codex 使用深度报告'
+  const title = insights.title || tr('report_title')
   const subtitle = insights.subtitle || `${report.generated_for ?? ''} · ${report.timezone ?? ''}`
+  const htmllang = tr('html_lang')
 
   const parts = [
-    "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'>",
+    `<!doctype html><html lang='${esc(htmllang)}'><head><meta charset='utf-8'>`,
     "<meta name='viewport' content='width=device-width, initial-scale=1'>",
     `<title>${esc(title)}</title>`,
     '<style>',
@@ -103,28 +124,28 @@ function render(report, insights) {
     '</style></head><body><main>',
     `<header><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></header>`,
     "<section class='metrics'>",
-    metric('会话', report.sessions ?? 0),
-    metric('Token', comma(tokens.total ?? 0)),
-    metric('估算成本', money(report.estimated_cost_usd ?? 0)),
-    metric('活跃时长', report.duration ?? '0m'),
-    metric('缓存命中', pct(report.cache_hit_rate ?? 0)),
-    metric('Reasoning 占比', pct(report.reasoning_ratio ?? 0)),
+    metric(tr('m_sessions'), report.sessions ?? 0),
+    metric(tr('m_tokens'), comma(tokens.total ?? 0)),
+    metric(tr('m_est_cost'), money(report.estimated_cost_usd ?? 0)),
+    metric(tr('m_duration'), report.duration ?? '0m'),
+    metric(tr('m_cache_hit'), pct(report.cache_hit_rate ?? 0)),
+    metric(tr('m_reasoning_ratio'), pct(report.reasoning_ratio ?? 0)),
     '</section>',
   ]
 
-  parts.push("<section class='panel focus'><h2>执行摘要</h2><ul>")
+  parts.push(`<section class='panel focus'><h2>${esc(tr('h_exec_summary'))}</h2><ul>`)
   for (const item of insights.executive_summary ?? []) parts.push(`<li>${esc(item)}</li>`)
   if (!insights.executive_summary || !insights.executive_summary.length) {
-    parts.push('<li>未提供 AI 摘要；请在 insights JSON 中补充 executive_summary。</li>')
+    parts.push(`<li>${esc(tr('exec_empty'))}</li>`)
   }
   parts.push('</ul></section>')
 
-  parts.push("<section><h2>AI 建议</h2><div class='cards'>")
+  parts.push(`<section><h2>${esc(tr('h_ai_recs'))}</h2><div class='cards'>`)
   for (const rec of insights.recommendations ?? []) {
     parts.push(
       `<article class='card rec${priorityClass(rec.priority)}'>` +
         `<strong>${esc(rec.title)}</strong>` +
-        `<p class='muted'>证据：${esc(rec.evidence)}</p>` +
+        `<p class='muted'>${esc(tr('rec_evidence'))}${esc(rec.evidence)}</p>` +
         `<p>${esc(rec.action)}</p>` +
         '</article>',
     )
@@ -133,17 +154,17 @@ function render(report, insights) {
 
   const insightLadder = insights.insight_ladder ?? []
   if (insightLadder.length) {
-    parts.push("<section><h2>深度洞见</h2><div class='insights'>")
+    parts.push(`<section><h2>${esc(tr('h_deep_insights'))}</h2><div class='insights'>`)
     for (const item of insightLadder) {
       parts.push(
         "<article class='card insight'>" +
           `<strong>${esc(item.title)}</strong>` +
-          '<h3>证据</h3>' +
+          `<h3>${esc(tr('lbl_evidence'))}</h3>` +
           `${signalList(item.evidence ?? [])}` +
-          `<p><b>代表什么</b><br>${esc(item.meaning ?? '')}</p>` +
-          `<p><b>为什么重要</b><br>${esc(item.impact ?? '')}</p>` +
-          `<p><b>继续深入</b><br>${esc(item.drilldown ?? '')}</p>` +
-          `<p><b>建议动作</b><br>${esc(item.intervention ?? '')}</p>` +
+          `<p><b>${esc(tr('lbl_meaning'))}</b><br>${esc(item.meaning ?? '')}</p>` +
+          `<p><b>${esc(tr('lbl_impact'))}</b><br>${esc(item.impact ?? '')}</p>` +
+          `<p><b>${esc(tr('lbl_drilldown'))}</b><br>${esc(item.drilldown ?? '')}</p>` +
+          `<p><b>${esc(tr('lbl_action'))}</b><br>${esc(item.intervention ?? '')}</p>` +
           '</article>',
       )
     }
@@ -151,14 +172,14 @@ function render(report, insights) {
   }
 
   parts.push("<section class='grid2'>")
-  parts.push(usageTable('来源', sources, tokens.total ?? 0))
-  parts.push(usageTable('语言', languages, tokens.total ?? 0))
+  parts.push(usageTable(tr('src'), sources, tokens.total ?? 0))
+  parts.push(usageTable(tr('lang'), languages, tokens.total ?? 0))
   parts.push('</section>')
 
   parts.push("<section class='grid2'>")
-  parts.push("<div class='panel'><h2>Git 习惯</h2>")
+  parts.push(`<div class='panel'><h2>${esc(tr('h_git'))}</h2>`)
   parts.push(
-    `<p><b>${git.command_count ?? 0}</b> 次 git 命令 · <b>${git.branch_count ?? 0}</b> 个分支上下文</p>`,
+    `<p>${tr('git_summary', { commands: git.command_count ?? 0, branches: git.branch_count ?? 0 })}</p>`,
   )
   parts.push(
     '<p>' + pills((git.top_subcommands ?? []).map((x) => `${x.command} ${x.count}`)) + '</p>',
@@ -166,15 +187,15 @@ function render(report, insights) {
   parts.push(signalList([...(git.review_signals ?? []), ...(git.risk_signals ?? [])]))
   parts.push('</div>')
 
-  parts.push("<div class='panel'><h2>项目管理习惯</h2>")
+  parts.push(`<div class='panel'><h2>${esc(tr('h_pm'))}</h2>`)
   const projectCounts = [
-    `有测试 ${project.repos_with_tests ?? 0}`,
-    `有构建 ${project.repos_with_build_system ?? 0}`,
-    `有 CI ${project.repos_with_ci ?? 0}`,
+    tr('pm_tests', { n: project.repos_with_tests ?? 0 }),
+    tr('pm_build', { n: project.repos_with_build_system ?? 0 }),
+    tr('pm_ci', { n: project.repos_with_ci ?? 0 }),
   ]
   const changeCounts = [
-    `文档/计划 ${project.documentation_changes ?? 0}`,
-    `配置 ${project.config_changes ?? 0}`,
+    tr('pm_docs', { n: project.documentation_changes ?? 0 }),
+    tr('pm_config', { n: project.config_changes ?? 0 }),
   ]
   parts.push(`<p>${pills(projectCounts)}</p>`)
   parts.push(`<p>${pills(changeCounts)}</p>`)
@@ -189,19 +210,19 @@ function render(report, insights) {
 
   const sessionReviews = insights.session_reviews ?? []
   if (sessionReviews.length) {
-    parts.push("<section><h2>Session Prompt 复盘</h2><div class='cards wide'>")
+    parts.push(`<section><h2>${esc(tr('h_session_review'))}</h2><div class='cards wide'>`)
     for (const review of sessionReviews) {
       parts.push(
         "<article class='card'>" +
           `<strong>${esc(review.repo)}</strong>` +
           `<p class='muted'>${esc(review.session_id || review.rollout_path)}</p>` +
           `<p>${esc(review.summary)}</p>` +
-          '<h3>Token 驱动</h3>' +
+          `<h3>${esc(tr('h_token_drivers'))}</h3>` +
           `${signalList(review.token_drivers ?? [])}` +
-          '<h3>Prompt 问题</h3>' +
+          `<h3>${esc(tr('h_prompt_issues'))}</h3>` +
           `${signalList(review.prompt_issues ?? [])}` +
-          `<p><b>更好的起始 prompt</b><br>${esc(review.better_first_prompt ?? '')}</p>` +
-          `<p><b>更好的追问</b><br>${esc(review.better_followup_prompt ?? '')}</p>` +
+          `<p><b>${esc(tr('lbl_better_first'))}</b><br>${esc(review.better_first_prompt ?? '')}</p>` +
+          `<p><b>${esc(tr('lbl_better_followup'))}</b><br>${esc(review.better_followup_prompt ?? '')}</p>` +
           `<p class='muted'>${esc(review.next_action ?? '')}</p>` +
           '</article>',
       )
@@ -210,7 +231,7 @@ function render(report, insights) {
   }
 
   parts.push(
-    "<section><h2>项目画像</h2><table><thead><tr><th>项目</th><th>语言</th><th>构建/测试</th><th>变更</th><th>Token</th><th>AI 备注</th></tr></thead><tbody>",
+    `<section><h2>${esc(tr('h_project_profile'))}</h2><table><thead><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_language'))}</th><th>${esc(tr('th_build_test'))}</th><th>${esc(tr('th_changes'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_ai_notes'))}</th></tr></thead><tbody>`,
   )
   const notes = new Map((insights.project_notes ?? []).map((n) => [n.repo, n]))
   for (const repo of repos) {
@@ -220,7 +241,7 @@ function render(report, insights) {
     const build = pills([...(repo.build_systems ?? []), ...(repo.test_commands ?? [])])
     parts.push(
       '<tr>' +
-        `<td><b>${esc(repo.repo)}</b><br><span class='muted'>${repo.sessions ?? 0} 会话 · ${money(repo.estimated_cost_usd ?? 0)}</span></td>` +
+        `<td><b>${esc(repo.repo)}</b><br><span class='muted'>${esc(tr('sessions_cost', { n: repo.sessions ?? 0, cost: money(repo.estimated_cost_usd ?? 0) }))}</span></td>` +
         `<td>${esc(repo.language ?? '-')}</td>` +
         `<td>${build}</td>` +
         `<td>${esc(changes)}</td>` +
@@ -231,7 +252,7 @@ function render(report, insights) {
   }
   parts.push('</tbody></table></section>')
 
-  parts.push("<section class='panel'><h2>原始报告来源</h2>")
+  parts.push(`<section class='panel'><h2>${esc(tr('h_raw_source'))}</h2>`)
   parts.push(`<p><code>${esc(report.codex_home)}</code> · source: <code>${esc(report.source)}</code></p>`)
   parts.push(
     `<p>shell ${tools.shell_calls ?? 0} · web ${tools.web_searches ?? 0} · file changes ${tools.file_changes ?? 0}</p>`,
@@ -258,7 +279,9 @@ function main() {
   }
   const report = load(a.report)
   const insights = load(a.insights)
-  writeFileSync(a.output, render(report, insights))
+  const copy = load(a.copy ?? DEFAULT_COPY)
+  const lang = a.lang ?? copy.default ?? 'en' // 默认英文（ADR 0025）；agent 按用户语言传 --lang
+  writeFileSync(a.output, render(report, insights, copy, lang))
   console.log(`wrote ${a.output}`)
 }
 

@@ -34,7 +34,7 @@ Separate **tokens/models** (authoritative local facts, offline) from **cost** (c
 If the user gives no time argument, analyze **today** (ccoach's default). Only widen the window when the user asks:
 
 - `$period` a date `2026-06-01` → `--date 2026-06-01`; a bare integer `7` → `--days 7`; empty → **no window flag (today)**.
-- Use the **same** window flag for every ccoach/ccusage call so both platforms cover one window (the report header shows it). If a platform has no activity in the window (e.g. Codex when it wasn't used), its panel renders "本窗口内无活动" — that's expected, not an error.
+- Use the **same** window flag for every ccoach/ccusage call so both platforms cover one window (the report header shows it). If a platform has no activity in the window (e.g. Codex when it wasn't used), its panel renders a localized "no activity in this window" note — that's expected, not an error.
 - Note: behavior/habit/timeline dimensions over a 1-day window are thin; if the user wants habit analysis, pass `--days N` or `--since`.
 
 ## Workflow
@@ -69,26 +69,27 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
      - `executive_summary` — a prominent paragraph (or short list) covering both platforms.
      - `recommendations` — a list; each item is a string or `{title, text, evidence}` (include `evidence` grounded in the merged numbers).
      - `insights` — a list; each item is a string or `{title, detail}`.
-   - All fields are optional and backward-compatible: a flat `{"insights": ["string", ...]}` still renders. Use Chinese unless the user asks otherwise.
+   - All fields are optional and backward-compatible: a flat `{"insights": ["string", ...]}` still renders. **Write insights in the user's language; default to English** when their language is unclear — match the `--lang` you pass to the renderer/scorecard (default English, ADR 0025).
    - Behavior data is in `platforms.<plat>.behavior` (tools / top_commands / git_habits / languages / repos / hours / sources / extras) for both platforms — ground at least one insight per platform in these behavior numbers.
    - **Billing / endpoint / exec-profile** (ADR 0022/0023) also surface in the merged JSON & rendered HTML: `platforms.codex.billing` (token split by subscription plan tier plus/pro + `unclassified`), `platforms.<plat>.endpoint` (`endpoint` official/custom + `billing_mode` subscription/api_or_relay/unknown + `relay_suspected` + `subscription_type`), `platforms.codex.codex_specific` (effort/approval/sandbox/collaboration_mode/originators/compactions/aborted_turns/context_window), `platforms.claude_code.claude_specific` (server web search/fetch counts). All are derived whitelist labels — never key/token/full URL. `plan_type` is spoofable by relays (`confidence: spoofable-by-relay`); if `endpoint=custom`/`relay_suspected`, treat plan tiers and subscription claims as untrusted. Don't print quota percentages.
    - For richer interpretation patterns (evidence → meaning → impact → drilldown → intervention), read `references/insight-patterns.md`; distill those ladders into the `recommendations`/`insights` fields described in `references/dual-insights-schema.md`.
    - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization (ADR 0015); skip it only if the user opts out.
 6. (Optional) Build the shareable **scorecard** (see "Shareable scorecard" below):
-   - `node ${CLAUDE_SKILL_DIR}/scripts/scorecard.mjs --data /tmp/ai-usage.json --lang zh --output /tmp/scorecard.json`
-   - Pick `--lang zh|en` per the user's language. Then write the personality-summary
-     sentence yourself (in the user's language) into the insights `executive_summary` —
-     the fixed tier names / roasts come from the localized copy table, not from you.
+   - `node ${CLAUDE_SKILL_DIR}/scripts/scorecard.mjs --data /tmp/ai-usage.json --lang en --output /tmp/scorecard.json`
+   - **Default language is English** (ADR 0025); pass `--lang zh` (or another supported locale)
+     to match the user's language. Then write the personality-summary sentence yourself
+     (in that language) into the insights `executive_summary` — the fixed tier names / roasts
+     come from the localized copy table, not from you.
 7. Render HTML (run step 4.5 `apply_pricing.mjs` first so cost is the official-online figure, not the offline fallback):
-   - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang zh --output ai-usage-report.html`
-   - The header shows the unified 统计窗口 + "成本：官方定价（联网查询于 …）". `--scorecard` is optional; include it to put the screenshot-friendly cover card at the top. Match `--lang` to the scorecard's.
+   - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ai-usage-report.html`
+   - The whole report skeleton is localized from `references/report-copy.json` (default English; ADR 0025). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
    - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
 
 ### Fallback when ccusage is unavailable
 
 If `node`/`npx` is missing or `ccusage` fails to run, degrade to a **Codex-only** report from ccoach data:
 
-- Run `ccoach report --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --output codex-report.enriched.html`.
+- Run `ccoach report --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --lang en --output codex-report.enriched.html` (skeleton localized from `references/report-copy.json`, default English; pass `--lang zh` for Chinese).
 - Tell the user the Claude Code half was skipped and that installing Node/ccusage (`npx ccusage@latest`) enables the dual-platform report.
 - **Never** substitute `~/.claude/stats-cache.json` for the missing Claude Code data — it is wrong and stale (see data-layer rules).
 
@@ -157,9 +158,9 @@ price table (models change; a stale snapshot drifts). The CLI stays offline and 
 
 ## Shareable scorecard
 
-`scripts/scorecard.mjs` grades four independent axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier labels + roast lines from `references/scorecard-copy.json` (hand-localized zh/en, ADR 0008/0009). The renderer shows it as a screenshot-friendly cover card.
+`scripts/scorecard.mjs` grades four independent axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier labels + roast lines from `references/scorecard-copy.json` (hand-localized zh/en, ADR 0008/0009). The report skeleton itself is localized from `references/report-copy.json` (ADR 0025). The renderer shows the scorecard as a screenshot-friendly cover card.
 
-- Tiers/roasts/UI labels are **fixed localized copy** (the table) — do not translate them yourself; pick `--lang zh|en`.
+- Tiers/roasts/UI labels are **fixed localized copy** (the tables) — do not translate them yourself; **default English**, pass `--lang zh` (or another supported locale) to match the user. To add a locale, add its key to both copy JSONs (hand-localize per ADR 0009; missing keys fall back to the default language).
 - The personality-summary sentence and any deeper roast IS yours to write, in the user's language.
 - Tone: tease changeable **habits**, never ability or the person. The relative rank ("beats X%") is a local **estimate** — keep it labelled as such.
 - Privacy is a selling point: state that all analysis is local and prompt content never leaves the machine.

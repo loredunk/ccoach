@@ -184,7 +184,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   estimated_cost_usd: '离线 best-effort fallback 估算，仅供参考、不等于实际账单。权威成本由 skill 层联网查询各模型官方定价后计算覆盖；本字段仅在未联网查价时作兜底（用内置离线 fallback 价表）。',
   models_timeline: '每个模型的首/末出现日期（first_day/last_day，本机时区）与每日 token；用于时间感知判断：某旧模型占大头若只因新模型当时还没出现，不应判为浪费。（防 token 爆炸：列表取 token 前 10 个模型，每个 days[] 只列最近 31 天；first_day/last_day/tokens 为真实全量。repos/sources/languages 同样按 token 取前 N。）',
   model_tokens: '每个模型的全窗口 token 分桶（input/cached_input/output/reasoning_output/cache_creation/total）+ 离线 fallback 估算成本与 priced 标记。供 skill 层按实际模型名联网查官方定价后自行计价（Claude 互斥桶 vs Codex cached⊆input 公式不同，必须分桶）。按 token 取前 10 个模型。',
-  tokens: 'input/cached_input/output/reasoning_output/cache_creation/total；cached_input 是 input 的子集。',
+  tokens: 'input/cached_input/output/reasoning_output/cache_creation/total。注意两平台 input 口径不同：Claude 的 input 仅"非缓存新输入"，cached_input(cache_read) 与 cache_creation 是与之并列的独立互斥桶（input+cached_input+cache_creation+output=total）；Codex 的 input 已含缓存（cached_input ⊆ input）、reasoning_output ⊆ output（input+output=total）。total 两平台都是全部 token 之和、可直接相比；展示"输入侧总量"时 Claude 需把 cached_input+cache_creation 计入（见 skill 渲染 ADR 0024）。',
   prompt_signals: '仅由 user prompt 派生的数值信号（长度/结构化率/文件引用率/约束率/返工率），不含任何原文。',
   error_signals: '工具失败率/中断数/API错误，及失败按工具与按白名单类别（git/test/build/permission/network/timeout/not-read/other）。仅由工具结果派生计数+类别，绝不含原始 stderr/输出/文件内容/命令全行（隐私红线细化，ADR 0016）。',
   rework_signals: '编辑次数、用户事后手改率（userModified）、累计新增/删除行数（structuredPatch）。只派生计数，绝不含 diff 文本（ADR 0017）。',

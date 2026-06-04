@@ -175,7 +175,7 @@ export function claudeBehavior(r) {
     tool_categories: cats,
     git_habits: cleanGit(git.top_subcommands ?? []),
     languages: (r.file_languages ?? []).slice(0, 10).map((l) => ({ name: l.name, count: l.files ?? 0 })),
-    languages_unit: '文件',
+    languages_unit: 'files', // 中性键；renderer 按 --lang 本地化（ADR 0025）
     repos: (r.repos ?? []).slice(0, 10).map((x) => ({
       repo: x.repo, sessions: x.sessions ?? 0, tokens: x.tokens ?? 0, tool_calls: 0,
     })),
@@ -208,7 +208,7 @@ export function codexBehavior(r) {
     tool_categories: cats,
     git_habits: cleanGit(git.top_subcommands ?? []),
     languages: (r.languages ?? []).slice(0, 10).map((l) => ({ name: l.name, count: l.sessions ?? 0 })),
-    languages_unit: '会话',
+    languages_unit: 'sessions', // 中性键；renderer 按 --lang 本地化（ADR 0025）
     repos,
     hours: normHours(r.hours ?? []),
     sources: (r.sources ?? []).map((s) => ({ name: s.name, count: s.sessions ?? 0 })),
@@ -337,7 +337,8 @@ function main() {
   const codex = buildCodex(codexReport, a['codex-ccusage'] ? load(a['codex-ccusage']) : null)
 
   const merged = {
-    title: '双平台 AI 使用报告',
+    title: 'Dual-Platform AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题，ADR 0025）；保留字段兼容
+
     generated_at: todayIso(),
     window: buildWindow([codexReport, ccBehavior]),
     platforms: { claude_code: claude, codex: codex },

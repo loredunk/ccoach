@@ -161,40 +161,26 @@
 - [ ] 隐私：仍只产出**固定白名单标签 + 纯计数**，匹配用的错误文本**瞬时派生即弃**，
       绝不存储/外发 stderr/stdout/命令全行（ADR 0016/0017 红线不变）。
 
-## T15 · 报告多语言选项（默认语言待定）（P1）— ⏳ pending
+## T15 · 报告多语言选项（默认英文）（P1）— ✅ 已完成
 
-> 背景：用户反馈「下载下来的 HTML 报告都是中文」。根因——成绩卡文案表（`scorecard-copy.json`）虽有 zh/en
-> 双份（ADR 0009），但**报告骨架本身的 UI 文案在 `render_dual_platform.mjs` 里硬编码中文**
-> （如 `本窗口内无活动` / `无数据` / `无活跃时段数据` / `成本：官方定价` 等），`--lang en` 也会夹中文；
-> 且 SKILL.md 示例默认 `--lang zh`。
-> 决策：待写 ADR（沿用 ADR 0009「人工本地化、非直译」口径，扩到报告骨架）。
+> 决策：[`adr/0025-report-skeleton-i18n-default-english.md`](adr/0025-report-skeleton-i18n-default-english.md)（沿用 ADR 0009「人工本地化、非直译」口径，扩到报告骨架）。
+> 背景：用户反馈「下载下来的 HTML 报告都是中文」。根因——成绩卡有 zh/en，但**报告骨架 UI 文案在两个渲染器里硬编码中文**、`--lang` 从不被读、`htmllang` 写死 `zh-CN`。
 
-- [ ] **报告骨架 i18n 化**：把 `render_dual_platform.mjs`（及 `render_enriched_codex_report.mjs`）里硬编码的中文
-      UI 文案抽到文案表，按 `--lang` 取，做到 `--lang en` 时报告**无残留中文**。
-- [ ] **扩语言**：在 zh/en 之外预留更多语言（如 ja / ko / es 等），文案表结构支持新增 locale；
-      缺失语言回退到默认语言。
-- [ ] **默认语言 = 英文**（已拍板 2026-06-04）：与 README（英文为默认）、npm 全球分发一致；
-      zh 改为显式 `--lang zh`。实现时把 SKILL.md 示例默认值由 `--lang zh` 改为 `--lang en`。
-- [ ] **语言来源**：明确 `--lang` 由谁决定（SKILL 按用户对话语言传入 / 还是 CLI 加全局默认 + 环境探测如 `LANG`）。
+- [x] **报告骨架 i18n 化**：新增 `references/report-copy.json`（`dual`/`enriched` 两段、任意 locale、缺失键逐键回退默认语言）；`render_dual_platform.mjs` 与 `render_enriched_codex_report.mjs` 接 `--lang` + `tr()`，`<html lang>`、`languages_unit`（merge 改吐中性键 `files`/`sessions`）、每面板 `source` 标签全本地化。CJK 闸门回归 `test/i18n-report.test.ts`：`--lang en` 骨架零中文。
+- [x] **扩语言**：文案表结构支持任意 locale + 缺失回退默认语言；本期填 zh/en，文档说明如何加（人工本地化、不机翻）。
+- [x] **默认语言 = 英文**：`render×2` + `scorecard.mjs` 缺省 `--lang` 即 `en`；SKILL.md 示例默认值改 `--lang en`、「Use Chinese unless asked」改为「按用户语言写、不明默认英文」。
+- [x] **语言来源**：agent（SKILL.md 指导）按用户对话语言传 `--lang`，脚本缺省英文；不引入环境探测（决策见 ADR 0025）。
+- [ ]（follow-up，**不在 T15 范围**）**CLI 自身 i18n**：`src/habits.ts` 生成的中文信号短语（经 `--json`→merge `extras`→报告）、merge 的少量 `extras` 前缀、`src/emit/text.ts` 全中文人读输出——英文报告里仍会夹这些 CLI 层中文，需给 CLI 加语言层（信号结构化 / emitter 文案表）。详见 ADR 0025「已知遗留」。
 
-## T16 · 输入/输出 Token 分布可疑（疑似 BUG，待核）（P1）— ⏳ pending
+## T16 · 输入/输出 Token 分布修正（展示口径）（P1）— ✅ 已完成
 
-> 来源：用户 2026-06-04 看报告时的观察，**先记观察，后续自己修**。
-> 现象：两平台 token 方向不一致——
->
-> | 平台 | 输入 Token | 输出 Token |
-> |---|---|---|
-> | Claude Code | 192,128 | 3,553,058 |
-> | Codex | 34,593,032 | 153,180 |
->
-> 反常点：Claude Code **输入 192K 远小于输出 3.5M**（正常应输入≫输出，尤其含 cache read/creation）；
-> Codex 方向（输入 34.5M ≫ 输出 153K）反而正常。怀疑 Claude Code 侧的「输入 Token」展示口径有问题。
+> 决策：[`adr/0024-report-input-token-display-parity.md`](adr/0024-report-input-token-display-parity.md)。
+> 现象：Claude「输入 192K ≪ 输出 3.5M」反常、Codex（34.5M ≫ 153K）正常。**确属 BUG，TODO 怀疑方向正确**。
+> 根因：两平台 `tokens.input` 口径刻意不对称（Claude=非缓存 fresh、cache_read/cache_creation 独立桶；Codex=含缓存），展示层却把 `input` 直接头对头比较 + Codex 构成面板双算。`total` 含全部 → ccusage 对账（只校 total）保持绿，故问题在**展示分桶、非解析层**（与下条判断一致）。
 
-- [ ] 复现并定位：确认报告里「输入 Token」是否**漏算 cache 输入**（cache_read / cache_creation 没并进展示的 input），
-      或 Claude 适配器 input/output 字段**映射颠倒**。
-- [ ] 与对账交叉：`scripts/verify-ccusage.ts` 是 token 严格相等的——若 CI 对账仍绿，问题更可能在
-      **emitter/渲染的分桶展示**而非解析层；若对账也偏，则在解析层。两条路分别查。
-- [ ] 修复后补 fixture 回归，确保两平台 input/output（含 cache 拆分）展示口径一致。
+- [x] 复现并定位：是**漏算 cache 输入**（cache_read/cache_creation 没并进展示的 input），非映射颠倒；经独立 agent 对抗式核验确认。
+- [x] 与对账交叉：CI 对账仍绿（`verify-ccusage.ts` 只校 `tokens.total`），故走**展示层**修复——`render_dual_platform.mjs` 纯展示层改，不动解析/`models[].tokens`/计价（ccusage 两平台仍 OK）。
+- [x] 修复 + 回归（`test/token-display.test.ts`）：头对头「输入 Token」改「输入侧总量（含缓存读）」两平台统一、两个「Token 构成」面板改互斥桶（求和=total、Codex reasoning 转脚注）、Codex 模型表「输入」列改 fresh、`model.ts` glossary 更正。真实数据验证：Claude 输入侧总量 924M ≫ output 3.35M。
 
 ---
 
