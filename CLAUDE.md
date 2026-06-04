@@ -17,8 +17,8 @@
 
 两者通过 **`--json` 契约**解耦：CLI 出数据，skill 出解读。改 CLI 不应破坏该契约（见 ADR 0004 / 0010）。
 
-**分发**：skill 走 **`npx skills add loredunk/ccoach -a claude-code -a codex -g -y`**（Vercel Labs `skills` CLI，
-一条命令装到 Claude Code + Codex 双端；仓库无需清单、自动发现 `skills/*/SKILL.md`），见 [ADR 0028](docs/adr/0028-distribution-npx-skills.md)。
+**分发**：skill 走 **`npx skills add loredunk/ccoach`**（Vercel Labs `skills` CLI，交互选 agent/scope，可装到
+Claude Code + Codex；仓库无需清单、自动发现 `skills/*/SKILL.md`），见 [ADR 0028](docs/adr/0028-distribution-npx-skills.md)。
 
 ## 架构方向（Phase 1 已落地：CLI 核心已是 TypeScript；已去 Go）
 

@@ -63,13 +63,13 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 
 ### 安装 skill（Claude Code + Codex）
 
-用 [`skills`](https://github.com/vercel-labs/skills) CLI **一条命令装到 Claude Code 和 Codex 两端**（你已装 Node，无需全局安装别的）：
+用 [`skills`](https://github.com/vercel-labs/skills) CLI 安装（你已装 Node，无需再装别的）：
 
 ```bash
-npx skills add loredunk/ccoach -a claude-code -a codex -g -y
+npx skills add loredunk/ccoach
 ```
 
-随后在 Claude Code 里用 `/ccoach-insight` 触发；Codex 从其 skills 目录识别。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。（报告默认英文；要中文给 skill 脚本传 `--lang zh`，见 SKILL.md。）
+它会让你**自行选择 agent（Claude Code / Codex）与范围（全局 / 项目）**。随后在 Claude Code 里用 `/ccoach-insight` 触发；Codex 从其 skills 目录识别。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。（报告默认英文；要中文给 skill 脚本传 `--lang zh`，见 SKILL.md。）
 
 ## 说明与边界
 

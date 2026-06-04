@@ -66,13 +66,13 @@ never reads hidden system prompts.
 
 ### Install the skill (Claude Code + Codex)
 
-The skill installs to **both Claude Code and Codex in one command** via the [`skills`](https://github.com/vercel-labs/skills) CLI (you already have Node — nothing to install globally):
+Install the skill via the [`skills`](https://github.com/vercel-labs/skills) CLI (you already have Node — nothing else to install):
 
 ```bash
-npx skills add loredunk/ccoach -a claude-code -a codex -g -y
+npx skills add loredunk/ccoach
 ```
 
-Then invoke it in Claude Code with `/ccoach-insight`; Codex picks it up from its skills dir. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`. (Report defaults to English; pass `--lang zh` to the skill's scripts for Chinese — see the skill's SKILL.md.)
+It prompts you to pick the agents (Claude Code / Codex) and scope (global / project) — choose what you want. Then invoke it in Claude Code with `/ccoach-insight`; Codex picks it up from its skills dir. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`. (Report defaults to English; pass `--lang zh` to the skill's scripts for Chinese — see the skill's SKILL.md.)
 
 ## Notes & boundaries
 

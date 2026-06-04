@@ -13,11 +13,13 @@
 
 ## 决策
 
-**主推 `npx skills add`**，不自建分发 CLI（取代 ADR 0003 D3）：
+**主推 `npx skills add`**，不自建分发 CLI（取代 ADR 0003 D3）。用户面命令保持最简、交互选 agent/scope：
 
 ```
-npx skills add loredunk/ccoach -a claude-code -a codex -g -y
+npx skills add loredunk/ccoach
 ```
+
+（非交互可加 `-a claude-code -a codex -g -y`，即下文实测所用。）
 
 - 仓库**无需任何清单文件**：`skills` CLI 自动扫描 `skills/*/SKILL.md`，已实测能发现 `ccoach-insight`。
 - 安装模型（实测）：内容落 `~/.agents/skills/ccoach-insight`（**Codex 直接读这个 universal 目录**），并 **symlink**

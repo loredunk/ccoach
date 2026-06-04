@@ -246,13 +246,13 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 - **CLI 走普通 npm 发布**：`npx @loredunk/ccoach` 即用，无预编译二进制矩阵、无 postinstall 联网下载。
 - **skills 走 `npx skills add`**（Vercel Labs `skills` CLI，**取代**自建 `@ccoach/skills` 包 + `ccoach skills install`，
-  见 [ADR 0028](adr/0028-distribution-npx-skills.md)）：`npx skills add loredunk/ccoach -a claude-code -a codex -g -y`
-  一条命令装到两端（Claude symlink `~/.claude/skills`、Codex universal `~/.agents/skills`）；仓库无需清单、自动发现
-  `skills/*/SKILL.md`。已实测本地与远端均可装出 `ccoach-insight`。
+  见 [ADR 0028](adr/0028-distribution-npx-skills.md)）：`npx skills add loredunk/ccoach`
+  （交互选 agent/scope；非交互可加 `-a claude-code -a codex -g -y`），装到 Claude symlink `~/.claude/skills`、
+  Codex universal `~/.agents/skills`；仓库无需清单、自动发现 `skills/*/SKILL.md`。已实测本地与远端均可装出 `ccoach-insight`。
 
 ### 5.3 验收标准
 
 - [ ] `npx @loredunk/ccoach` 可在不预装的情况下直接跑通（跨平台，普通 Node 包）。
 - [ ] `npm i -g @loredunk/ccoach` 后全局可用 `ccoach`。
-- [x] skill 可经 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y` 一键装到双端（ADR 0028，已实测）。
+- [x] skill 可经 `npx skills add loredunk/ccoach`（交互选 agent/scope）装到双端（ADR 0028，已实测）。
 - [x] README / README_CN 写明安装命令（CLI `npx @loredunk/ccoach` + skill `npx skills add`）。

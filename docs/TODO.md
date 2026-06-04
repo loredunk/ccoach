@@ -131,7 +131,7 @@
 - [ ] CI：build + test + 发布；版本与仓库同源。
 
 ### T4.3 skills 分发 — ✅ 改走 `npx skills add`（ADR 0028，取代自建 `ccoach skills install`）
-- [x] **主推 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y`**（Vercel Labs `skills` CLI）：
+- [x] **主推 `npx skills add loredunk/ccoach`**（Vercel Labs `skills` CLI，交互选 agent/scope；非交互可加 `-a claude-code -a codex -g -y`）：
       仓库无需清单、自动发现 `skills/*/SKILL.md`；已本地实测发现 + 双端安装（Claude symlink、Codex universal `~/.agents/skills`）。
 - [x] README（中英）写明一行安装命令。
 - [x]（外部端到端，ADR 0028 4b）**已验证**：提交推送到公开 `loredunk/ccoach` 后，临时 HOME 跑
