@@ -1,7 +1,7 @@
 import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
   type ReworkSignals, type EnvironmentSignals, type FileLanguage,
-  type BillingReport, type CodexSpecific,
+  type BillingReport, type CodexSpecific, type ClaudeSpecific,
   type ScopeBucket, type ProjectScope, type SessionScope,
   type ModelTimeline, type ModelDayCount, type ModelTokenBreakdown,
   REPORT_GLOSSARY, emptyTokens,
@@ -116,6 +116,9 @@ export class Aggregator {
   private cxContextWindow = new Map<number, number>() // 窗口规格 -> 出现次数（取众数）
   private cxGitIdentity = false
   private cxNonDefaultProvider = false // D2a：历史 JSONL 见过 model_provider≠openai（中转弱信号，ADR 0022）
+  // Claude 服务端工具计数（ADR 0023 D2）
+  private clWebSearchReq = 0
+  private clWebFetchReq = 0
   // 分层 scope（默认 global）：!=global 时按桶攒派生信号，每条记录前由适配器 beginRecord 设当前桶。
   private scope: Scope
   private groups = new Map<string, GroupAcc>()
@@ -336,6 +339,8 @@ export class Aggregator {
   // D2a（ADR 0022）：rollout 的 session_meta.model_provider 非 openai → 历史曾用自定义/中转 provider（可被命名规避）。
   markCodexNonDefaultProvider(): void { this.cxNonDefaultProvider = true }
   getCodexNonDefaultProvider(): boolean { return this.cxNonDefaultProvider }
+  // Claude 服务端工具（ADR 0023 D2）：累计 usage.server_tool_use 的 web 搜索/抓取请求数（纯计数）。
+  applyClaudeServerTool(webSearch: number, webFetch: number): void { this.clWebSearchReq += webSearch; this.clWebFetchReq += webFetch }
 
   touchSession(id: string): void { if (id) this.sessionIds.add(id) }
 
@@ -501,6 +506,11 @@ export class Aggregator {
         cs.context_window = best
       }
       report.codex_specific = cs
+    }
+    // Claude 服务端工具计数（ADR 0023 D2）；Codex-only 时为 0 → 不输出。
+    if (this.clWebSearchReq || this.clWebFetchReq) {
+      const cl: ClaudeSpecific = { web_search_requests: this.clWebSearchReq, web_fetch_requests: this.clWebFetchReq }
+      report.claude_specific = cl
     }
     if (this.scope !== 'global') {
       report.scope = this.scope

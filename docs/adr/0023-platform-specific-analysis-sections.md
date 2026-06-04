@@ -1,6 +1,6 @@
 # ADR 0023 — 平台特色分析板块：Codex 执行画像是蓝海、Claude 差异化已覆盖
 
-> 状态：提议中 · 日期：2026-06-04
+> 状态：已接受 · 日期：2026-06-04（D1 codex_specific / D2 claude_specific 已实现；D4 已进 CLI text 与 skill 层 HTML（端点/计费/执行画像卡片））
 > · 沿用 [`adr/0011-multi-platform-usage-sources.md`](0011-multi-platform-usage-sources.md)（「平台数据源适配器」+「平台无关分析层」；新增信号只补适配器）
 > · 复用 [`adr/0017-derived-non-content-signals.md`](0017-derived-non-content-signals.md) 的「瞬时读 → 只留计数/白名单标签、原文绝不留」红线（本 ADR 全部新信号都落在此边界）
 > · 与 [`adr/0022-billing-mode-plan-split-relay-guardrail.md`](0022-billing-mode-plan-split-relay-guardrail.md) 同批：0022 管「计费维度」、本篇管「执行画像维度」

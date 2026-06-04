@@ -119,6 +119,12 @@ export interface EndpointDetection {
   confidence: 'high' | 'medium' | 'low'
   basis: string[]                                     // 判定依据（仅安全白名单标签，如 auth_mode:chatgpt / base_url:official）
 }
+// 平台特色：Claude 独有补充（ADR 0023 D2）。Claude 多数差异化信号已在 environment/skills/rework 等覆盖，
+// 此处只补尚未采的 server_tool_use 计数（服务端 web 搜索/抓取）。仅纯计数。
+export interface ClaudeSpecific {
+  web_search_requests: number  // usage.server_tool_use.web_search_requests 累计
+  web_fetch_requests: number   // usage.server_tool_use.web_fetch_requests 累计
+}
 // 环境/使用画像——只由记录元数据派生的非敏感标签/计数（ADR 0017）。
 export interface EnvironmentSignals {
   claude_versions?: string[]        // Claude Code 版本
@@ -162,6 +168,7 @@ export interface Report {
   environment?: EnvironmentSignals
   billing?: BillingReport      // 计费维度（仅 Codex 填，ADR 0022 D1）：按订阅 plan tier 拆 token
   codex_specific?: CodexSpecific // 平台特色：Codex 执行画像（ADR 0023 D1）
+  claude_specific?: ClaudeSpecific // 平台特色：Claude 服务端工具计数（ADR 0023 D2）
   endpoints?: EndpointDetection[] // 端点/计费模式检测（ADR 0022 D2/D3/D4）：账户级当前快照，读 config 派生白名单标签
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
   scope?: string              // "global" | "project" | "session"
@@ -185,6 +192,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   environment: 'Claude Code 版本、权限模式分布、附件数、子代理消息数——只由记录元数据派生的非敏感标签/计数（ADR 0017）。',
   billing: '仅 Codex：按订阅 plan tier(plus/pro/…) 拆 token + 未分类桶（有 token 无 plan_type，≠确定API）。只从 rate_limits 的存在性+plan_type 标签派生 token 归类，不输出任何配额%/余额/重置时间（rate_limits 顶层仍恒 null）。confidence=spoofable-by-relay：plan_type 来自后端响应、可被中转透传或伪造，不能据此断言"官方订阅"（ADR 0022 D1）。',
   codex_specific: '仅 Codex 的执行画像：effort/审批策略/沙箱/协作模式/personality/客户端身份(originators) 分布 + 压缩(compactions)/放弃回合(aborted_turns)/上下文窗口(context_window)/git 仓库身份(布尔)。全为派生计数/白名单枚举标签，collaboration_mode 仅取 mode 名、绝不读 developer_instructions 正文（ADR 0023 D1 / 0017）。',
+  claude_specific: '仅 Claude 的服务端工具计数：web 搜索/抓取请求数（usage.server_tool_use）。Claude 多数差异化信号已在 environment/skills/rework 覆盖，此处仅补 server_tool_use（ADR 0023 D2）。',
   endpoints: '端点/计费模式检测（账户级当前快照，读本机 config）：endpoint(official|custom|unknown)+relay_suspected+auth_mode+subscription_type+billing_mode(subscription|api_or_relay|unknown)+confidence。只派生布尔/host 白名单/枚举标签，绝不存 key/token/完整 base_url URL（custom 不回显中转域名）。与 billing 块（历史 token 拆分）正交：这是"现在怎么计费/是否走中转"。endpoint=custom 时 plan_type 标签可能被中转伪造，billing_mode 保守判 api_or_relay（ADR 0022 D2/D3/D4）。',
   git_habits: 'git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。',
   project_management: '各仓库是否有测试/构建/CI 信号。',
