@@ -168,6 +168,10 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 **prompt 读取边界**：会话 / 项目层可读 user prompt（仅本机、用户发起、转述 + 脱敏、不逐字成片堆叠），
 复用 `references/session-prompt-review.md` 框架；全局层保持纯聚合（零 prompt 文本）。
 
+> **规划中（pending）**：拟**细化失败类别**——把 `other` 兜底里的环境/外因（断网、磁盘、命令缺失、被 kill 等）
+> 识别出来，并按**外因/内因**分组，回答「失败是 AI/prompt 的问题还是机器环境的问题」。仅扩白名单标签 + 纯计数，
+> 红线不变。见 [`adr/0021-error-taxonomy-refinement.md`](adr/0021-error-taxonomy-refinement.md)（提议中）、TODO T14。
+
 ### 3.10 特性优先建议（已实现）
 
 > 决策见 [`adr/0006-feature-first-recommendations.md`](adr/0006-feature-first-recommendations.md)。
@@ -208,6 +212,10 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 - **对比钩子**：「超过了 73% 的用户」相对排名；早期用本地估算、标注、后期校准。
 - **分寸**：损但不伤人——只吐槽可改变的行为习惯，不攻击能力 / 人格。
 - **隐私即卖点**：prompt 全程本地处理、不上传，并在 README / UI 写明（沿用 §3.8 / ADR 0005）。
+
+> **规划中（pending）**：拟加**第 5 轴「编码自主度」**，把「用户多大程度自己改代码 / 不采用 AI 产出」
+> （古法编程 / 人机结对 / AI 全托管 / 甩手提问家）做成称号，复用已有 `rework_signals`、无新采集。
+> 见 [`adr/0020-coding-autonomy-scorecard-axis.md`](adr/0020-coding-autonomy-scorecard-axis.md)（提议中）、TODO T13。
 
 ---
 

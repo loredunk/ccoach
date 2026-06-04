@@ -136,6 +136,33 @@
 
 ---
 
+## T13 · 编码自主度成绩卡第 5 轴（P1）— ⏳ pending
+
+> 决策：[`adr/0020-coding-autonomy-scorecard-axis.md`](adr/0020-coding-autonomy-scorecard-axis.md)（提议中）
+> · 把「用户多大程度自己改代码 / 不采用 AI 产出」做成称号；复用既有 `rework_signals`，无新采集。
+
+- [ ] 复用 `rework_signals`（`edits` / `user_modified_rate`）派生「编码自主度」称号轴：**两信号组合**——
+      先看「让不让 AI 写」（`editsPerSession`），再看「写完改不改」（`user_modified_rate`），分 4 档：
+      古法编程 / 人机结对 / AI 全托管 / 甩手提问家。
+- [ ] `scripts/scorecard.mjs` 加 `scoreAutonomy` + 进 `axesSpec`；`references/scorecard-copy.json` 加 `axes.autonomy`
+      + `ui.zh/en` 的 `axis_autonomy` 标签；`test/scorecard.test.ts` 的 `AXES` 补 `autonomy`。
+- [ ] 开放问题：中性轴是否计入 `rank_pct`（建议不计入，仅展示称号）；阈值用真实样本校准；
+      Codex 侧 `userModified` 等价字段待核（无则该轴仅 Claude Code，渲染降级）。
+
+## T14 · 失败类别细化 + 外因/内因分组（P1）— ⏳ pending
+
+> 决策：[`adr/0021-error-taxonomy-refinement.md`](adr/0021-error-taxonomy-refinement.md)（提议中）
+> · CLI「按类别」里 `other` 过笼统；细化环境/外因类别，回答「失败是 AI 的问题还是环境的问题」。
+
+- [ ] 扩 `src/errors.ts` 的 `classifyError` 白名单（外因优先排序）：`command-not-found` / `disk` / `oom` /
+      `signal` / `syntax`（可选 `type`）。
+- [ ] 加**外因/内因**分组计数（`error_signals.external_count` / `internal_count`，纯计数）；
+      `src/emit/text.ts` 的「错误 / 卡顿」段补一行「外因 X% · 内因 Y%」习惯洞察。
+- [ ] 隐私：仍只产出**固定白名单标签 + 纯计数**，匹配用的错误文本**瞬时派生即弃**，
+      绝不存储/外发 stderr/stdout/命令全行（ADR 0016/0017 红线不变）。
+
+---
+
 ## 已完成（历史）
 - [x] 建立 `docs/`：PRD / ADR / TODO 体系（2026-06-02）。
 - [x] 规划 npm 分发与 skills 化分析（ADR 0003 / 0004，2026-06-02）。
