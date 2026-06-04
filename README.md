@@ -63,6 +63,16 @@ a dual-platform HTML report with a scorecard. It can drill from high-token proje
 sessions (`ccoach sessions`), reads a selected session's user prompts only after explicit approval, and
 never reads hidden system prompts.
 
+### Install the skill (Claude Code + Codex)
+
+The skill installs to **both Claude Code and Codex in one command** via the [`skills`](https://github.com/vercel-labs/skills) CLI (you already have Node — nothing to install globally):
+
+```bash
+npx skills add loredunk/ccoach -a claude-code -a codex -g -y
+```
+
+Then invoke it in Claude Code with `/ccoach-insight`; Codex picks it up from its skills dir. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`. (Report defaults to English; pass `--lang zh` to the skill's scripts for Chinese — see the skill's SKILL.md.)
+
 ## Notes & boundaries
 
 - **Local machine only**: rollouts are per-machine; this tool reads only local files and never aggregates across machines.

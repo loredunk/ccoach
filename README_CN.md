@@ -60,6 +60,16 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 并能从高耗项目下钻到候选会话（`ccoach sessions`）；只在你明确授权后才读取所选会话的 user prompt，
 且绝不读取隐藏的系统提示。
 
+### 安装 skill（Claude Code + Codex）
+
+用 [`skills`](https://github.com/vercel-labs/skills) CLI **一条命令装到 Claude Code 和 Codex 两端**（你已装 Node，无需全局安装别的）：
+
+```bash
+npx skills add loredunk/ccoach -a claude-code -a codex -g -y
+```
+
+随后在 Claude Code 里用 `/ccoach-insight` 触发；Codex 从其 skills 目录识别。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。（报告默认英文；要中文给 skill 脚本传 `--lang zh`，见 SKILL.md。）
+
 ## 说明与边界
 
 - **只反映本机**：同账号多机登录时 rollout 按机器隔离，本工具只读本机文件、不跨机器汇总。

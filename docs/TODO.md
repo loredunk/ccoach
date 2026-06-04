@@ -130,9 +130,14 @@
 - [ ] CLI 作为普通 npm 包发布，`npx ccoach` 跨平台即用（无二进制矩阵、无 postinstall 下载）。
 - [ ] CI：build + test + 发布；版本与仓库同源。
 
-### T4.3 skills 安装
-- [ ] `@ccoach/skills` 可直接 `npm i` 安装。
-- [ ] `ccoach skills install`：探测并复制到 Claude Code / Codex 的 skills 目录（ADR 0003 OQ3 / 0004 OQ1）。
+### T4.3 skills 分发 — ✅ 改走 `npx skills add`（ADR 0028，取代自建 `ccoach skills install`）
+- [x] **主推 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y`**（Vercel Labs `skills` CLI）：
+      仓库无需清单、自动发现 `skills/*/SKILL.md`；已本地实测发现 + 双端安装（Claude symlink、Codex universal `~/.agents/skills`）。
+- [x] README（中英）写明一行安装命令。
+- [ ]（**pending，依赖外部 — 推公开仓库后用户验收**，ADR 0028 4b）：
+      1. push 本批提交到公开 `loredunk/ccoach`；2. 干净环境跑 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y`
+      确认装出 `ccoach-insight`、`/ccoach-insight` 可触发、Codex 识别；3. 如 `skills` 生态有可选 registry 登记则按需登记。
+- [ ]（作废）原 `@ccoach/skills` npm 包 + 自建 `ccoach skills install`（ADR 0003 D3）——被 npx skills 取代。
 
 ---
 
