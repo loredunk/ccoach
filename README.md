@@ -58,7 +58,7 @@ For richer AI-written HTML reports, use the reusable skill
 [skills/ai-usage-html-report](skills/ai-usage-html-report/SKILL.md): it reads local **Claude Code + Codex**
 data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms; `ccusage`
 is an offline token cross-check, never a runtime dependency), computes authoritative cost from each model's
-**official online price** ([ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)), and renders
+**official online price**, and renders
 a dual-platform HTML report with a scorecard. It can drill from high-token projects down to candidate
 sessions (`ccoach sessions`), reads a selected session's user prompts only after explicit approval, and
 never reads hidden system prompts.
@@ -67,7 +67,7 @@ never reads hidden system prompts.
 
 - **Local machine only**: rollouts are per-machine; this tool reads only local files and never aggregates across machines.
 - **No quota percentages**: `rate_limits` is always null under the CLI, and quota is account-level / cross-machine.
-- **Cost is an estimate**, not your actual bill. The CLI ships a best-effort **offline fallback** price table; **authoritative** cost is computed by the report skill, which looks up each observed model's **official online price** per token class ([ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)). Tokens (and the offline cost) are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
+- **Cost is an estimate**, not your actual bill. The CLI ships a best-effort **offline fallback** price table; **authoritative** cost is computed by the report skill, which looks up each observed model's **official online price** per token class. Tokens (and the offline cost) are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
 - Time windows use absolute local-timezone day boundaries; the report header states the timezone.
 
 ## Credits

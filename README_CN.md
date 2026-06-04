@@ -4,7 +4,7 @@
 
 > 本机 AI 用量教练（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
 > 告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。
-> 两个平台是对称的一等公民（不是只给 Codex 用的工具），未来还会扩展到 OpenClaw、Harness 等其它 Agent CLI。设计与决策见 [`docs/`](docs/)（PRD / ADR / TODO）。
+> 两个平台是对称的一等公民（不是只给 Codex 用的工具），未来还会扩展到 OpenClaw、Harness 等其它 Agent CLI。设计与决策见 [`docs/`](docs/)。
 
 ## 它能做什么
 
@@ -56,8 +56,7 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 更深入的 AI 解读与 HTML 报告，用可复用的 skill
 [skills/ai-usage-html-report](skills/ai-usage-html-report/SKILL.md)：它从 `ccoach report --json` 读取
 **Claude Code + Codex** 两平台的本机数据（token、按模型拆分、行为画像；`ccusage` 仅作离线 token 交叉
-验证，绝非运行时依赖），并按报告里实际出现的模型**联网查官方单价**计算权威成本
-（[ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)），产出双平台 HTML 报告与成绩卡，
+验证，绝非运行时依赖），并按报告里实际出现的模型**联网查官方单价**计算权威成本，产出双平台 HTML 报告与成绩卡，
 并能从高耗项目下钻到候选会话（`ccoach sessions`）；只在你明确授权后才读取所选会话的 user prompt，
 且绝不读取隐藏的系统提示。
 
@@ -65,7 +64,7 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 
 - **只反映本机**：同账号多机登录时 rollout 按机器隔离，本工具只读本机文件、不跨机器汇总。
 - **不输出配额百分比**：CLI 下 `rate_limits` 恒为 null，且配额是账号级、跨机器的。
-- **成本为估算值**，不等于实际账单。CLI 内置一张 best-effort 的**离线 fallback** 价表；**权威成本**由报告 skill 按各 token 类别 × 报告里实际出现模型的**官方联网单价**计算（[ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)）。Token（与离线估算成本）经 `npm run verify:ccusage` 与 `ccusage` 对账——token 严格相等、成本 1% 容差内（ccusage 仅作开发/CI 校验，绝非运行时依赖）。
+- **成本为估算值**，不等于实际账单。CLI 内置一张 best-effort 的**离线 fallback** 价表；**权威成本**由报告 skill 按各 token 类别 × 报告里实际出现模型的**官方联网单价**计算。Token（与离线估算成本）经 `npm run verify:ccusage` 与 `ccusage` 对账——token 严格相等、成本 1% 容差内（ccusage 仅作开发/CI 校验，绝非运行时依赖）。
 - 时间窗口按本机时区的绝对日期边界划分，报告头部会标明时区。
 
 ## 致谢
