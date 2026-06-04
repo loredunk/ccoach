@@ -55,7 +55,7 @@ ccoach --json                   # JSON output, script / agent friendly
 ## Advice skill
 
 For richer AI-written HTML reports, use the reusable skill
-[skills/ai-usage-html-report](skills/ai-usage-html-report/SKILL.md): it reads local **Claude Code + Codex**
+[skills/ccoach-insight](skills/ccoach-insight/SKILL.md): it reads local **Claude Code + Codex**
 data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms; `ccusage`
 is an offline token cross-check, never a runtime dependency), computes authoritative cost from each model's
 **official online price**, and renders

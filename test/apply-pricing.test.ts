@@ -5,7 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const MOD = path.resolve(HERE, '..', 'skills', 'ai-usage-html-report', 'scripts', 'apply_pricing.mjs')
+const MOD = path.resolve(HERE, '..', 'skills', 'ccoach-insight', 'scripts', 'apply_pricing.mjs')
 const { priceModel, applyPricing } = await import(MOD)
 
 describe('priceModel', () => {

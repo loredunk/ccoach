@@ -10,7 +10,7 @@
 
 ## 背景
 
-`ai-usage-html-report` skill 实跑时暴露了几个相互纠缠的问题：
+`ccoach-insight` skill 实跑时暴露了几个相互纠缠的问题：
 
 1. **「LiteLLM 离线定价」措辞令人困惑、且不够权威**。Claude Code 成本来自 `ccusage` 内置的 LiteLLM
    价格快照（`model_prices_and_context_window.json`），是二手聚合、会过期；`src/pricing.ts` 还硬编码了
@@ -35,7 +35,7 @@
   `model_tokens` / `src/model.ts` `ModelTokenBreakdown`。
 - **D2（成本 = skill 层联网官方价）**：skill 从合并 JSON 里收集**实际出现的每个模型名**，**联网查询其官方
   API 定价**（含第三方 provider 自己的价目页），写 `/tmp/pricing.json`，由新脚本
-  `skills/ai-usage-html-report/scripts/apply_pricing.mjs` **确定性**按各模型 token 分桶算成本，重写
+  `skills/ccoach-insight/scripts/apply_pricing.mjs` **确定性**按各模型 token 分桶算成本，重写
   `platforms.<plat>.{models[].cost,cost_usd}`、`combined.total_cost_usd`，盖 `cost_basis:'official-online'`
   + `priced_at`，并设 `cost_is_real`（全命中=`true`、有未命中=`'partial'`）。查不到官方价的模型回退到
   离线 fallback 估算并记入 `unpriced_models`。`apply_pricing` 的口径与 `src/pricing.ts:estimateCost` 完全一致。

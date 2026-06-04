@@ -12,7 +12,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const SKILL = path.resolve(HERE, '..', 'skills', 'ai-usage-html-report', 'scripts')
+const SKILL = path.resolve(HERE, '..', 'skills', 'ccoach-insight', 'scripts')
 const FIX = path.join(HERE, 'fixtures', 'scorecard')
 const DATA = path.join(FIX, 'merged_sample.json')
 const INSIGHTS = path.join(FIX, 'insights_sample.json')

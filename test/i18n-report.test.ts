@@ -9,7 +9,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const SKILL = path.resolve(HERE, '..', 'skills', 'ai-usage-html-report', 'scripts')
+const SKILL = path.resolve(HERE, '..', 'skills', 'ccoach-insight', 'scripts')
 const RENDER_DUAL = path.join(SKILL, 'render_dual_platform.mjs')
 const RENDER_ENRICHED = path.join(SKILL, 'render_enriched_codex_report.mjs')
 

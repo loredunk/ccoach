@@ -7,10 +7,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 // @ts-ignore — skill 层 .mjs 无类型声明（运行时导入，仅用于透传单测）
-import { buildClaude, buildCodex } from '../skills/ai-usage-html-report/scripts/merge_dual_platform.mjs'
+import { buildClaude, buildCodex } from '../skills/ccoach-insight/scripts/merge_dual_platform.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const RENDER = path.resolve(HERE, '..', 'skills', 'ai-usage-html-report', 'scripts', 'render_dual_platform.mjs')
+const RENDER = path.resolve(HERE, '..', 'skills', 'ccoach-insight', 'scripts', 'render_dual_platform.mjs')
 
 // 合成 ccoach codex 报告（含 billing / codex_specific / endpoints）。
 function codexReport(endpoint: Record<string, unknown>) {

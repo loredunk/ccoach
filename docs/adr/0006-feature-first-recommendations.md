@@ -7,7 +7,7 @@
 
 本产品的根本目的是**让用户更好地用上 Claude Code / Codex 的特性**。因此分析给出的建议，
 凡是能用产品**原生特性**解决的，就应当落到具体特性上，而不是停留在泛泛的「拆分会话 /
-写好提示」。现有 [`references/insight-patterns.md`](../../skills/ai-usage-html-report/references/insight-patterns.md)
+写好提示」。现有 [`references/insight-patterns.md`](../../skills/ccoach-insight/references/insight-patterns.md)
 的 intervention 已零散提到 AGENTS.md、skills、工作拆分，但没有系统化为「问题 → 特性」的映射。
 本 ADR 把「特性优先」确立为建议的组织原则。
 
@@ -45,6 +45,6 @@ skill 只产出建议，由用户确认后自行实施；不自动写 settings /
 
 - 好处：建议可执行、贴合产品能力，真正帮用户「用好特性」，而非泛泛说教。
 - 代价：需维护 finding→feature 映射并随特性演进更新；每次给配置建议都要核对文档（D3）。
-- 影响：[`references/insight-patterns.md`](../../skills/ai-usage-html-report/references/insight-patterns.md)
+- 影响：[`references/insight-patterns.md`](../../skills/ccoach-insight/references/insight-patterns.md)
   的 intervention 需系统化为特性映射；可能新增一份 feature-mapping 参考（见 TODO T6）。
 </content>

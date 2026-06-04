@@ -31,14 +31,14 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 | 能力 | 命令 | 说明 |
 | --- | --- | --- |
 | 本机用量报告（默认命令） | `ccoach [--json --days N --since … --date … --by-repo]` | 只读 `~/.codex` rollout，输出 Token / 成本 / 工具 / 仓库 / 时段 / 来源 / 语言 / git 习惯 / 配置扫描；裸命令即出报告，`ccoach report …` 亦可 |
-| 双平台 AI 使用报告 skill | `skills/ai-usage-html-report/` | 已上线：用 ccusage + `ccoach report --json` 数据，产出 Claude Code + Codex 双平台 HTML 报告、行为画像，并支持 Codex 高耗会话钻取 |
+| 双平台 AI 使用报告 skill | `skills/ccoach-insight/` | 已上线：用 ccusage + `ccoach report --json` 数据，产出 Claude Code + Codex 双平台 HTML 报告、行为画像，并支持 Codex 高耗会话钻取 |
 
 `ccoach --json` 已经是「脚本友好」的结构化输出（见
 [`src/model.ts`](../src/model.ts) 的 `Report` 结构，
 已含 `repos / hours / sources / languages / git_habits / project_management` 等行为维度，由
 [`src/aggregate.ts`](../src/aggregate.ts) / [`src/habits.ts`](../src/habits.ts) /
 [`src/language.ts`](../src/language.ts) 产出），是 AI 分析能力的天然数据底座。
-本次增强是在**已上线的 `ai-usage-html-report` skill** 之上演进，而非从零新建。
+本次增强是在**已上线的 `ccoach-insight` skill** 之上演进，而非从零新建。
 
 > **技术栈（Phase 1 已落地 · 已去 Go）**：CLI 已从 Go **迁移到 Node/TypeScript**
 > （`@loredunk/ccoach`，[ADR 0010](adr/0010-cli-rewrite-node-ccusage.md)），并自建**统一解析层**——因 ccoach 还要从同一批
@@ -95,7 +95,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
    （如 `cache_hit_rate=缓存输入/总输入，越高越省钱`），让 agent 无需额外上下文即可读懂。
    Codex 侧复用现有聚合；Claude Code 侧数据源待调研（TODO T1.1）。
 2. **skill**：用自然语言教 agent——何时运行哪条命令、如何解读各指标、输出怎样的建议。
-   skill 是产品的第二部分交付物，**在已上线的 `ai-usage-html-report` skill 上演进**
+   skill 是产品的第二部分交付物，**在已上线的 `ccoach-insight` skill 上演进**
    （非新建），独立打包为 `@ccoach/skills`（见 §5、ADR 0003）。
 3. **使用**：用户在自己常用的 Claude Code / Codex 里直接问「我的用量怎么样、怎么省」，
    agent 运行 CLI、按 skill 给出结论。分析所用模型天然就是用户当前 agent。
@@ -116,7 +116,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 **In scope（本期）**
 - 增强 CLI 数据：让 `report --json`（及可能的 `--digest`）成为 agent 可直接消费的语义化数据。
-- 演进 `ai-usage-html-report` skill：新增**会话 / 项目 / 全局三个 scope**（§3.9、ADR 0005）。
+- 演进 `ccoach-insight` skill：新增**会话 / 项目 / 全局三个 scope**（§3.9、ADR 0005）。
 - **特性优先建议**：诊断结果优先映射到 Claude Code / Codex 原生特性（§3.10、ADR 0006）。
 - **会话 / 项目层可读 user prompt**（转述 + 脱敏）以诊断提示质量；全局层保持纯聚合。
 - 隐私护栏写进 skill 指令（仅本机、估算成本、禁配额幻觉、绝不读 assistant 回复）。
@@ -151,7 +151,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 > 决策见 [`adr/0005-tiered-analysis-and-signals.md`](adr/0005-tiered-analysis-and-signals.md)。
 
-三个 scope 作为 `ai-usage-html-report` skill 的模式：
+三个 scope 作为 `ccoach-insight` skill 的模式：
 
 | scope | 视角 | 数据定位 |
 | --- | --- | --- |
@@ -189,7 +189,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 看 per-day per-model 时间线（`ccoach report --json` 已产出 `models_timeline`：每模型 `first_day`/`last_day`
 + 每日 token），若新模型只在窗口末尾才出现（`first_day` 很晚）或尚未出现，则旧模型花费属发布时机所致、
 是预期行为；仅当新模型在窗口内确实可用时，才建议**今后**默认用更新的模型（须先联网核对发布日期）。
-对已开始切换到新模型的用户，应肯定其前瞻行为、无需纠偏。（落地见 `skills/ai-usage-html-report/`
+对已开始切换到新模型的用户，应肯定其前瞻行为、无需纠偏。（落地见 `skills/ccoach-insight/`
 的 SKILL.md「Analysis Guidance」与 `references/insight-patterns.md`「Model Version Distribution」。）
 
 ### 3.11 可分享成绩卡（病毒传播）（已实现）

@@ -11,7 +11,7 @@
 
 1. **CLI** — 产出只读、语义化的用量数据（默认命令 `ccoach`，即原 `report`；`--json` 为 agent 友好输出）。
 2. **skills** — 教 agent 解读 CLI 产物、给**对人有用的建议**、渲染**可分享成绩卡**
-   （已上线 `skills/ai-usage-html-report/`）。
+   （已上线 `skills/ccoach-insight/`）。
 
 两者通过 **`--json` 契约**解耦：CLI 出数据，skill 出解读。改 CLI 不应破坏该契约（见 ADR 0004 / 0010）。
 
@@ -55,7 +55,7 @@
   `pricing.ts`（双平台**离线 fallback** 价表，非权威；权威价走 skill 层联网官方价，ADR 0019）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `emit/{json,text}.ts`。
 - `test/` — vitest 单测 + 两平台 JSONL fixture（含 `test/fixtures/scorecard/`）；`test/scorecard.test.ts` 成绩卡回归
   （取代 `tools/test_scorecard.py`）；`scripts/verify-ccusage.ts` — 与 ccusage 对账（接入 CI）。
-- `skills/ai-usage-html-report/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；脚本全部 `.mjs`（merge / `apply_pricing`（联网官方价计成本，ADR 0019）/ scorecard / render×2）+ 采集并入 ccoach，**skill 内无 `.py`**。
+- `skills/ccoach-insight/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；脚本全部 `.mjs`（merge / `apply_pricing`（联网官方价计成本，ADR 0019）/ scorecard / render×2）+ 采集并入 ccoach，**skill 内无 `.py`**。
 - `tools/` — 校验脚本（`check_adrs.mjs`，原 `check_adrs.py`；scorecard 回归已并入 vitest）。
 - `docs/` — PRD / ADR / TODO（含 `superpowers/` 设计与实现计划），见下。
 - `README.md`（英文，默认）/ `README_CN.md`（中文）。

@@ -8,7 +8,7 @@
 ## T1 · AI 用量分析（skills 化）（P0）— ✅ 已完成
 
 > 决策：[`adr/0004-skills-based-analysis.md`](adr/0004-skills-based-analysis.md)（已接受）
-> · skill 在已上线的 `skills/ai-usage-html-report/` 上演进。
+> · skill 在已上线的 `skills/ccoach-insight/` 上演进。
 
 - [x] 复用 `codexreport.Build()` 产出 Codex 侧聚合。
 - [x] Claude Code 数据源：`~/.claude/projects/**/*.jsonl`（`collect_claude_behavior.py`）。

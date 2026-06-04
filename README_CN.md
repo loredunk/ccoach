@@ -54,7 +54,7 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 ## 使用建议 skill
 
 更深入的 AI 解读与 HTML 报告，用可复用的 skill
-[skills/ai-usage-html-report](skills/ai-usage-html-report/SKILL.md)：它从 `ccoach report --json` 读取
+[skills/ccoach-insight](skills/ccoach-insight/SKILL.md)：它从 `ccoach report --json` 读取
 **Claude Code + Codex** 两平台的本机数据（token、按模型拆分、行为画像；`ccusage` 仅作离线 token 交叉
 验证，绝非运行时依赖），并按报告里实际出现的模型**联网查官方单价**计算权威成本，产出双平台 HTML 报告与成绩卡，
 并能从高耗项目下钻到候选会话（`ccoach sessions`）；只在你明确授权后才读取所选会话的 user prompt，

@@ -8,7 +8,7 @@
 项目最初是 **autofresh**：在工作时段按 `5h10m` 间隔触发 Codex / Claude 保活 ping，
 把 5 小时计费窗口卡在需要的时段。保活之外，逐步长出了更有价值的一块——**只读用量分析**
 （`report` + `internal/codexreport`：token / 成本 / 工具 / 仓库 / 时段 / 语言 / git 习惯 / 配置扫描）
-与基于它的 **skill 建议**（`skills/ai-usage-html-report/`）。
+与基于它的 **skill 建议**（`skills/ccoach-insight/`）。
 
 产品重心已经转移：用户真正需要的是「**帮我用好 Claude Code / Codex、给我使用建议**」，
 而不是保活。保活功能（launchd/crontab 调度、provider ping、schedule、config、logging）
@@ -44,6 +44,6 @@
 - 好处：定位清晰（用量分析 + 建议）；二进制更瘦、依赖面更小；CLI 与测试大幅简化。
 - 代价：保活用户需另寻方案（本工具不再提供）；README / skill / 文档需同步改名。
 - 兼容：`go build ./... && go test ./...` 通过；`ccoach` 裸命令与 `ccoach report …` 行为一致。
-- 影响：PRD 定位段、README/README_EN、`skills/ai-usage-html-report/` 内的 `autofresh report`
+- 影响：PRD 定位段、README/README_EN、`skills/ccoach-insight/` 内的 `autofresh report`
   调用、docs 全面改为 ccoach。
 </content>

@@ -1,13 +1,13 @@
 ---
-name: ai-usage-html-report
+name: ccoach-insight
 description: Generate an enriched dual-platform (Claude Code + Codex) HTML report of local AI coding usage. Tokens & models come from `ccoach report --json` (offline local parse, ccusage cross-checks Claude); cost is computed from official online prices the agent looks up per model. Use when the user wants a deeper AI-written review of how they use Claude Code and/or Codex — cost, token, cache, model and active-hours breakdown, habits analysis, project-by-project recommendations, high-token project/session drilldown, or a richer HTML dashboard than the raw text/JSON reports.
-when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage across Claude Code and Codex — for example "how much did I spend on Claude Code / Codex", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my Claude Code and Codex usage", "which projects burned the most tokens", "compare my Claude Code vs Codex usage", "review my most expensive or unclear Codex sessions", "analyze my AI coding habits", or an explicit /ai-usage-html-report invocation.'
+when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage across Claude Code and Codex — for example "how much did I spend on Claude Code / Codex", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my Claude Code and Codex usage", "which projects burned the most tokens", "compare my Claude Code vs Codex usage", "review my most expensive or unclear Codex sessions", "analyze my AI coding habits", or an explicit /ccoach-insight invocation.'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
 allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(ccusage *)
 ---
 
-# AI Usage HTML Report (Claude Code + Codex)
+# ccoach Insight — AI usage report (Claude Code + Codex)
 
 ## Purpose
 

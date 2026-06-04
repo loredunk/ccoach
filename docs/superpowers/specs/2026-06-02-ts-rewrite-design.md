@@ -77,7 +77,7 @@ src/
   index.ts            # 库导出（供 skill TS 复用类型/逻辑）
 test/                 # vitest + 两平台 JSONL fixture
 scripts/verify-ccusage.ts   # 对账脚本（dev / CI）
-skills/ai-usage-html-report/scripts/   # Phase 2：渲染/计算层 .py → 手写 .mjs（已落地）；采集类 .py 待续
+skills/ccoach-insight/scripts/   # Phase 2：渲染/计算层 .py → 手写 .mjs（已落地）；采集类 .py 待续
 # cmd/ internal/      # 原 Go 参考实现 —— 已退役删除（去 Go 完成）
 ```
 

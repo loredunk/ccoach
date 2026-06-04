@@ -9,10 +9,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 // @ts-ignore — skill 层 .mjs 无类型声明（运行时导入，仅用于单测）
-import { inputSideTotal, tokenComposition } from '../skills/ai-usage-html-report/scripts/render_dual_platform.mjs'
+import { inputSideTotal, tokenComposition } from '../skills/ccoach-insight/scripts/render_dual_platform.mjs'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
-const RENDER = path.resolve(HERE, '..', 'skills', 'ai-usage-html-report', 'scripts', 'render_dual_platform.mjs')
+const RENDER = path.resolve(HERE, '..', 'skills', 'ccoach-insight', 'scripts', 'render_dual_platform.mjs')
 
 // 还原 T16 报告里的反常形状：Claude input(fresh) 远小于 output，但 cache_read 占大头；
 // Codex input(含缓存) 远大于 output。两平台 total 都是全部 token 之和。

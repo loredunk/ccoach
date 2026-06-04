@@ -10,7 +10,7 @@
 分析应建立在 **user prompt + permission + tool 调用** 上，而**不读取 assistant 回复**，以大幅
 降低上下文。本 ADR 把这三层与信号选择固定下来。
 
-按用户决策：三个层级作为现有 `skills/ai-usage-html-report/` skill 的**模式**承载（演进现有
+按用户决策：三个层级作为现有 `skills/ccoach-insight/` skill 的**模式**承载（演进现有
 skill，而非新建或拆分）。
 
 ## 决策
@@ -39,7 +39,7 @@ skill，而非新建或拆分）。
 ### D3 — prompt 读取边界（分层）
 
 - **会话级 / 项目级**：**可读 user prompt**，但限定：仅本机、用户发起、**转述 + 脱敏**、
-  绝不逐字成片堆叠、绝不读 assistant 回复。复用 [`references/session-prompt-review.md`](../../skills/ai-usage-html-report/references/session-prompt-review.md)
+  绝不逐字成片堆叠、绝不读 assistant 回复。复用 [`references/session-prompt-review.md`](../../skills/ccoach-insight/references/session-prompt-review.md)
   的脱敏与改写框架。
 - **全局级**：**保持纯聚合**，沿用 `ccoach report --json`（原 `scripts/collect_claude_behavior.py`，已并入 CLI，见 [ADR 0018](0018-cli-absorbs-collection-prompt-preview.md)）
   的零 prompt 文本策略（只出计数/类别/扩展名/仓库 basename 等聚合量）。

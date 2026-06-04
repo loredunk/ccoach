@@ -14,7 +14,7 @@ ccusage 仅作交叉验证、非运行时依赖。Go 版原地保留作行为基
 **Tech Stack：** TypeScript（ESM, Node ≥ 18）、cac（CLI）、tsdown（打包）、vitest（测试）、Node 内置 fs/path/readline。
 
 **参考实现（仓库内现成，作为行为基准）：** `internal/codexreport/*.go`（Codex）、
-`skills/ai-usage-html-report/scripts/collect_claude_behavior.py`（Claude Code）。移植时以它们为准、保持口径一致。
+`skills/ccoach-insight/scripts/collect_claude_behavior.py`（Claude Code）。移植时以它们为准、保持口径一致。
 
 **全局原则：** DRY、YAGNI、TDD（先红后绿）、频繁提交。每个 Task 结束 = 一次可工作、测试通过的提交。
 
