@@ -171,4 +171,3 @@
 - [x] 规划游戏化可分享成绩卡 + i18n（ADR 0008 / 0009，2026-06-02）。
 - [x] **实现** T1/T5/T6/T7/T2/T3（glossary、三层 scope + prompt 信号、feature-mapping、成绩卡 + zh/en、CI 检查，2026-06-02）。
 - [x] **TS 重构 Phase 1 落地**（T8/T9）：`@loredunk/ccoach`（cac/tsdown/vitest、ESM、Node≥18）——统一解析层（`claude-code` + `codex` 适配器）、平台无关聚合器、双平台计价、prompt 数值信号、习惯派生、JSON/文本 emitter、CLI（`--platform`/`--json`）、ccusage 交叉验证 + 隐私回归 + TS CI；token 与 ccusage 严格相等、成本 1% 内（2026-06-02）。
-</content>

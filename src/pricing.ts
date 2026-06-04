@@ -29,7 +29,7 @@ const priceTable: { prefix: string; p: Price }[] = [
   { prefix: 'gpt-5-nano', p: { input: 0.05, cachedInput: 0.005, output: 0.40 } },
   { prefix: 'gpt-5', p: { input: 1.25, cachedInput: 0.125, output: 10.0 } },
   { prefix: 'codex-mini', p: { input: 1.5, cachedInput: 0.375, output: 6.0 } },
-  // Claude 家族：带 cacheCreation（缓存写入价）=> 互斥桶口径。费率对齐 ccusage/LiteLLM、
+  // Claude 家族：带 cacheCreation（缓存写入价）=> 互斥桶口径。费率对齐 ccusage、
   // 经 scripts/verify-ccusage.ts 实测校准。注：新 Opus（4.5/4.8）已降价到 $5/$25（cache_read
   // 0.1×、cache_write 1.25×）；旧 Opus 4.0/4.1 为 $15/$75，本期以当前在用的新价为家族默认。
   { prefix: 'claude-opus', p: { input: 5, cachedInput: 0.5, output: 25, cacheCreation: 6.25 } },

@@ -78,7 +78,7 @@ function unifyClaudeModels(ccModels) {
     return {
       model: m.model,
       tokens: { input, cached_input: cachedInput, output, reasoning_output: 0, cache_creation: cacheCreation, total: input + cachedInput + cacheCreation + output },
-      cost: round(m.cost ?? 0, 4), // offline fallback (ccusage LiteLLM); overwritten by apply_pricing
+      cost: round(m.cost ?? 0, 4), // offline fallback (from ccusage); overwritten by apply_pricing
       priced: true,
     }
   })

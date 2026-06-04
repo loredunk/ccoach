@@ -1,7 +1,6 @@
 # PRD — ccoach
 
-> 状态：草拟中 · 最近更新：2026-06-02
-> · 更名：原 **autofresh**（保活工具）已剥离保活、聚焦用量分析与建议，更名为 **ccoach**（见 [ADR 0007](adr/0007-drop-keepalive-rebrand-ccoach.md)）。
+> 状态：草拟中 · 最近更新：2026-06-04
 
 本 PRD 覆盖 ccoach 的整体定位，并重点展开 **AI 用量分析与建议** 能力，以及 **可分享成绩卡**。
 
@@ -22,8 +21,6 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
    **特性优先**的建议（凡能用产品原生特性解决的就点名特性去解决）。
 3. **可分享成绩卡（传播）**：把用量 / 习惯 / prompt 评成多轴段位，做一张可截图、能炫能自嘲的
    成绩卡（见 §3.11、[ADR 0008](adr/0008-gamified-shareable-scorecard.md)）。
-
-> **不再做保活**：原 autofresh 的 launchd/crontab 保活 ping 已移除（ADR 0007）。
 
 目标用户：重度使用 Claude Code / Codex 的个人开发者，希望「花得值、用在刀刃上」，并乐于分享战绩。
 
@@ -57,7 +54,7 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 - 不输出任何**配额百分比**（CLI 下 `rate_limits` 恒为 null，且配额是账号级、跨机器的）。
 - 成本为**估算值**，不等于实际账单。Codex 的 token 累加与成本计算**对齐 ccusage**：按每轮
   `last_token_usage` 累加（无该字段时回退对 `total_token_usage` 求增量），成本 = 非缓存输入×输入价 +
-  缓存输入×缓存读取价 + 输出×输出价（输出已含 reasoning），参考价镜像 LiteLLM（[ADR 0012](adr/0012-codex-cost-tokens-ccusage-method.md)）。
+  缓存输入×缓存读取价 + 输出×输出价（输出已含 reasoning）；单价由 skill 层按实际模型联网查**官方价**计算、CLI 仅出离线 fallback 估算（[ADR 0019](adr/0019-pricing-online-official-at-skill-layer.md)，取代 [0012](adr/0012-codex-cost-tokens-ccusage-method.md) 的内置镜像价口径）。
 
 ---
 
@@ -71,7 +68,7 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 ### 3.2 问题陈述
 
 `report` 当前只「呈现数字」，用户仍需自行解读：缓存命中率是否偏低？reasoning 占比是否过高？
-某仓库是否在烧钱？保活窗口是否对齐了真实活跃时段？这一步「从数字到结论」的解读，
+某仓库是否在烧钱？最活跃的时段在哪、值不值？这一步「从数字到结论」的解读，
 正是大模型擅长、且对用户价值最高的部分。
 
 ### 3.3 用户故事
@@ -82,7 +79,7 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 
 ### 3.4 方案概述（skills 化）
 
-> 方案已调整：不再由 autofresh 二进制自己调模型，而是 **CLI 出数据 + skill 教 agent 解读**。
+> 方案已调整：不再由 CLI 自己调模型，而是 **CLI 出数据 + skill 教 agent 解读**。
 > 决策见 [`adr/0004-skills-based-analysis.md`](adr/0004-skills-based-analysis.md)
 > （取代 [ADR 0002](adr/0002-ai-analyzed-usage-report.md) 的「二进制内调模型 / `advise` 子命令」）。
 
@@ -99,7 +96,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
    Codex 侧复用现有聚合；Claude Code 侧数据源待调研（TODO T1.1）。
 2. **skill**：用自然语言教 agent——何时运行哪条命令、如何解读各指标、输出怎样的建议。
    skill 是产品的第二部分交付物，**在已上线的 `ai-usage-html-report` skill 上演进**
-   （非新建），独立打包为 `@autofresh/skills`（见 §5、ADR 0003）。
+   （非新建），独立打包为 `@ccoach/skills`（见 §5、ADR 0003）。
 3. **使用**：用户在自己常用的 Claude Code / Codex 里直接问「我的用量怎么样、怎么省」，
    agent 运行 CLI、按 skill 给出结论。分析所用模型天然就是用户当前 agent。
 
@@ -109,7 +106,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 每个 skill 至少包含：
 
-- **触发场景**：用户询问用量 / 花销 / 如何省额度 / 保活窗口是否合理。
+- **触发场景**：用户询问用量 / 花销 / 如何省额度 / 怎么用得更好。
 - **操作步骤**：建议运行的命令，如 `ccoach report --json --days 7`。
 - **解读指南**：各指标含义与经验阈值（缓存命中率偏低 → 提示复用上下文；reasoning 占比过高 → 提示精简任务）。
 - **输出模板**：结论 / 依据 / 行动项 / 风险与不确定性。
@@ -125,11 +122,11 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 - 隐私护栏写进 skill 指令（仅本机、估算成本、禁配额幻觉、绝不读 assistant 回复）。
 
 **Out of scope（本期不做）**
-- 在二进制内调用 LLM / `autofresh advise` 子命令（已被 ADR 0004 取消）。
+- 在二进制内调用 LLM / `advise` 子命令（已被 ADR 0004 取消）。
 - **读取 / 导出 assistant 回复文本**（任一 scope 都不读，见 §3.9 信号选择）。
 - 跨机器汇总用量（受 rollout 机器隔离约束）。
 - 真实账单 / 配额百分比（口径限制，见 §2 边界）。
-- skill 自动「改保活计划」或自动改配置（先只给建议，执行由人确认）。
+- skill 自动改配置（先只给建议，执行由人确认）。
 
 ### 3.7 验收标准
 
@@ -221,7 +218,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 
 ## 4. 度量
 
-- 采纳率：用户看到建议后是否调整了保活计划 / 使用习惯（可由后续 `plan` 变更间接观察）。
+- 采纳率：用户看到建议后是否调整了使用习惯 / 配置（可由后续变更间接观察）。
 - 可信度：建议中是否出现与口径冲突的表述（如声称配额百分比）——目标为 0。
 
 ---
@@ -235,8 +232,7 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 让用户能用最顺手的方式安装：`npx ccoach` 试用、`npm i -g ccoach` 全局安装；
 同时把产品的两块交付物——**CLI** 与 **skills**——在同一仓库内清晰分开、各自独立发布。
 
-> 包名随 [ADR 0007](adr/0007-drop-keepalive-rebrand-ccoach.md) 的更名调整：CLI 包 `ccoach`、
-> skills 包 `@ccoach/skills`（ADR 0003 中的 `autofresh` / `@autofresh/skills` 为更名前的旧名）。
+> 包名：CLI 包 `ccoach`、skills 包 `@ccoach/skills`（[ADR 0003](adr/0003-npm-distribution.md) 写于更名前，包名以此处为准）。
 
 ### 5.2 方案
 
@@ -255,4 +251,3 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 - [ ] `npm i -g ccoach` 后全局可用 `ccoach`。
 - [ ] skills 可经 `npm i @ccoach/skills` 或 `ccoach skills install` 两条路径安装。
 - [ ] README / README_CN 安装段简化为 `npx ccoach` 一行。
-</content>

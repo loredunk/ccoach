@@ -7,9 +7,6 @@
 **ccoach** = 本机 AI 用量教练（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
 告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。
 
-> 原名 **autofresh**（Codex/Claude 保活工具），已剥离保活、聚焦用量分析与建议，更名为 ccoach
-> （见 [ADR 0007](docs/adr/0007-drop-keepalive-rebrand-ccoach.md)）。
-
 产品分两块、同仓库内明确分开：
 
 1. **CLI** — 产出只读、语义化的用量数据（默认命令 `ccoach`，即原 `report`；`--json` 为 agent 友好输出）。

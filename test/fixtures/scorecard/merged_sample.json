@@ -4,7 +4,7 @@
   "platforms": {
     "claude_code": {
       "platform": "Claude Code",
-      "source": "ccusage (LiteLLM offline pricing)",
+      "source": "ccusage (offline fallback pricing)",
       "active_days": 6,
       "sessions": 3,
       "cost_usd": 42.0,

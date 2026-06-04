@@ -75,4 +75,3 @@
 | `estimate_note` | 排名为本地估算，仅供娱乐 | Ranking is a local estimate, just for fun. |
 
 > 注：`{pct}` 等占位符由渲染层填值；称号 / 人格总结整段由模型按用户语言生成，不在本表。
-</content>
