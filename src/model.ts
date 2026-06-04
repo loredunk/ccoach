@@ -104,6 +104,21 @@ export interface CodexSpecific {
   context_window?: number                     // model_context_window 众数（上下文窗口规格）
   git_repo_identity: boolean                  // 是否带 git 仓库身份（repository_url/commit_hash），仅布尔不存 URL
 }
+// 端点/计费模式检测（ADR 0022 D2/D3/D4）：账户级**当前快照**，读本机 config 派生白名单标签。
+// 隐私：只读、只派生布尔/host 白名单/枚举标签，**绝不存或输出 key/token/完整 base_url URL**。
+// 与历史 token 拆分（billing 块）不同——这是「现在这台机器怎么计费/是否走中转」，非历史归属。
+export interface EndpointDetection {
+  platform: string                                    // 'codex' | 'claude-code'
+  endpoint: 'official' | 'custom' | 'unknown'         // 活跃端点是否官方域名
+  official_host?: string                              // 仅 official 时给（公开域名，如 api.anthropic.com）；custom 绝不回显中转域名
+  relay_suspected: boolean                            // endpoint=custom 即 true（中转/镜像/自建网关）
+  auth_mode?: string                                  // 白名单标签：codex chatgpt|apikey；claude oauth-subscription|auth-token|api-key
+  subscription_type?: string                         // claude 账户订阅档（max/pro/…）标签（D4，账户级当前快照）
+  non_default_provider?: boolean                      // codex：历史 JSONL 见过 model_provider≠openai（D2a，可被命名规避，低置信）
+  billing_mode: 'subscription' | 'api_or_relay' | 'unknown' // D3 综合判定；有 plan_type 但端点非官方 → api_or_relay（保守）
+  confidence: 'high' | 'medium' | 'low'
+  basis: string[]                                     // 判定依据（仅安全白名单标签，如 auth_mode:chatgpt / base_url:official）
+}
 // 环境/使用画像——只由记录元数据派生的非敏感标签/计数（ADR 0017）。
 export interface EnvironmentSignals {
   claude_versions?: string[]        // Claude Code 版本
@@ -147,6 +162,7 @@ export interface Report {
   environment?: EnvironmentSignals
   billing?: BillingReport      // 计费维度（仅 Codex 填，ADR 0022 D1）：按订阅 plan tier 拆 token
   codex_specific?: CodexSpecific // 平台特色：Codex 执行画像（ADR 0023 D1）
+  endpoints?: EndpointDetection[] // 端点/计费模式检测（ADR 0022 D2/D3/D4）：账户级当前快照，读 config 派生白名单标签
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
   scope?: string              // "global" | "project" | "session"
   projects?: ProjectScope[]   // --scope project：每项目跨会话的派生信号桶
@@ -169,6 +185,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   environment: 'Claude Code 版本、权限模式分布、附件数、子代理消息数——只由记录元数据派生的非敏感标签/计数（ADR 0017）。',
   billing: '仅 Codex：按订阅 plan tier(plus/pro/…) 拆 token + 未分类桶（有 token 无 plan_type，≠确定API）。只从 rate_limits 的存在性+plan_type 标签派生 token 归类，不输出任何配额%/余额/重置时间（rate_limits 顶层仍恒 null）。confidence=spoofable-by-relay：plan_type 来自后端响应、可被中转透传或伪造，不能据此断言"官方订阅"（ADR 0022 D1）。',
   codex_specific: '仅 Codex 的执行画像：effort/审批策略/沙箱/协作模式/personality/客户端身份(originators) 分布 + 压缩(compactions)/放弃回合(aborted_turns)/上下文窗口(context_window)/git 仓库身份(布尔)。全为派生计数/白名单枚举标签，collaboration_mode 仅取 mode 名、绝不读 developer_instructions 正文（ADR 0023 D1 / 0017）。',
+  endpoints: '端点/计费模式检测（账户级当前快照，读本机 config）：endpoint(official|custom|unknown)+relay_suspected+auth_mode+subscription_type+billing_mode(subscription|api_or_relay|unknown)+confidence。只派生布尔/host 白名单/枚举标签，绝不存 key/token/完整 base_url URL（custom 不回显中转域名）。与 billing 块（历史 token 拆分）正交：这是"现在怎么计费/是否走中转"。endpoint=custom 时 plan_type 标签可能被中转伪造，billing_mode 保守判 api_or_relay（ADR 0022 D2/D3/D4）。',
   git_habits: 'git 子命令频次与评审/风险信号（如只 diff/status 不 commit）。',
   project_management: '各仓库是否有测试/构建/CI 信号。',
   'tools.by_name': '各工具被调用次数（仅工具名计数，如 Bash/Edit/Glob/mcp__…；不含命令行/参数）。',

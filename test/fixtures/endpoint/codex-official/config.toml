@@ -1,0 +1,6 @@
+# 官方直连：无顶层 model_provider 覆写（openai 隐式默认），仅有 projects 信任配置。
+[projects."/home/u/work/ccoach"]
+trust_level = "trusted"
+
+[projects."/home/u/work/other"]
+trust_level = "trusted"

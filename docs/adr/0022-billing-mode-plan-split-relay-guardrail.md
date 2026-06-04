@@ -1,6 +1,6 @@
 # ADR 0022 — 计费维度拆分：Codex 订阅 plan tier 可拆、Claude 不可拆；中转(relay)检测护栏
 
-> 状态：提议中 · 日期：2026-06-04
+> 状态：已接受 · 日期：2026-06-04（D1/D2a/D2b/D3/D4 均已实现并测试；endpoints[] 块落地，数据面扩张已生效）
 > · 沿用 [`adr/0011-multi-platform-usage-sources.md`](0011-multi-platform-usage-sources.md)（平台数据源适配器 + 平台无关分析层）
 > · 复用 [`adr/0016-error-signals-derived-tool-result-reading.md`](0016-error-signals-derived-tool-result-reading.md) /
 >   [`adr/0017-derived-non-content-signals.md`](0017-derived-non-content-signals.md) 的「瞬时读 → 只留布尔/计数/白名单标签、原文绝不留」红线

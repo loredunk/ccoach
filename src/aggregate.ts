@@ -115,6 +115,7 @@ export class Aggregator {
   private cxAbortedTurns = 0
   private cxContextWindow = new Map<number, number>() // 窗口规格 -> 出现次数（取众数）
   private cxGitIdentity = false
+  private cxNonDefaultProvider = false // D2a：历史 JSONL 见过 model_provider≠openai（中转弱信号，ADR 0022）
   // 分层 scope（默认 global）：!=global 时按桶攒派生信号，每条记录前由适配器 beginRecord 设当前桶。
   private scope: Scope
   private groups = new Map<string, GroupAcc>()
@@ -332,6 +333,9 @@ export class Aggregator {
   markCodexAbortedTurn(): void { this.cxAbortedTurns++ }
   applyCodexContextWindow(n: number): void { if (n > 0) this.cxContextWindow.set(n, (this.cxContextWindow.get(n) ?? 0) + 1) }
   markCodexGitIdentity(): void { this.cxGitIdentity = true }
+  // D2a（ADR 0022）：rollout 的 session_meta.model_provider 非 openai → 历史曾用自定义/中转 provider（可被命名规避）。
+  markCodexNonDefaultProvider(): void { this.cxNonDefaultProvider = true }
+  getCodexNonDefaultProvider(): boolean { return this.cxNonDefaultProvider }
 
   touchSession(id: string): void { if (id) this.sessionIds.add(id) }
 

@@ -1,0 +1,8 @@
+# 中转：顶层 model_provider 指向自定义 provider，其 base_url 指向中转域名（cc-switch 典型写法）。
+model_provider = "packycode"
+
+[model_providers.packycode]
+name = "PackyCode"
+base_url = "https://relay.SECRET-HOST.example/v1"
+wire_api = "responses"
+requires_openai_auth = true

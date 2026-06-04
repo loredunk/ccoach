@@ -162,6 +162,10 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           if (typeof payload.originator === 'string' && payload.originator) originator = payload.originator
           const git = payload.git
           if (git && typeof git === 'object' && (git.repository_url || git.commit_hash)) gitIdentity = true
+          // D2a 中转弱信号（ADR 0022）：model_provider≠openai → 历史曾用自定义/中转 provider（仅布尔，不存 provider 名）。
+          if (typeof payload.model_provider === 'string' && payload.model_provider && payload.model_provider !== 'openai') {
+            agg.markCodexNonDefaultProvider()
+          }
           break
         }
         case 'compacted': {
