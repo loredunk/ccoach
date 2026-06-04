@@ -14,6 +14,10 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 > **双平台对称、可扩展**：Codex 与 Claude Code 是**对称的一等数据源**（不是只给 Codex 用的工具），
 > 未来扩展到 **OpenClaw / Harness** 等其它 Agent CLI。架构上分「平台数据源适配器 + 平台无关的分析层」，
 > 见 [ADR 0011](adr/0011-multi-platform-usage-sources.md)。
+>
+> **主打英文市场**：CLI 与报告**默认英文输出**（信号/窗口/glossary/骨架文案全英文），`--lang zh` 切中文、
+> 结构可扩任意 locale（缺失回退默认语言）；成绩卡 roast 人工本地化、不机翻。见
+> [ADR 0026](adr/0026-cli-output-i18n-default-english.md)（CLI）/ [0025](adr/0025-report-skeleton-i18n-default-english.md)（报告骨架）。
 
 1. **用量分析（已上线）**：只读本机记录，输出 Token、成本、工具调用、仓库 / 时段 / 语言 /
    git 习惯 / 配置扫描等。
@@ -240,14 +244,15 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 > Node 包**，不再是「包装 Go 二进制」。ADR 0003 D2 的「平台专属 optionalDependencies 二进制矩阵」
 > **作废**——Node 包天然跨平台，分发大幅简化。
 
-- **单仓库、两包**：`ccoach`（CLI，纯 Node 包）+ `@ccoach/skills`（skills 内容）。
-- **CLI 走普通 npm 发布**：`npx ccoach` 即用，无预编译二进制矩阵、无 postinstall 联网下载。
-- **skills 安装便捷化**：除 `npm i @ccoach/skills` 外，提供 `ccoach skills install`
-  把 skills 落到 Claude Code / Codex 的 skills 目录。
+- **CLI 走普通 npm 发布**：`npx @loredunk/ccoach` 即用，无预编译二进制矩阵、无 postinstall 联网下载。
+- **skills 走 `npx skills add`**（Vercel Labs `skills` CLI，**取代**自建 `@ccoach/skills` 包 + `ccoach skills install`，
+  见 [ADR 0028](adr/0028-distribution-npx-skills.md)）：`npx skills add loredunk/ccoach -a claude-code -a codex -g -y`
+  一条命令装到两端（Claude symlink `~/.claude/skills`、Codex universal `~/.agents/skills`）；仓库无需清单、自动发现
+  `skills/*/SKILL.md`。已实测本地与远端均可装出 `ccoach-insight`。
 
 ### 5.3 验收标准
 
-- [ ] `npx ccoach` 可在不预装的情况下直接跑通（跨平台，普通 Node 包）。
-- [ ] `npm i -g ccoach` 后全局可用 `ccoach`。
-- [ ] skills 可经 `npm i @ccoach/skills` 或 `ccoach skills install` 两条路径安装。
-- [ ] README / README_CN 安装段简化为 `npx ccoach` 一行。
+- [ ] `npx @loredunk/ccoach` 可在不预装的情况下直接跑通（跨平台，普通 Node 包）。
+- [ ] `npm i -g @loredunk/ccoach` 后全局可用 `ccoach`。
+- [x] skill 可经 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y` 一键装到双端（ADR 0028，已实测）。
+- [x] README / README_CN 写明安装命令（CLI `npx @loredunk/ccoach` + skill `npx skills add`）。

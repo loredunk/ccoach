@@ -48,6 +48,7 @@ ccoach --days 7                 # 最近 7 天
 ccoach --platform claude-code   # claude-code | codex | all（默认 all）
 ccoach --by-repo                # 按 git 仓库展开（含分支）
 ccoach --scope project          # global | project | session（额外给 projects[] / sessions_detail[]）
+ccoach --lang zh                # 输出语言：en | zh（默认 en）
 ccoach --json                   # 输出 JSON，脚本 / agent 友好
 ```
 

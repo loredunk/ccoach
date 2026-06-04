@@ -1,6 +1,6 @@
 # ADR 0028 — skill 分发：主推 `npx skills add`（Vercel Labs skills CLI）
 
-> 状态：已接受 · 日期：2026-06-04（4a 已落地并本地实测；4b 外部端到端待推公开仓库后验收 — 见下 pending）
+> 状态：已接受 · 日期：2026-06-04（4a 本地实测 + 4b 外部端到端均已验证：推公开仓库后 `npx skills add loredunk/ccoach` 实测装出 ccoach-insight）
 > · 取代 [`adr/0003-npm-distribution.md`](0003-npm-distribution.md) 的「自建 `ccoach skills install` + `@ccoach/skills` 包」设想（D3）；沿用 [`adr/0027-rename-skill-ccoach-insight.md`](0027-rename-skill-ccoach-insight.md) 的 canonical 名 `ccoach-insight`
 
 ## 背景
@@ -31,12 +31,10 @@ npx skills add loredunk/ccoach -a claude-code -a codex -g -y
 - `HOME=<tmp> npx skills add . -a claude-code -a codex -s ccoach-insight -g -y` → 安装完成；
   `~/.claude/skills/ccoach-insight/SKILL.md` 经 symlink 可达；`~/.agents/skills/ccoach-insight` 为 Codex universal 落位。
 
-## Pending（4b，依赖外部，交付用户验收）
+## 已验证（4b，外部端到端）
 
-外部 `npx skills add loredunk/ccoach ...`（远端 owner/repo）跑通**依赖把本批提交推到公开 GitHub**（推前远端仍是旧名）。
-沙箱内无法验证远端拉取，故留作 pending 待办（见 [`docs/TODO.md`](../TODO.md) T4）：
+提交推送到公开 `loredunk/ccoach` 后，临时 HOME 跑
+`npx skills add loredunk/ccoach -a claude-code -a codex -s ccoach-insight -g -y` **成功从远端 clone 并装出
+`ccoach-insight`**（`~/.claude/skills/ccoach-insight` symlink 可达、`~/.agents/skills/ccoach-insight` Codex universal 落位）。
 
-1. `git push` 本批提交到 `loredunk/ccoach`（公开）。
-2. 在干净环境跑 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y`，确认装出 `ccoach-insight`、
-   `/ccoach-insight` 可触发、Codex 也识别。
-3. 若 `skills` 生态有可选的 registry/索引登记以提升 `npx skills find` 可发现性，按其文档登记（仅按需，不阻塞安装）。
+剩余可选项（pending，不阻塞安装）：若 `skills` 生态有 registry/索引登记以提升 `npx skills find` 可发现性，按其文档按需登记。

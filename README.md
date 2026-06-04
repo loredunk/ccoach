@@ -49,6 +49,7 @@ ccoach --days 7                 # the last 7 days
 ccoach --platform claude-code   # claude-code | codex | all (default: all)
 ccoach --by-repo                # per-repository breakdown (with branches)
 ccoach --scope project          # global | project | session (adds projects[] / sessions_detail[])
+ccoach --lang zh                # output language: en | zh (default: en)
 ccoach --json                   # JSON output, script / agent friendly
 ```
 

@@ -5,15 +5,20 @@
 ## 项目是什么
 
 **ccoach** = 本机 AI 用量教练（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
-告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。
+告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。**主打英文市场**：CLI 与
+报告**默认英文输出**，`--lang zh` 切中文（i18n 见 [ADR 0026](docs/adr/0026-cli-output-i18n-default-english.md) / [0025](docs/adr/0025-report-skeleton-i18n-default-english.md)）。
 
 产品分两块、同仓库内明确分开：
 
-1. **CLI** — 产出只读、语义化的用量数据（默认命令 `ccoach`，即原 `report`；`--json` 为 agent 友好输出）。
+1. **CLI** — 产出只读、语义化的用量数据（默认命令 `ccoach`，即原 `report`；`--json` 为 agent 友好输出；
+   `--lang en|zh`，默认 en）。
 2. **skills** — 教 agent 解读 CLI 产物、给**对人有用的建议**、渲染**可分享成绩卡**
-   （已上线 `skills/ccoach-insight/`）。
+   （已上线 `skills/ccoach-insight/`，原名 `ai-usage-html-report`，见 [ADR 0027](docs/adr/0027-rename-skill-ccoach-insight.md)）。
 
 两者通过 **`--json` 契约**解耦：CLI 出数据，skill 出解读。改 CLI 不应破坏该契约（见 ADR 0004 / 0010）。
+
+**分发**：skill 走 **`npx skills add loredunk/ccoach -a claude-code -a codex -g -y`**（Vercel Labs `skills` CLI，
+一条命令装到 Claude Code + Codex 双端；仓库无需清单、自动发现 `skills/*/SKILL.md`），见 [ADR 0028](docs/adr/0028-distribution-npx-skills.md)。
 
 ## 架构方向（Phase 1 已落地：CLI 核心已是 TypeScript；已去 Go）
 
@@ -52,7 +57,7 @@
 
 - `src/` — **TS CLI（Phase 1，当前实现）**：`cli.ts`（cac）/ `index.ts`（`buildReport` + 平台合并）/
   `parsers/{claude-code,codex}.ts`（双平台适配器）/ `aggregate.ts`（平台无关聚合）/ `model.ts`（统一结构 + glossary）/
-  `pricing.ts`（双平台**离线 fallback** 价表，非权威；权威价走 skill 层联网官方价，ADR 0019）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `emit/{json,text}.ts`。
+  `pricing.ts`（双平台**离线 fallback** 价表，非权威；权威价走 skill 层联网官方价，ADR 0019）/ `habits.ts` / `prompt-signals.ts` / `text.ts` / `window.ts` / `i18n.ts`（CLI 输出 en/zh 文案表，默认 en，ADR 0026）/ `emit/{json,text}.ts`。
 - `test/` — vitest 单测 + 两平台 JSONL fixture（含 `test/fixtures/scorecard/`）；`test/scorecard.test.ts` 成绩卡回归
   （取代 `tools/test_scorecard.py`）；`scripts/verify-ccusage.ts` — 与 ccusage 对账（接入 CI）。
 - `skills/ccoach-insight/` — 已上线的分析 skill（三层 scope、feature-first、成绩卡）；脚本全部 `.mjs`（merge / `apply_pricing`（联网官方价计成本，ADR 0019）/ scorecard / render×2）+ 采集并入 ccoach，**skill 内无 `.py`**。

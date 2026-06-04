@@ -134,9 +134,10 @@
 - [x] **主推 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y`**（Vercel Labs `skills` CLI）：
       仓库无需清单、自动发现 `skills/*/SKILL.md`；已本地实测发现 + 双端安装（Claude symlink、Codex universal `~/.agents/skills`）。
 - [x] README（中英）写明一行安装命令。
-- [ ]（**pending，依赖外部 — 推公开仓库后用户验收**，ADR 0028 4b）：
-      1. push 本批提交到公开 `loredunk/ccoach`；2. 干净环境跑 `npx skills add loredunk/ccoach -a claude-code -a codex -g -y`
-      确认装出 `ccoach-insight`、`/ccoach-insight` 可触发、Codex 识别；3. 如 `skills` 生态有可选 registry 登记则按需登记。
+- [x]（外部端到端，ADR 0028 4b）**已验证**：提交推送到公开 `loredunk/ccoach` 后，临时 HOME 跑
+      `npx skills add loredunk/ccoach -a claude-code -a codex -s ccoach-insight -g -y` 成功装出 `ccoach-insight`
+      （Claude symlink `~/.claude/skills` + Codex universal `~/.agents/skills` 均落位）。
+- [ ]（可选，pending）如 `skills` 生态有 registry/索引登记以提升 `npx skills find` 可发现性，按其文档按需登记（不阻塞安装）。
 - [ ]（作废）原 `@ccoach/skills` npm 包 + 自建 `ccoach skills install`（ADR 0003 D3）——被 npx skills 取代。
 
 ---
