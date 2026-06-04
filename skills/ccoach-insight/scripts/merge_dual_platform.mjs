@@ -147,10 +147,18 @@ function normHours(hours, countKey = null) {
   return out
 }
 
+// i18n for the few behavior `extras` prefixes composed here (default English, ADR 0026).
+// (git/pm signals come already-localized from `ccoach report --lang`; these are merge-added labels.)
+const MERGE_I18N = {
+  en: { perm: 'Permission modes: ', sep: ', ', subagent: (n) => `${n} subagent messages`, reasoning: (p) => `reasoning ${p}% of output` },
+  zh: { perm: '权限模式: ', sep: '、', subagent: (n) => `子代理消息 ${n} 条`, reasoning: (p) => `推理 token 占比 ${p}%` },
+}
+const mlang = (lang) => MERGE_I18N[lang] ?? MERGE_I18N.en
+
 // Normalize `ccoach report --platform claude-code --json` (a unified Report) into
 // the renderer's behavior shape. Claude behavior + model_tokens come from ccoach; ccusage
 // supplies Claude per-line token attribution; cost is recomputed by apply_pricing (online).
-export function claudeBehavior(r) {
+export function claudeBehavior(r, lang = 'en') {
   if (!r) return null
   const tools = r.tools ?? {}
   const cats = tools.categories ?? {
@@ -161,10 +169,11 @@ export function claudeBehavior(r) {
   const env = r.environment ?? {}
   // Drop any signal containing a path-like token so no absolute path leaks.
   const safe = (sigs, n) => (sigs ?? []).filter((s) => !String(s).includes('/')).slice(0, n)
+  const L = mlang(lang)
   const extras = []
   const pmodes = env.permission_modes ?? []
-  if (pmodes.length) extras.push('权限模式: ' + pmodes.slice(0, 4).map((p) => `${p.command}×${p.count}`).join('、'))
-  if (env.subagent_messages) extras.push(`子代理消息 ${env.subagent_messages} 条`)
+  if (pmodes.length) extras.push(L.perm + pmodes.slice(0, 4).map((p) => `${p.command}×${p.count}`).join(L.sep))
+  if (env.subagent_messages) extras.push(L.subagent(env.subagent_messages))
   extras.push(...safe(git.review_signals, 3), ...safe(git.risk_signals, 2), ...safe(pm.signals, 3))
   return {
     generated_for: r.generated_for ?? null,
@@ -186,7 +195,7 @@ export function claudeBehavior(r) {
 }
 
 // Normalize ccoach report --json into the unified behavior shape.
-export function codexBehavior(r) {
+export function codexBehavior(r, lang = 'en') {
   if (!r) return null
   const tools = r.tools ?? {}
   const cats = { shell: tools.shell_calls ?? 0, web: tools.web_searches ?? 0, file: tools.file_changes ?? 0 }
@@ -198,7 +207,7 @@ export function codexBehavior(r) {
   // Drop any signal containing a path-like token so no absolute path leaks.
   const safe = (sigs, n) => (sigs ?? []).filter((s) => !String(s).includes('/')).slice(0, n)
   const extras = [...safe(git.review_signals, 3), ...safe(git.risk_signals, 2), ...safe(pm.signals, 3)]
-  if (r.reasoning_ratio) extras.push(`推理 token 占比 ${(r.reasoning_ratio * 100).toFixed(1)}%`)
+  if (r.reasoning_ratio) extras.push(mlang(lang).reasoning((r.reasoning_ratio * 100).toFixed(1)))
   return {
     generated_for: r.generated_for ?? null,
     sessions: r.sessions ?? 0,
@@ -216,7 +225,7 @@ export function codexBehavior(r) {
   }
 }
 
-export function buildClaude(ccDaily, ccSession, ccBehavior = null) {
+export function buildClaude(ccDaily, ccSession, ccBehavior = null, lang = 'en') {
   const t = ccDaily.totals ?? {}
   const daily = ccDaily.daily ?? []
   const sessions = ccSession.sessions ?? []
@@ -253,7 +262,7 @@ export function buildClaude(ccDaily, ccSession, ccBehavior = null) {
     models,
     daily_series: series,
     top_sessions: top,
-    behavior: claudeBehavior(ccBehavior),
+    behavior: claudeBehavior(ccBehavior, lang),
     prompt_signals: (ccBehavior ?? {}).prompt_signals ?? {},
     // 平台特色 + 端点/计费（ADR 0023 D2 / 0022 D2-D4）：均为派生白名单标签，不含 key/token/完整 URL。
     claude_specific: (ccBehavior ?? {}).claude_specific ?? null,
@@ -265,7 +274,7 @@ export function buildClaude(ccDaily, ccSession, ccBehavior = null) {
 // is only an optional historical sparkline source — it gives 0 per-model cost (the old
 // "Codex cost = 0/partial" bug came from sourcing cost there). Cost is computed later by
 // apply_pricing.mjs from online official prices over the CLI's model_tokens[].
-export function buildCodex(codexReport, codexCcusage = null) {
+export function buildCodex(codexReport, codexCcusage = null, lang = 'en') {
   const r = codexReport ?? {}
   const tok = r.tokens ?? {}
   const afTotal = tok.total ?? 0
@@ -297,7 +306,7 @@ export function buildCodex(codexReport, codexCcusage = null) {
     cache_hit_rate: round(r.cache_hit_rate ?? 0, 4),
     models,
     daily_series: series,
-    behavior: codexBehavior(r),
+    behavior: codexBehavior(r, lang),
     // 计费维度 + 执行画像 + 端点（ADR 0022 D1-D4 / 0023 D1）：均为派生计数/白名单标签，不含敏感内容。
     billing: r.billing ?? null,
     codex_specific: r.codex_specific ?? null,
@@ -331,10 +340,11 @@ function main() {
       process.exit(2)
     }
   }
+  const lang = a.lang || 'en' // 默认英文（ADR 0026）；与 ccoach report / scorecard / render 同传
   const ccBehavior = a['cc-behavior'] ? load(a['cc-behavior']) : null
   const codexReport = load(a['codex-report'])
-  const claude = buildClaude(load(a['cc-daily']), load(a['cc-session']), ccBehavior)
-  const codex = buildCodex(codexReport, a['codex-ccusage'] ? load(a['codex-ccusage']) : null)
+  const claude = buildClaude(load(a['cc-daily']), load(a['cc-session']), ccBehavior, lang)
+  const codex = buildCodex(codexReport, a['codex-ccusage'] ? load(a['codex-ccusage']) : null, lang)
 
   const merged = {
     title: 'Dual-Platform AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题，ADR 0025）；保留字段兼容

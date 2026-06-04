@@ -43,7 +43,7 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
 
    Let `<W>` be the window flag derived from `$period` (default: **no flag = today**; `--date <d>` / `--days <n>` / `--since <d>` otherwise). Use the **same `<W>`** for every command below.
 
-   Let `<L>` be the language flag `--lang en|zh` (**default English**; pass `--lang zh` etc. to match the user's language). **Use the same `<L>` on every `ccoach report` call AND on `scorecard.mjs` / `render_*.mjs`** — the CLI localizes its habit/behavior signals and window description by `--lang` (ADR 0026), so a Chinese report needs `--lang zh` on ccoach too, or those signals stay English. Omit `<L>` for the English default.
+   Let `<L>` be the language flag `--lang en|zh` (**default English**; pass `--lang zh` etc. to match the user's language). **Use the same `<L>` on every `ccoach report` call AND on `merge_dual_platform.mjs` / `scorecard.mjs` / `render_*.mjs`** — the CLI localizes its habit/behavior signals and window description by `--lang` (ADR 0026), so a Chinese report needs `--lang zh` everywhere, or some signals stay English. Omit `<L>` for the English default.
 
 1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
    - Prefer `ccoach` from `PATH`; otherwise `npx @loredunk/ccoach@latest`.
@@ -59,7 +59,7 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
    - `ccoach report --platform claude-code <W> <L> --json > /tmp/claude-behavior.json`
    - This report also carries `model_tokens[]` (per-model token buckets for pricing) and `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
-   - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json --output /tmp/ai-usage.json`
+   - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json <L> --output /tmp/ai-usage.json`
    - `--codex-ccusage` and `--cc-behavior` are optional (Codex sparkline / Claude behavior degrade gracefully). Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
 4.5. **Price from official online prices** (cost layer; see "Online official pricing" below):
    - Read `/tmp/ai-usage.json`, collect every model name from each `platforms.<plat>.models[]` (skip `<synthetic>` / zero-token entries).
