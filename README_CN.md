@@ -36,8 +36,6 @@ node dist/cli.js --json --days 7
 # 或 `npm link`，之后 `ccoach` 即在 PATH 中
 ```
 
-> 原 Go 实现（`cmd/`、`internal/`）已退役并移除——重写期间它作行为基准；TS CLI 现直接以 ccusage 交叉验证（见 [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)）。
-
 ## 用法
 
 裸命令即出今天的用量报告（两平台合并）：
@@ -69,4 +67,7 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 - **不输出配额百分比**：CLI 下 `rate_limits` 恒为 null，且配额是账号级、跨机器的。
 - **成本为估算值**，不等于实际账单。CLI 内置一张 best-effort 的**离线 fallback** 价表；**权威成本**由报告 skill 按各 token 类别 × 报告里实际出现模型的**官方联网单价**计算（[ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)）。Token（与离线估算成本）经 `npm run verify:ccusage` 与 `ccusage` 对账——token 严格相等、成本 1% 容差内（ccusage 仅作开发/CI 校验，绝非运行时依赖）。
 - 时间窗口按本机时区的绝对日期边界划分，报告头部会标明时区。
-</content>
+
+## 致谢
+
+ccoach 站在 [ccusage](https://github.com/ryoppippi/ccusage)（作者 [@ryoppippi](https://github.com/ryoppippi)）的肩膀上：统一解析层的本机 JSONL 读法借鉴自 ccusage 的做法（未复制其代码），并以 ccusage 作 token / 成本交叉验证。谢谢。🙏

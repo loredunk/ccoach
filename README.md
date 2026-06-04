@@ -37,8 +37,6 @@ node dist/cli.js --json --days 7
 # or `npm link`, then `ccoach` is on your PATH
 ```
 
-> The original Go implementation (`cmd/`, `internal/`) has been retired and removed — it served as a behavior baseline during the rewrite; the TS CLI is now validated directly against ccusage (see [ADR 0010](docs/adr/0010-cli-rewrite-node-ccusage.md) / [0013](docs/adr/0013-self-built-unified-parser.md)).
-
 ## Usage
 
 A bare invocation prints today's usage report, both platforms merged:
@@ -71,3 +69,7 @@ never reads hidden system prompts.
 - **No quota percentages**: `rate_limits` is always null under the CLI, and quota is account-level / cross-machine.
 - **Cost is an estimate**, not your actual bill. The CLI ships a best-effort **offline fallback** price table; **authoritative** cost is computed by the report skill, which looks up each observed model's **official online price** per token class ([ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)). Tokens (and the offline cost) are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
 - Time windows use absolute local-timezone day boundaries; the report header states the timezone.
+
+## Credits
+
+ccoach stands on the shoulders of [ccusage](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi): its unified parser learned how to read the local JSONL from ccusage's approach (without copying its code), and ccusage remains ccoach's token / cost cross-check. Thank you. 🙏
