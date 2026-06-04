@@ -4,10 +4,7 @@
 
 > A local AI usage coach (macOS / Linux). Read-only analysis of how you use **Claude Code / Codex** —
 > where your tokens go, what's wasted, and how to use the tools better — turned into a **shareable scorecard**.
-> Both platforms are first-class and symmetric (not a Codex-only tool); more agent CLIs (OpenClaw, Harness, …) are planned.
->
-> Formerly **autofresh** (a Codex/Claude keep-alive tool). Keep-alive has been removed; the project now
-> focuses on usage analysis and advice, and is renamed **ccoach**. Design & decisions live in [`docs/`](docs/).
+> Both platforms are first-class and symmetric (not a Codex-only tool); more agent CLIs (OpenClaw, Harness, …) are planned. Design & decisions live in [`docs/`](docs/).
 
 ## What it does
 
@@ -53,20 +50,24 @@ ccoach --since 2026-05-01       # from a day through today
 ccoach --days 7                 # the last 7 days
 ccoach --platform claude-code   # claude-code | codex | all (default: all)
 ccoach --by-repo                # per-repository breakdown (with branches)
+ccoach --scope project          # global | project | session (adds projects[] / sessions_detail[])
 ccoach --json                   # JSON output, script / agent friendly
 ```
 
 ## Advice skill
 
 For richer AI-written HTML reports, use the reusable skill
-[skills/ai-usage-html-report](skills/ai-usage-html-report/SKILL.md): it uses `ccoach report --json`
-(Codex) + ccusage (Claude Code) local data to produce a dual-platform HTML report and behavior profile,
-and can drill from high-token projects down to candidate sessions. It reads a selected session's user
-prompts only after explicit approval, and never reads hidden system prompts.
+[skills/ai-usage-html-report](skills/ai-usage-html-report/SKILL.md): it reads local **Claude Code + Codex**
+data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms; `ccusage`
+is an offline token cross-check, never a runtime dependency), computes authoritative cost from each model's
+**official online price** ([ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)), and renders
+a dual-platform HTML report with a scorecard. It can drill from high-token projects down to candidate
+sessions (`ccoach sessions`), reads a selected session's user prompts only after explicit approval, and
+never reads hidden system prompts.
 
 ## Notes & boundaries
 
 - **Local machine only**: rollouts are per-machine; this tool reads only local files and never aggregates across machines.
 - **No quota percentages**: `rate_limits` is always null under the CLI, and quota is account-level / cross-machine.
-- **Cost is an estimate** (per token-class × LiteLLM-aligned reference price), not your actual bill. Tokens and cost are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
+- **Cost is an estimate**, not your actual bill. The CLI ships a best-effort **offline fallback** price table; **authoritative** cost is computed by the report skill, which looks up each observed model's **official online price** per token class ([ADR 0019](docs/adr/0019-pricing-online-official-at-skill-layer.md)). Tokens (and the offline cost) are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
 - Time windows use absolute local-timezone day boundaries; the report header states the timezone.
