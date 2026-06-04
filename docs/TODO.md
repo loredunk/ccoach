@@ -1,7 +1,7 @@
 # TODO — ccoach
 
 > 约定：`[ ]` 待办 · `[~]` 进行中 · `[x]` 完成。优先级 P0 > P1 > P2。
-> 最近更新：2026-06-03
+> 最近更新：2026-06-04
 
 ---
 
@@ -160,6 +160,41 @@
       `src/emit/text.ts` 的「错误 / 卡顿」段补一行「外因 X% · 内因 Y%」习惯洞察。
 - [ ] 隐私：仍只产出**固定白名单标签 + 纯计数**，匹配用的错误文本**瞬时派生即弃**，
       绝不存储/外发 stderr/stdout/命令全行（ADR 0016/0017 红线不变）。
+
+## T15 · 报告多语言选项（默认语言待定）（P1）— ⏳ pending
+
+> 背景：用户反馈「下载下来的 HTML 报告都是中文」。根因——成绩卡文案表（`scorecard-copy.json`）虽有 zh/en
+> 双份（ADR 0009），但**报告骨架本身的 UI 文案在 `render_dual_platform.mjs` 里硬编码中文**
+> （如 `本窗口内无活动` / `无数据` / `无活跃时段数据` / `成本：官方定价` 等），`--lang en` 也会夹中文；
+> 且 SKILL.md 示例默认 `--lang zh`。
+> 决策：待写 ADR（沿用 ADR 0009「人工本地化、非直译」口径，扩到报告骨架）。
+
+- [ ] **报告骨架 i18n 化**：把 `render_dual_platform.mjs`（及 `render_enriched_codex_report.mjs`）里硬编码的中文
+      UI 文案抽到文案表，按 `--lang` 取，做到 `--lang en` 时报告**无残留中文**。
+- [ ] **扩语言**：在 zh/en 之外预留更多语言（如 ja / ko / es 等），文案表结构支持新增 locale；
+      缺失语言回退到默认语言。
+- [ ] **默认语言 = 英文**（已拍板 2026-06-04）：与 README（英文为默认）、npm 全球分发一致；
+      zh 改为显式 `--lang zh`。实现时把 SKILL.md 示例默认值由 `--lang zh` 改为 `--lang en`。
+- [ ] **语言来源**：明确 `--lang` 由谁决定（SKILL 按用户对话语言传入 / 还是 CLI 加全局默认 + 环境探测如 `LANG`）。
+
+## T16 · 输入/输出 Token 分布可疑（疑似 BUG，待核）（P1）— ⏳ pending
+
+> 来源：用户 2026-06-04 看报告时的观察，**先记观察，后续自己修**。
+> 现象：两平台 token 方向不一致——
+>
+> | 平台 | 输入 Token | 输出 Token |
+> |---|---|---|
+> | Claude Code | 192,128 | 3,553,058 |
+> | Codex | 34,593,032 | 153,180 |
+>
+> 反常点：Claude Code **输入 192K 远小于输出 3.5M**（正常应输入≫输出，尤其含 cache read/creation）；
+> Codex 方向（输入 34.5M ≫ 输出 153K）反而正常。怀疑 Claude Code 侧的「输入 Token」展示口径有问题。
+
+- [ ] 复现并定位：确认报告里「输入 Token」是否**漏算 cache 输入**（cache_read / cache_creation 没并进展示的 input），
+      或 Claude 适配器 input/output 字段**映射颠倒**。
+- [ ] 与对账交叉：`scripts/verify-ccusage.ts` 是 token 严格相等的——若 CI 对账仍绿，问题更可能在
+      **emitter/渲染的分桶展示**而非解析层；若对账也偏，则在解析层。两条路分别查。
+- [ ] 修复后补 fixture 回归，确保两平台 input/output（含 cache 拆分）展示口径一致。
 
 ---
 
