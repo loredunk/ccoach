@@ -1,10 +1,10 @@
 ---
 name: ccoach-insight
-description: Generate an enriched dual-platform (Claude Code + Codex) HTML report of local AI coding usage. Tokens & models come from `ccoach report --json` (offline local parse, ccusage cross-checks Claude); cost is computed from official online prices the agent looks up per model. Use when the user wants a deeper AI-written review of how they use Claude Code and/or Codex — cost, token, cache, model and active-hours breakdown, habits analysis, project-by-project recommendations, high-token project/session drilldown, or a richer HTML dashboard than the raw text/JSON reports.
+description: Generate an enriched dual-platform (Claude Code + Codex) HTML report of local AI coding usage. Tokens & models come from `ccoach report --json` (offline local parse of both platforms); cost is computed from official online prices the agent looks up per model. Use when the user wants a deeper AI-written review of how they use Claude Code and/or Codex — cost, token, cache, model and active-hours breakdown, habits analysis, project-by-project recommendations, high-token project/session drilldown, or a richer HTML dashboard than the raw text/JSON reports.
 when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage across Claude Code and Codex — for example "how much did I spend on Claude Code / Codex", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my Claude Code and Codex usage", "which projects burned the most tokens", "compare my Claude Code vs Codex usage", "review my most expensive or unclear Codex sessions", "analyze my AI coding habits", or an explicit /ccoach-insight invocation.'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
-allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(ccusage *)
+allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *)
 ---
 
 # ccoach Insight — AI usage report (Claude Code + Codex)
@@ -15,18 +15,17 @@ Build a dual-platform local AI usage report. Use authoritative on-disk facts as 
 
 Keep responsibilities separate:
 
-- Data tools (ccusage, `ccoach report`) collect local facts.
+- Data tools (`ccoach report`, `ccoach sessions`) collect local facts (offline, both platforms).
 - This skill interprets those facts and produces an enhanced HTML document.
 
 ### Data-layer rules (mandatory)
 
 Separate **tokens/models** (authoritative local facts, offline) from **cost** (computed in this skill from official online prices):
 
-- **Tokens & model list = authoritative, offline, from ccoach.** `ccoach report --json` parses the local JSONL into the unified Report — tokens + per-model token breakdown (`model_tokens[]`) + behavior. ccoach never leaves the machine.
-- **Claude Code per-model token attribution is cross-checked with `ccusage`.** ccusage reads each `~/.claude/projects/*.jsonl` line for the real per-message model; ccoach's parser dedups differently, so for Claude Code use ccusage's per-model token breakdown (daily `--breakdown`) as the displayed tokens. (ccusage is a cross-check, not a runtime dependency — it's invoked on demand via `npx`, never bundled.)
-- **Cost is NOT taken from ccusage's bundled LiteLLM snapshot.** Instead this skill looks up the **official API price of each actually-observed model name online** (including third-party cc-switch models like kimi/deepseek), then `apply_pricing.mjs` computes cost deterministically from each model's token buckets. See "Online official pricing" below.
+- **Tokens & model list = authoritative, offline, from ccoach — for BOTH platforms.** `ccoach report --platform claude-code|codex --json` parses the local JSONL into the unified Report — tokens + per-model token buckets (`model_tokens[]`) + `models_timeline` (per-day series) + behavior. ccoach never leaves the machine. **ccusage is NOT used at skill runtime**: ccoach's own per-model attribution now matches ccusage within ~0.04% (ADR 0030; the older ~20% gap predated ccoach's streaming "final/max usage" dedup fix). ccusage stays purely a dev/CI cross-check of the CLI (`npm run verify:ccusage`) — this skill never invokes it.
+- **Both platforms are symmetric.** Tokens / models / daily sparkline (`models_timeline`) / behavior all come from each platform's `ccoach report --json`. The Claude **top-sessions** table is sourced from `ccoach sessions --platform claude-code --top N` (numeric only — repo/tokens/models, NO prompt text, NO per-session cost); skip it and that table just renders empty.
+- **Cost is NOT a bundled/snapshot price.** This skill looks up the **official API price of each actually-observed model name online** (including third-party cc-switch models like kimi/deepseek), then `apply_pricing.mjs` computes cost deterministically from each model's token buckets. See "Online official pricing" below.
 - **NEVER use `~/.claude/stats-cache.json`.** It is polluted by cc-switch swapping in third-party providers (kimi, etc.), so its model/cost attribution is wrong, and it stopped updating after 2026-04-09 — stale and inaccurate. Do not read or fall back to it under any circumstances.
-- **Codex data** comes from `ccoach report --platform codex --json` (token + `model_tokens[]` + behavior). `ccusage codex daily` is an **optional** historical sparkline only (often unavailable); Codex tokens/models come from ccoach, never from ccusage's empty per-model cost.
 - ccoach emits only aggregates: Bash → first token / git subcommand only, repo → cwd basename, file → extension only. Never prompt text, file contents, full commands, or absolute paths.
 
 ### Default window = today
@@ -34,7 +33,7 @@ Separate **tokens/models** (authoritative local facts, offline) from **cost** (c
 If the user gives no time argument, analyze **today** (ccoach's default). Only widen the window when the user asks:
 
 - `$period` a date `2026-06-01` → `--date 2026-06-01`; a bare integer `7` → `--days 7`; empty → **no window flag (today)**.
-- Use the **same** window flag for every ccoach/ccusage call so both platforms cover one window (the report header shows it). If a platform has no activity in the window (e.g. Codex when it wasn't used), its panel renders a localized "no activity in this window" note — that's expected, not an error.
+- Use the **same** window flag for every ccoach call so both platforms cover one window (the report header shows it). If a platform has no activity in the window (e.g. Codex when it wasn't used), its panel renders a localized "no activity in this window" note — that's expected, not an error.
 - Note: behavior/habit/timeline dimensions over a 1-day window are thin; if the user wants habit analysis, pass `--days N` or `--since`.
 
 ## Workflow
@@ -48,19 +47,16 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
 1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
    - Prefer `ccoach` from `PATH`; otherwise `npx @loredunk/ccoach@latest`.
    - If this is the ccoach source repo, run `npm ci && npm run build`, then invoke `node dist/cli.js` (or `npm run dev --` to run `tsx src/cli.ts`).
-   - Generate the Codex report (token + `model_tokens[]` + behavior dimensions):
-     - `ccoach report --platform codex <W> <L> --json > /tmp/codex-usage-report.json`
-2. Pull Claude Code tokens with `ccusage` (offline cross-check for per-model token attribution; no upload). Match `<W>` (ccusage uses `--since YYYYMMDD`):
-   - `npx ccusage@latest claude daily --json --offline --breakdown > /tmp/cc-daily.json`
-   - `npx ccusage@latest claude session --json --offline > /tmp/cc-session.json`
-   - `npx ccusage@latest codex daily --json --offline > /tmp/cc-codex.json` (optional — Codex sparkline history; skip if it fails)
-   - Use `ccusage ...` directly if on `PATH`; otherwise `npx ccusage@latest ...`.
-3. Collect the Claude Code **behavior** profile from ccoach (offline, local parse), same `<W>`:
-   - `ccoach report --platform claude-code <W> <L> --json > /tmp/claude-behavior.json`
-   - This report also carries `model_tokens[]` (per-model token buckets for pricing) and `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
+2. Generate **both platform reports** from ccoach (offline local parse; same `<W>`/`<L>`):
+   - `ccoach report --platform codex <W> <L> --json > /tmp/codex-usage-report.json`
+   - `ccoach report --platform claude-code <W> <L> --json > /tmp/claude-report.json`
+   - Each report carries `tokens` + `model_tokens[]` (per-model token buckets for pricing) + `models_timeline` (the daily sparkline series) + `behavior` + `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
+3. (Optional) Top Claude sessions for the sessions table — numeric only, **NO prompt text**, same `<W>`:
+   - `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
+   - Skip it and the Claude top-sessions table just renders empty (it has no `--include-user-prompts`, so it's repo/tokens/models counts only).
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
-   - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json <L> --output /tmp/ai-usage.json`
-   - `--codex-ccusage` and `--cc-behavior` are optional (Codex sparkline / Claude behavior degrade gracefully). Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
+   - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-report /tmp/claude-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-usage-report.json <L> --output /tmp/ai-usage.json`
+   - `--cc-sessions` is optional (the top-sessions table degrades to empty). Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
 4.5. **Price from official online prices** (cost layer; see "Online official pricing" below):
    - Read `/tmp/ai-usage.json`, collect every model name from each `platforms.<plat>.models[]` (skip `<synthetic>` / zero-token entries).
    - For each model, **web-search its official API price** (Anthropic / OpenAI / the third-party provider that serves it). Record per-million-token USD: `{input, cached_input, output, cache_creation?}` (include `cache_creation` only for Claude-family models). Normalize units (per-1K → ×1000).
@@ -81,25 +77,29 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
    - **Default language is English** (ADR 0025); pass `--lang zh` (or another supported locale) to match the user.
    - The **tier scores and tier names** come from `scorecard.mjs` + the copy table — **do not change the names**
      (stable, recognizable, shareable identity; unsupported locales fall back to English).
-   - **Roast lines are yours to write (ADR 0029).** `scorecard.json` ships a safe fixture roast per axis as the
+   - **Roast lines are yours to write (ADR 0029/0031).** `scorecard.json` ships a safe fixture roast per axis as the
      default/fallback; you SHOULD **rewrite each `axes[].roast` in `/tmp/scorecard.json`** (before step 7) into the
-     **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules:
-     tease **changeable habits, never the person/ability** (ADR 0008); **aggregate-only — never quote or imply prompt
-     text** (the shareable card stays zero-raw-text); one short punchy line per axis; ground it in the real aggregate
-     numbers when it lands harder (e.g. cost/tokens/late-night share). If you don't rewrite, the fixture roast renders.
+     **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules (ADR 0031):
+     **describe a phenomenon backed by a concrete number** in the merged JSON (cost / tokens / cache-replay / late-night
+     share / plan-mode count / active days…) — *describing it is enough*; a light wry note is **optional, NOT a savage
+     punchline tacked onto every axis**. **NEVER assert something ccoach doesn't measure**: it tracks tool/command
+     CATEGORIES and counts, not intent — so do not claim "never ran a test", "didn't review the code", or "should've
+     used plan mode" (there is no test-execution / review / plan-necessity signal; inventing one is a correctness bug,
+     not a joke). Tease **changeable habits, never the person/ability** (ADR 0008); **aggregate-only — never quote or
+     imply prompt text** (the shareable card stays zero-raw-text). If you don't rewrite, the fixture roast renders.
    - Also write the personality-summary sentence yourself (in that language) into the insights `executive_summary`.
 7. Render HTML (run step 4.5 `apply_pricing.mjs` first so cost is the official-online figure, not the offline fallback):
    - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ai-usage-report.html`
    - The whole report skeleton is localized from `references/report-copy.json` (default English; ADR 0025). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
    - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
 
-### Fallback when ccusage is unavailable
+### Single-platform fallback
 
-If `node`/`npx` is missing or `ccusage` fails to run, degrade to a **Codex-only** report from ccoach data:
+The dual report already tolerates one platform having no data in the window — that panel just renders a localized empty note. If you deliberately want a **single-platform** enriched report (e.g. Codex-only), skip the merge and render straight from one ccoach report:
 
-- Run `ccoach report --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --lang en --output codex-report.enriched.html` (skeleton localized from `references/report-copy.json`, default English; pass `--lang zh` for Chinese).
-- Tell the user the Claude Code half was skipped and that installing Node/ccusage (`npx ccusage@latest`) enables the dual-platform report.
-- **Never** substitute `~/.claude/stats-cache.json` for the missing Claude Code data — it is wrong and stale (see data-layer rules).
+- Run `ccoach report --platform codex --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --lang en --output codex-report.enriched.html` (skeleton localized from `references/report-copy.json`, default English; pass `--lang zh` for Chinese).
+- If Node itself is missing, ccoach can't run and there is no report — install Node, then `npx @loredunk/ccoach@latest`.
+- **Never** substitute `~/.claude/stats-cache.json` for missing Claude Code data — it is wrong and stale (see data-layer rules).
 
 ### Project and session drilldown (Codex)
 
@@ -170,7 +170,8 @@ price table (models change; a stale snapshot drifts). The CLI stays offline and 
 
 - **Deterministic, fixed**: the tier *score* and the tier *name* (UI labels too) come from `scorecard.mjs` + the copy tables — **don't change names yourself**; **default English**, pass `--lang zh` (or another locale) to match the user. To add a tier-name locale, add its keys to the copy tables (missing keys fall back to the default language).
 - **Model-authored (ADR 0029)**: the **axis roast lines** AND the personality-summary sentence are **yours to write in the user's language**. The fixture roast in `scorecard.json` is a safe default/fallback + your tone exemplar — rewrite `axes[].roast` (idiomatic, fresh, one line) before rendering; leave it for the fixture default. This is where the LLM's per-language idiom shines, so you don't have to hand-localize roasts into every language.
-- Tone: tease changeable **habits**, never ability or the person (ADR 0008). **Aggregate-only**: roasts may use aggregate numbers (cost/tokens/hours/tier) but **never prompt text** — the shareable card stays zero-raw-text. The relative rank ("beats X%") is a local **estimate** — keep it labelled.
+- **Grounded, not savage (ADR 0031)**: every roast must **describe a real phenomenon backed by a concrete number** in the merged JSON — *describing it is enough*; a light wry note is optional, **not a mocking punchline on every axis**. **Never assert what ccoach doesn't measure** (e.g. "never ran a test", "didn't review", "should've used plan mode" — there is no such signal; making it up is a correctness bug). Tease changeable **habits**, never ability or the person (ADR 0008).
+- **Aggregate-only**: roasts may use aggregate numbers (cost/tokens/hours/tier) but **never prompt text** — the shareable card stays zero-raw-text. The relative rank ("beats X%") is a local **estimate** — keep it labelled.
 - Privacy is a selling point: state that all analysis is local and prompt content never leaves the machine.
 
 ## Analysis Guidance
@@ -183,7 +184,7 @@ Before recommending any platform configuration or feature (CLAUDE.md/AGENTS.md, 
 
 **Model-version findings must be time-aware.** Usage is historical, so a model split across a window does NOT mean the user "chose" the older model — the newer one may not have existed yet. Before framing "most spend went to an older model" as waste or recommending "pin to the newest model":
 
-- Look at the **per-day, per-model timeline**. Codex's `ccoach report --json` emits `models_timeline` (each model's `first_day` / `last_day` / per-day tokens); `ccusage codex daily` / ccusage daily give the same per-day per-model breakdown. Find when each model *first appears* — a late `first_day` means it was recently released.
+- Look at the **per-day, per-model timeline**. Each platform's `ccoach report --json` emits `models_timeline` (each model's `first_day` / `last_day` / per-day tokens). Find when each model *first appears* — a late `first_day` means it was recently released.
 - If a newer model only appears in the **last few days** of the window (or not at all), treat it as **recently released / newly available** — the older-model spend before that date is expected, not a mistake. Do **not** count it as waste, and do **not** compute a "X% wasted on the old model" figure over a span where the newer model didn't exist.
 - Scope any "switch to the newer model" suggestion to **going forward**, and only when the newer model was actually available during (most of) the window. Web-verify model release dates before asserting availability.
 - A user who *already started* adopting the newer model recently needs no correction here — acknowledge it as good, forward-looking behavior.

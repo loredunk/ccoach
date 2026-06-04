@@ -5,7 +5,7 @@
     "en": {
       "html_lang": "en",
       "report_title": "Dual-Platform AI Usage Report",
-      "src_claude": "ccoach + ccusage (local parse: tokens/models) · official online pricing",
+      "src_claude": "ccoach (local parse: tokens/models) · official online pricing",
       "src_codex": "ccoach (local parse: tokens/models) · official online pricing",
       "header_meta": "Statistics window: {window} · Generated at {gen}",
       "header_source": "Data source: ccoach (local offline parse; tokens & models are authoritative facts)",
@@ -34,7 +34,7 @@
       "panel_sessions_meta": "{source} · {range} · {sessions} sessions · {cost}",
       "panel_cx_meta": "{source} · {range} · {cost}",
       "h_model_dist": "Model Distribution",
-      "h_top_sessions": "Top Sessions (by Cost)",
+      "h_top_sessions": "Top Sessions (by Tokens)",
       "th_project": "Project",
       "th_cost": "Cost",
       "th_tokens": "Tokens",
@@ -111,7 +111,7 @@
       "exec_git_identity": "git repo identity ✓",
       "cc_server_tools": "Server-side tools: web search {s} · web fetch {f}",
       "h_provenance": "Data Provenance & Privacy",
-      "prov_tokens_li": "<b>Tokens & models</b> (authoritative local facts): parsed offline by <code>ccoach report --json</code>; Claude Code per-model token attribution is additionally cross-checked with <code>ccusage claude daily --breakdown</code>.",
+      "prov_tokens_li": "<b>Tokens & models</b> (authoritative local facts): parsed offline by <code>ccoach report --json</code> for both Claude Code and Codex.",
       "prov_cost_li": "<b>Cost</b>: no longer uses a third-party bundled price table. This skill looks up the <b>official API price</b> of <b>each model name actually observed</b> (including third-party models) online, then deterministically computes cost from each model's token buckets{priced}. Models with no official price fall back to an offline estimate and are flagged. Cost is an estimate, not a bill.",
       "prov_cost_priced_at": " (queried at {at})",
       "prov_privacy_li": "Privacy: usage is aggregated tokens/cost/model names/project directory names. <b>Your own user prompts are read</b> for habit and quality grading (standing local authorization) — but always <b>redacted</b> (secrets/home dir/absolute paths/email/IP) and truncated before reading; the report only writes <b>paraphrases and numeric signals, never embedding raw prompt text</b>; the shareable scorecard is purely aggregate, zero raw text. Assistant replies / thinking / tool results / system prompts / file contents are never read. ccoach parses entirely locally and offline; only this skill goes online to query official pricing (sending model names only, never usage or prompts)."
@@ -119,7 +119,7 @@
     "zh": {
       "html_lang": "zh-CN",
       "report_title": "双平台 AI 使用报告",
-      "src_claude": "ccoach + ccusage（本地解析，token/模型）· 官方在线定价",
+      "src_claude": "ccoach（本地解析，token/模型）· 官方在线定价",
       "src_codex": "ccoach（本地解析，token/模型）· 官方在线定价",
       "header_meta": "统计窗口：{window} · 生成于 {gen}",
       "header_source": "数据来源：ccoach（本地离线解析，token 与模型为权威事实）",
@@ -148,7 +148,7 @@
       "panel_sessions_meta": "{source} · {range} · {sessions} 会话 · {cost}",
       "panel_cx_meta": "{source} · {range} · {cost}",
       "h_model_dist": "模型分布",
-      "h_top_sessions": "Top 会话（按成本）",
+      "h_top_sessions": "Top 会话（按 Token）",
       "th_project": "项目",
       "th_cost": "成本",
       "th_tokens": "Token",
@@ -225,7 +225,7 @@
       "exec_git_identity": "git 仓库身份 ✓",
       "cc_server_tools": "服务端工具：web 搜索 {s} · web 抓取 {f}",
       "h_provenance": "数据来源与隐私",
-      "prov_tokens_li": "<b>Token 与模型</b>（权威本地事实）：由 <code>ccoach report --json</code> 离线解析；Claude Code 的 per-model token 归属另用 <code>ccusage claude daily --breakdown</code> 交叉核对。",
+      "prov_tokens_li": "<b>Token 与模型</b>（权威本地事实）：由 <code>ccoach report --json</code> 离线解析（Claude Code 与 Codex 两平台）。",
       "prov_cost_li": "<b>成本</b>：不再用第三方内置价表。由本 skill 按报告里<b>实际出现的每个模型名</b>联网查询其<b>官方 API 定价</b>（含接入的第三方模型），再用各模型 token 分桶确定性计算{priced}。查不到官方价的模型回退到离线 fallback 估算并标注。成本为估算、非账单。",
       "prov_cost_priced_at": "（查询于 {at}）",
       "prov_privacy_li": "隐私：用量为聚合 token/成本/模型名/项目目录名。<b>会读取你本人的 user prompt</b> 用于习惯与质量评级（本机长期授权）——但读取前一律<b>脱敏</b>（密钥/home 目录/绝对路径/邮箱/IP）并截断，报告只写<b>转述与数值信号、不嵌入 prompt 原文</b>；可分享成绩卡纯聚合、零原文。绝不读取助手回复 / 思考 / 工具结果 / system 提示 / 文件内容。ccoach 解析全程本地离线；仅本 skill 在查询官方定价时联网（只发模型名、不发任何用量或 prompt）。"

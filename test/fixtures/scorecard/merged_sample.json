@@ -4,7 +4,7 @@
   "platforms": {
     "claude_code": {
       "platform": "Claude Code",
-      "source": "ccusage (offline fallback pricing)",
+      "source": "ccoach (offline fallback pricing)",
       "active_days": 6,
       "sessions": 3,
       "cost_usd": 42.0,
@@ -33,7 +33,7 @@
     },
     "codex": {
       "platform": "Codex",
-      "source": "ccoach report --json (today) + ccusage codex (history)",
+      "source": "ccoach report --json",
       "date_range": ["2026-06-01", "2026-06-02"],
       "active_days": 2,
       "cost_usd": 3.0,

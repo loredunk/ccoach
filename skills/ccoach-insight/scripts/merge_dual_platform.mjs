@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// Merge Claude Code + Codex usage into one dual-platform JSON. Tokens & model list are
-// authoritative local facts (ccoach offline parse; ccusage cross-checks Claude per-line
-// attribution). COST is NOT computed here — it's left as an offline fallback and recomputed
-// by apply_pricing.mjs from official online prices the agent looks up (per actual model name).
+// Merge Claude Code + Codex usage into one dual-platform JSON. Both platforms' tokens & model
+// list are authoritative local facts from ccoach's offline parse — ccusage is NOT used at skill
+// runtime (it stays a dev/CI cross-check only; ccoach's own per-model attribution now matches
+// ccusage within ~0.04%, see ADR 0030). COST is NOT computed here — it's left as an offline
+// fallback and recomputed by apply_pricing.mjs from official online prices the agent looks up
+// (per actual model name).
 //
-// Inputs (all JSON files produced beforehand):
-//   --cc-daily        ccusage claude daily --json --offline --breakdown  (Claude tokens/days/per-model attribution)
-//   --cc-session      ccusage claude session --json --offline            (top sessions)
-//   --cc-behavior     ccoach report --platform claude-code --json        (Claude behavior + model_tokens)
-//   --codex-report    ccoach report --platform codex --json              (Codex tokens + model_tokens + behavior)
-//   --codex-ccusage   ccusage codex daily --json --offline   (OPTIONAL historical sparkline; often unavailable)
+// Inputs (all JSON files produced beforehand by ccoach):
+//   --cc-report       ccoach report --platform claude-code --json   (Claude tokens + model_tokens + models_timeline + behavior)
+//   --cc-sessions     ccoach sessions --platform claude-code --top N (OPTIONAL; top sessions by token, numeric only — no prompt text)
+//   --codex-report    ccoach report --platform codex --json         (Codex tokens + model_tokens + behavior)
 //   --output          merged dual-platform JSON path
 //
 // Both platforms expose a unified `behavior` block (tools / git_habits /
@@ -45,53 +45,35 @@ function parseArgs(argv) {
   return o
 }
 
-export function aggregateCcModels(ccDaily) {
-  // Aggregate Claude Code per-model totals across all days.
-  const models = new Map()
-  for (const day of ccDaily.daily ?? []) {
-    for (const b of day.modelBreakdowns ?? []) {
-      const name = b.modelName ?? 'unknown'
-      let m = models.get(name)
-      if (!m) {
-        m = { cost: 0, input: 0, output: 0, cache_read: 0, cache_create: 0 }
-        models.set(name, m)
-      }
-      m.cost += b.cost ?? 0
-      m.input += b.inputTokens ?? 0
-      m.output += b.outputTokens ?? 0
-      m.cache_read += b.cacheReadTokens ?? 0
-      m.cache_create += b.cacheCreationTokens ?? 0
-    }
-  }
-  return [...models.entries()]
-    .sort((a, b) => b[1].cost - a[1].cost)
-    .map(([model, v]) => ({ model, ...v }))
-}
-
-// Unify per-model entries into { model, tokens:{...buckets}, cost(offline fallback), priced }
-// so apply_pricing.mjs can price every model the same way (online official prices).
-// Claude: tokens come from ccusage's trusted per-line attribution (cache_read→cached_input,
-// cache_create→cache_creation, disjoint buckets). Cost here is the ccusage offline fallback.
-function unifyClaudeModels(ccModels) {
-  return (ccModels ?? []).map((m) => {
-    const input = m.input ?? 0, cachedInput = m.cache_read ?? 0, cacheCreation = m.cache_create ?? 0, output = m.output ?? 0
-    return {
-      model: m.model,
-      tokens: { input, cached_input: cachedInput, output, reasoning_output: 0, cache_creation: cacheCreation, total: input + cachedInput + cacheCreation + output },
-      cost: round(m.cost ?? 0, 4), // offline fallback (from ccusage); overwritten by apply_pricing
-      priced: true,
-    }
-  })
-}
-// Codex: tokens come from the ccoach CLI's model_tokens[] (ccusage codex is unavailable/
-// gives 0 per-model cost — the old bug). Cost here is the CLI offline fallback.
-function unifyCodexModels(modelTokens) {
+// Unify ccoach's model_tokens[] into { model, tokens:{...buckets}, cost(offline fallback), priced }
+// so apply_pricing.mjs can price every model the same way (online official prices). Platform-neutral
+// — Claude (disjoint buckets, cache_creation>0) and Codex (cached⊆input) share the same shape.
+// Cost here is the CLI offline fallback; apply_pricing overwrites it with official online prices.
+function unifyModelTokens(modelTokens) {
   return (modelTokens ?? [])
     .filter((m) => (m.tokens?.total ?? 0) > 0)
     .map((m) => ({ model: m.model, tokens: m.tokens, cost: round(m.estimated_cost_usd ?? 0, 4), priced: m.priced ?? false }))
 }
-// Derive a daily {date,tokens} series from a CLI report's models_timeline (fallback
-// when ccusage codex history is unavailable). Sums per-day tokens across models.
+
+// Top Claude sessions by token (numeric only — repo/tokens/models; NO prompt text, NO cost:
+// per-session cost is no longer sourced since cost is per-model official-online). From
+// `ccoach sessions --platform claude-code --top N` (privacy: aggregate counts only).
+function topClaudeSessions(sessionsJson, n = 5) {
+  const list = sessionsJson?.sessions ?? (Array.isArray(sessionsJson) ? sessionsJson : [])
+  return [...list]
+    .sort((a, b) => (b.tokens ?? 0) - (a.tokens ?? 0))
+    .slice(0, n)
+    .map((s) => ({
+      project: s.repo ?? '(unknown)',
+      last: typeof s.last === 'string' ? s.last.slice(0, 10) : '', // date only
+      tokens: s.tokens ?? 0,
+      models: (s.models ?? []).filter((m) => m && m !== '<synthetic>'),
+    }))
+}
+// Derive a daily {date,tokens} series from a CLI report's models_timeline (used for both
+// platforms' sparklines). Sums per-day tokens across models. Note: models_timeline caps
+// days[] to the last ~31 days and models to the top 10 by token, so very wide windows show a
+// recent/top-model sparkline — first_day/last_day/totals stay exact (ADR 0030).
 function dailyFromTimeline(report) {
   const byDay = new Map()
   for (const mt of report?.models_timeline ?? []) {
@@ -100,9 +82,17 @@ function dailyFromTimeline(report) {
   return [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, tokens]) => ({ date, cost: 0, tokens }))
 }
 
-const cacheHitRate = (cacheRead, totalInputLike) => {
-  const denom = cacheRead + totalInputLike
-  return denom ? cacheRead / denom : 0
+// True activity date range from models_timeline's per-model first_day/last_day — these are the
+// real full-window endpoints (uncapped; only days[] is capped to ~31). Used for date_range so wide
+// windows aren't truncated to the sparkline's last-31-day view (ADR 0030 fix from review).
+function rangeFromTimeline(report) {
+  let lo = null
+  let hi = null
+  for (const mt of report?.models_timeline ?? []) {
+    if (mt.first_day && (lo === null || mt.first_day < lo)) lo = mt.first_day
+    if (mt.last_day && (hi === null || mt.last_day > hi)) hi = mt.last_day
+  }
+  return lo && hi ? [lo, hi] : []
 }
 
 // Known git subcommands; anything else (e.g. a leaked path captured by a parser)
@@ -156,8 +146,8 @@ const MERGE_I18N = {
 const mlang = (lang) => MERGE_I18N[lang] ?? MERGE_I18N.en
 
 // Normalize `ccoach report --platform claude-code --json` (a unified Report) into
-// the renderer's behavior shape. Claude behavior + model_tokens come from ccoach; ccusage
-// supplies Claude per-line token attribution; cost is recomputed by apply_pricing (online).
+// the renderer's behavior shape. Claude tokens / model_tokens / behavior all come from ccoach
+// (offline local parse); cost is recomputed by apply_pricing from official online prices.
 export function claudeBehavior(r, lang = 'en') {
   if (!r) return null
   const tools = r.tools ?? {}
@@ -225,74 +215,66 @@ export function codexBehavior(r, lang = 'en') {
   }
 }
 
-export function buildClaude(ccDaily, ccSession, ccBehavior = null, lang = 'en') {
-  const t = ccDaily.totals ?? {}
-  const daily = ccDaily.daily ?? []
-  const sessions = ccSession.sessions ?? []
-  const models = unifyClaudeModels(aggregateCcModels(ccDaily))
-  const cacheRead = t.cacheReadTokens ?? 0
-  const inputT = t.inputTokens ?? 0
-  const chr = cacheHitRate(cacheRead, inputT) // cache hit rate = cache_read / (cache_read + fresh input)
-  const series = daily.map((d) => ({ date: d.date, cost: round(d.totalCost ?? 0, 2), tokens: d.totalTokens ?? 0 }))
-  const topSessions = [...sessions].sort((a, b) => (b.totalCost ?? 0) - (a.totalCost ?? 0)).slice(0, 5)
-  const top = topSessions.map((s) => ({
-    project: (s.projectPath ?? '').replaceAll('-Users-mac-', '~/'),
-    last: s.lastActivity,
-    cost: round(s.totalCost ?? 0, 2),
-    tokens: s.totalTokens ?? 0,
-    models: s.modelsUsed ?? [],
-  }))
+// Claude Code from the ccoach CLI (authoritative tokens + per-model breakdown, offline local
+// parse). ccusage is no longer used at skill runtime: ccoach's own model_tokens[] matches
+// ccusage's per-line attribution within ~0.04% (ADR 0030; the ~20% gap in ADR 0019 D4 predated
+// the streaming "final/max usage" dedup fix). Cost here is the CLI offline fallback; apply_pricing
+// overwrites it with official online prices. Daily sparkline derives from models_timeline (same as
+// Codex); top sessions come from `ccoach sessions --top N` (numeric only — no prompt text, no cost).
+export function buildClaude(report, sessions = null, lang = 'en') {
+  const r = report ?? {}
+  const tok = r.tokens ?? {}
+  const models = unifyModelTokens(r.model_tokens)
+  const series = dailyFromTimeline(r)
+  const range = rangeFromTimeline(r)
+  const dateRange = range.length ? range : series.length ? [series[0].date, series[series.length - 1].date] : []
   return {
     platform: 'Claude Code',
-    // tokens/模型来自 ccoach 本地解析 + ccusage 逐行归属；成本由 skill 层联网官方价计算（apply_pricing）。
-    source: 'ccoach + ccusage（本地解析，token/模型）· 官方在线定价',
-    active_days: daily.length,
-    sessions: sessions.length,
-    date_range: daily.length ? [daily[0].date, daily[daily.length - 1].date] : [],
+    // tokens/模型来自 ccoach 本地解析；成本由 skill 层联网官方价计算（apply_pricing）。
+    source: 'ccoach（本地解析，token/模型）· 官方在线定价',
+    active_days: r.active_days ?? series.length,
+    sessions: r.sessions ?? 0,
+    date_range: dateRange,
     tokens: {
-      input: inputT,
-      output: t.outputTokens ?? 0,
-      cache_read: cacheRead,
-      cache_create: t.cacheCreationTokens ?? 0,
-      total: t.totalTokens ?? 0,
+      input: tok.input ?? 0,
+      output: tok.output ?? 0,
+      cache_read: tok.cached_input ?? 0,  // Claude: cached_input = cache_read（互斥桶）
+      cache_create: tok.cache_creation ?? 0,
+      total: tok.total ?? 0,
     },
-    cost_usd: round(t.totalCost ?? 0, 2), // 离线 fallback；apply_pricing 用官方价覆盖
-    cost_is_real: true,                   // 默认离线 fallback 真实；apply_pricing 按官方价覆盖
-    cache_hit_rate: round(chr, 4),
+    cost_usd: round(r.estimated_cost_usd ?? 0, 2), // 离线 fallback；apply_pricing 用官方价覆盖
+    cost_is_real: true,                            // 默认离线 fallback；apply_pricing 按官方价覆盖
+    cache_hit_rate: round(r.cache_hit_rate ?? 0, 4),
     models,
     daily_series: series,
-    top_sessions: top,
-    behavior: claudeBehavior(ccBehavior, lang),
-    prompt_signals: (ccBehavior ?? {}).prompt_signals ?? {},
+    top_sessions: topClaudeSessions(sessions),
+    behavior: claudeBehavior(r, lang),
+    prompt_signals: r.prompt_signals ?? {},
     // 平台特色 + 端点/计费（ADR 0023 D2 / 0022 D2-D4）：均为派生白名单标签，不含 key/token/完整 URL。
-    claude_specific: (ccBehavior ?? {}).claude_specific ?? null,
-    endpoint: ((ccBehavior ?? {}).endpoints ?? []).find((e) => e.platform === 'claude-code') ?? null,
+    claude_specific: r.claude_specific ?? null,
+    endpoint: (r.endpoints ?? []).find((e) => e.platform === 'claude-code') ?? null,
   }
 }
 
-// Codex from the ccoach CLI (authoritative tokens + per-model breakdown). ccusage codex
-// is only an optional historical sparkline source — it gives 0 per-model cost (the old
-// "Codex cost = 0/partial" bug came from sourcing cost there). Cost is computed later by
-// apply_pricing.mjs from online official prices over the CLI's model_tokens[].
-export function buildCodex(codexReport, codexCcusage = null, lang = 'en') {
+// Codex from the ccoach CLI (authoritative tokens + per-model breakdown, offline local parse).
+// Cost is computed later by apply_pricing.mjs from online official prices over the CLI's
+// model_tokens[]. Daily sparkline derives from the report's models_timeline (same as Claude).
+export function buildCodex(codexReport, lang = 'en') {
   const r = codexReport ?? {}
   const tok = r.tokens ?? {}
   const afTotal = tok.total ?? 0
-  const models = unifyCodexModels(r.model_tokens)
+  const models = unifyModelTokens(r.model_tokens)
 
-  // Daily sparkline: prefer ccusage codex history when present, else derive from the
-  // CLI report's models_timeline. (ccusage codex is frequently unavailable.)
-  const cdaily = codexCcusage?.daily ?? []
-  const series = cdaily.length
-    ? cdaily.map((d) => ({ date: d.date, cost: round(d.costUSD ?? 0, 2), tokens: d.totalTokens ?? 0 }))
-    : dailyFromTimeline(r)
-  const dateRange = series.length ? [series[0].date, series[series.length - 1].date] : []
+  // Daily sparkline derived from the CLI report's models_timeline.
+  const series = dailyFromTimeline(r)
+  const range = rangeFromTimeline(r)
+  const dateRange = range.length ? range : series.length ? [series[0].date, series[series.length - 1].date] : []
 
   return {
     platform: 'Codex',
     // tokens/模型来自 ccoach 本地解析；成本由 skill 层联网官方价计算（apply_pricing）。
     source: 'ccoach（本地解析，token/模型）· 官方在线定价',
-    active_days: series.length,
+    active_days: r.active_days ?? series.length,
     date_range: dateRange,
     tokens: {
       input: tok.input ?? 0,
@@ -332,31 +314,32 @@ function buildWindow(reports) {
 
 function main() {
   const a = parseArgs(process.argv.slice(2))
-  // codex-ccusage is now OPTIONAL (Codex tokens/models come from ccoach; ccusage codex
-  // is only a historical sparkline source and is often unavailable).
-  for (const k of ['cc-daily', 'cc-session', 'codex-report', 'output']) {
+  // Required: --cc-report / --codex-report (both ccoach offline parses) + --output.
+  // --cc-sessions is OPTIONAL (top Claude sessions table; degrades to empty if absent).
+  for (const k of ['cc-report', 'codex-report', 'output']) {
     if (!a[k]) {
       process.stderr.write(`missing --${k}\n`)
       process.exit(2)
     }
   }
   const lang = a.lang || 'en' // 默认英文（ADR 0026）；与 ccoach report / scorecard / render 同传
-  const ccBehavior = a['cc-behavior'] ? load(a['cc-behavior']) : null
+  const ccReport = load(a['cc-report'])
   const codexReport = load(a['codex-report'])
-  const claude = buildClaude(load(a['cc-daily']), load(a['cc-session']), ccBehavior, lang)
-  const codex = buildCodex(codexReport, a['codex-ccusage'] ? load(a['codex-ccusage']) : null, lang)
+  const ccSessions = a['cc-sessions'] ? load(a['cc-sessions']) : null
+  const claude = buildClaude(ccReport, ccSessions, lang)
+  const codex = buildCodex(codexReport, lang)
 
   const merged = {
     title: 'Dual-Platform AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题，ADR 0025）；保留字段兼容
 
     generated_at: todayIso(),
-    window: buildWindow([codexReport, ccBehavior]),
+    window: buildWindow([codexReport, ccReport]),
     platforms: { claude_code: claude, codex: codex },
     combined: {
       total_cost_usd: round(claude.cost_usd + codex.cost_usd, 2),
       total_tokens: claude.tokens.total + codex.tokens.total,
-      total_sessions: claude.sessions, // codex session count not in ccusage daily
-      prompt_signals: (ccBehavior ?? {}).prompt_signals ?? {},
+      total_sessions: claude.sessions, // Claude 会话数（Codex 会话数在其面板单列）
+      prompt_signals: ccReport.prompt_signals ?? {},
     },
   }
   writeFileSync(a.output, JSON.stringify(merged, null, 2))

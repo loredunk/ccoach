@@ -57,9 +57,8 @@ ccoach --json                   # JSON output, script / agent friendly
 
 For richer AI-written HTML reports, use the reusable skill
 [skills/ccoach-insight](skills/ccoach-insight/SKILL.md): it reads local **Claude Code + Codex**
-data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms; `ccusage`
-is an offline token cross-check, never a runtime dependency), computes authoritative cost from each model's
-**official online price**, and renders
+data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms),
+computes authoritative cost from each model's **official online price**, and renders
 a dual-platform HTML report with a scorecard. It can drill from high-token projects down to candidate
 sessions (`ccoach sessions`), reads a selected session's user prompts only after explicit approval, and
 never reads hidden system prompts.
@@ -72,7 +71,28 @@ Install the skill via the [`skills`](https://github.com/vercel-labs/skills) CLI 
 npx skills add loredunk/ccoach
 ```
 
-It prompts you to pick the agents (Claude Code / Codex) and scope (global / project) — choose what you want. Then invoke it in Claude Code with `/ccoach-insight`; Codex picks it up from its skills dir. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`. (Report defaults to English; pass `--lang zh` to the skill's scripts for Chinese — see the skill's SKILL.md.)
+It prompts you to pick the agents (Claude Code / Codex) and scope (global / project) — choose what you want. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`.
+
+### Use it
+
+Once installed, you can just ask in plain language — e.g. *"review my Claude Code + Codex usage for the last 7 days"* — and the agent picks up the skill. To invoke it explicitly:
+
+- **Claude Code** — a slash command; the optional argument is a number of days back or a `YYYY-MM-DD` date:
+
+  ```text
+  /ccoach-insight              # today, both platforms
+  /ccoach-insight 7            # the last 7 days
+  /ccoach-insight 2026-06-01   # a specific day
+  ```
+
+- **Codex** — once it's in your skills dir, the skill auto-triggers from a matching request (e.g. *"how much did I spend on Codex this week?"*). To invoke it explicitly, type `$` to mention it and add the window in words:
+
+  ```text
+  $ccoach-insight              # today
+  $ccoach-insight last 7 days  # widen the window
+  ```
+
+No time argument means **today**. The report is **English by default** — ask for Chinese, or pass `--lang zh` to the skill's scripts (see the skill's [SKILL.md](skills/ccoach-insight/SKILL.md)).
 
 ## Notes & boundaries
 
@@ -83,4 +103,4 @@ It prompts you to pick the agents (Claude Code / Codex) and scope (global / proj
 
 ## Credits
 
-ccoach stands on the shoulders of [ccusage](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi): its unified parser learned how to read the local JSONL from ccusage's approach (without copying its code), and ccusage remains ccoach's token / cost cross-check. Thank you. 🙏
+Thanks to [ccusage](https://github.com/ryoppippi/ccusage) by [@ryoppippi](https://github.com/ryoppippi) — ccoach's local-usage parsing took inspiration from its approach, and I lean on ccusage to cross-check and calibrate ccoach's token / cost numbers while developing. 🙏

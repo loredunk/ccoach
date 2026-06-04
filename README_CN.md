@@ -56,8 +56,7 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 
 更深入的 AI 解读与 HTML 报告，用可复用的 skill
 [skills/ccoach-insight](skills/ccoach-insight/SKILL.md)：它从 `ccoach report --json` 读取
-**Claude Code + Codex** 两平台的本机数据（token、按模型拆分、行为画像；`ccusage` 仅作离线 token 交叉
-验证，绝非运行时依赖），并按报告里实际出现的模型**联网查官方单价**计算权威成本，产出双平台 HTML 报告与成绩卡，
+**Claude Code + Codex** 两平台的本机数据（token、按模型拆分、行为画像），并按报告里实际出现的模型**联网查官方单价**计算权威成本，产出双平台 HTML 报告与成绩卡，
 并能从高耗项目下钻到候选会话（`ccoach sessions`）；只在你明确授权后才读取所选会话的 user prompt，
 且绝不读取隐藏的系统提示。
 
@@ -69,7 +68,28 @@ ccoach --json                   # 输出 JSON，脚本 / agent 友好
 npx skills add loredunk/ccoach
 ```
 
-它会让你**自行选择 agent（Claude Code / Codex）与范围（全局 / 项目）**。随后在 Claude Code 里用 `/ccoach-insight` 触发；Codex 从其 skills 目录识别。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。（报告默认英文；要中文给 skill 脚本传 `--lang zh`，见 SKILL.md。）
+它会让你**自行选择 agent（Claude Code / Codex）与范围（全局 / 项目）**。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。
+
+### 怎么用
+
+装好后，直接用自然语言说一句——比如*“看看我最近 7 天 Claude Code + Codex 的用量”*——agent 就会自动唤起 skill。也可以显式调用：
+
+- **Claude Code** —— 斜杠命令，可选参数是「往回数几天」或某个 `YYYY-MM-DD` 日期：
+
+  ```text
+  /ccoach-insight              # 今天，两平台
+  /ccoach-insight 7            # 最近 7 天
+  /ccoach-insight 2026-06-01   # 指定某一天
+  ```
+
+- **Codex** —— 装进 skills 目录后，相关请求会自动触发该 skill（比如*“我这周在 Codex 上花了多少？”*）。也可显式调用：输入 `$` 提及它、再用自然语言补上时间窗口：
+
+  ```text
+  $ccoach-insight              # 今天
+  $ccoach-insight 最近 7 天     # 放宽窗口
+  ```
+
+不带时间参数就是**今天**。报告**默认英文**——要中文就说一声，或给 skill 脚本传 `--lang zh`（见 [SKILL.md](skills/ccoach-insight/SKILL.md)）。
 
 ## 说明与边界
 
@@ -80,4 +100,4 @@ npx skills add loredunk/ccoach
 
 ## 致谢
 
-ccoach 站在 [ccusage](https://github.com/ryoppippi/ccusage)（作者 [@ryoppippi](https://github.com/ryoppippi)）的肩膀上：统一解析层的本机 JSONL 读法借鉴自 ccusage 的做法（未复制其代码），并以 ccusage 作 token / 成本交叉验证。谢谢。🙏
+感谢 [ccusage](https://github.com/ryoppippi/ccusage)（作者 [@ryoppippi](https://github.com/ryoppippi)）——ccoach 的本机用量解析方法参考了它，开发时我也用 ccusage 来交叉校准 ccoach 的 token / 成本数字。🙏

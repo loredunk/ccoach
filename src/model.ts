@@ -138,6 +138,7 @@ export interface Report {
   platform: string            // "claude-code" | "codex" | "all"
   source: string              // "glob" | "sqlite"
   sessions: number
+  active_days: number         // 窗口内有 token 活动的去重天数（真实全量，不受 models_timeline 展示封顶影响）
   duration_seconds: number
   duration: string
   tokens: Tokens
@@ -207,4 +208,5 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   projects: 'Per-project cross-session derived-signal buckets (tokens/tool_calls/cache_hit_rate/categories/git_top/prompt_signals); only with --scope project.',
   sessions_detail: 'Per-session derived-signal buckets (incl. session_id/duration_seconds); only with --scope session; contains no raw prompt text.',
   duration: 'Active duration (counted only when adjacent events are ≤5 minutes apart), not wall-clock span.',
+  active_days: 'Number of distinct local-timezone days with token activity in the window — true full count, not bounded by the models_timeline display caps (top-10 models / last-31 days).',
 }

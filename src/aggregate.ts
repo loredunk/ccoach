@@ -412,12 +412,17 @@ export class Aggregator {
     const permRec: Record<string, number> = {}
     for (const [k, v] of this.permModes) permRec[k] = v
 
+    // 真实活跃天数：byModelDay 的「天」并集（未封顶；models_timeline 仅展示层取 top-N 模型/近 N 天）。
+    const activeDays = new Set<string>()
+    for (const days of this.byModelDay.values()) for (const d of days.keys()) activeDays.add(d)
+
     const report: Report = {
       generated_for: window.desc,
       timezone: localTimezone(),
       platform: this.platform,
       source,
       sessions: this.sessionIds.size,
+      active_days: activeDays.size,
       duration_seconds: this.durationSeconds(),
       duration: humanizeDuration(this.durationMs),
       tokens: { ...this.tokens },

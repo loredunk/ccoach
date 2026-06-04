@@ -280,7 +280,9 @@ function behaviorPanel(beh, color, platform) {
 
 function sparkline(series, color) {
   if (!series || !series.length) return ''
-  const vals = series.map((s) => s.cost ?? 0)
+  // Plot per-day tokens — the series carries tokens (cost is per-model official-online,
+  // applied later, never per-day), so a token-over-time curve is what's meaningful (ADR 0030).
+  const vals = series.map((s) => s.tokens ?? s.cost ?? 0)
   const mx = Math.max(...vals) || 1
   const w = 280
   const h = 46
@@ -516,11 +518,11 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   p.push(sparkline(cc.daily_series, '#0f766e'))
   p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
   p.push(modelTable(cc.models, 'claude'))
-  p.push(`<h3>${esc(tr('h_top_sessions'))}</h3><table><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_cost'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_model'))}</th></tr>`)
+  p.push(`<h3>${esc(tr('h_top_sessions'))}</h3><table><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_model'))}</th></tr>`)
   for (const s of cc.top_sessions) {
     p.push(
       `<tr><td>${esc(s.project)}<br><span class='muted'>${esc(s.last)}</span></td>` +
-        `<td>${money(s.cost)}</td><td>${comma(s.tokens)}</td>` +
+        `<td>${comma(s.tokens)}</td>` +
         `<td>${esc((s.models ?? []).join(', '))}</td></tr>`,
     )
   }

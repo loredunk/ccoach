@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Render a Codex-only enriched HTML report from `ccoach report --json` data plus
-// an AI-written insights file. Used as the fallback when ccusage is unavailable.
+// an AI-written insights file. Used for the single-platform (Codex-only) fallback.
 //
 //   --report <ccoach-report.json> --insights <insights.json> --output <out.html> [--lang en|zh]
 //

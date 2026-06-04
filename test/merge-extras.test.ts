@@ -24,25 +24,31 @@ function codexReport(endpoint: Record<string, unknown>) {
     endpoints: [endpoint],
   }
 }
-function ccBehavior(endpoint: Record<string, unknown>) {
+// 合成 ccoach claude-code 报告（含 tokens / model_tokens / models_timeline / claude_specific / endpoints）。
+// ADR 0030 后 buildClaude 直接吃 ccoach report，不再吃 ccusage 的 cc-daily/cc-session。
+function ccReport(endpoint: Record<string, unknown>) {
   return {
-    tokens: { input: 100, output: 50, cached_input: 40, cache_creation: 10, total: 200 },
+    tokens: { input: 100, cached_input: 40, output: 50, reasoning_output: 0, cache_creation: 10, total: 200 },
+    cache_hit_rate: 0.2857,
+    sessions: 1,
+    estimated_cost_usd: 0,
+    model_tokens: [{ model: 'claude-opus-4-8', tokens: { input: 100, cached_input: 40, output: 50, reasoning_output: 0, cache_creation: 10, total: 200 }, estimated_cost_usd: 0, priced: true }],
+    models_timeline: [{ model: 'claude-opus-4-8', first_day: '2026-06-01', last_day: '2026-06-01', tokens: 200, estimated_cost_usd: 0, days: [{ date: '2026-06-01', tokens: 200 }] }],
+    prompt_signals: { prompts: 1, avg_len: 10, structured_ratio: 0, file_ref_ratio: 0, constraint_ratio: 0, correction_rate: 0 },
     claude_specific: { web_search_requests: 3, web_fetch_requests: 2 },
     endpoints: [endpoint],
   }
 }
-const ccDaily = { totals: { inputTokens: 100, outputTokens: 50, cacheReadTokens: 40, cacheCreationTokens: 10, totalTokens: 200, totalCost: 0 }, daily: [{ date: '2026-06-01', totalCost: 0, totalTokens: 200, modelBreakdowns: [] }] }
-const ccSession = { sessions: [] }
 
 describe('merge：billing/codex_specific/endpoint/claude_specific 透传（ADR 0022/0023）', () => {
   it('buildCodex 透传 billing / codex_specific / 对应平台 endpoint', () => {
-    const cx = buildCodex(codexReport({ platform: 'codex', endpoint: 'official', official_host: 'chatgpt.com', relay_suspected: false, auth_mode: 'chatgpt', billing_mode: 'subscription', confidence: 'high', basis: [] }), null)
+    const cx = buildCodex(codexReport({ platform: 'codex', endpoint: 'official', official_host: 'chatgpt.com', relay_suspected: false, auth_mode: 'chatgpt', billing_mode: 'subscription', confidence: 'high', basis: [] }))
     expect(cx.billing.by_plan_tier).toEqual({ plus: 150 })
     expect(cx.codex_specific.effort).toEqual({ high: 5, medium: 1 })
     expect(cx.endpoint.billing_mode).toBe('subscription')
   })
   it('buildClaude 透传 claude_specific / 对应平台 endpoint', () => {
-    const cc = buildClaude(ccDaily, ccSession, ccBehavior({ platform: 'claude-code', endpoint: 'official', official_host: 'api.anthropic.com', relay_suspected: false, auth_mode: 'oauth-subscription', subscription_type: 'max', billing_mode: 'subscription', confidence: 'high', basis: [] }))
+    const cc = buildClaude(ccReport({ platform: 'claude-code', endpoint: 'official', official_host: 'api.anthropic.com', relay_suspected: false, auth_mode: 'oauth-subscription', subscription_type: 'max', billing_mode: 'subscription', confidence: 'high', basis: [] }))
     expect(cc.claude_specific).toEqual({ web_search_requests: 3, web_fetch_requests: 2 })
     expect(cc.endpoint.subscription_type).toBe('max')
   })
@@ -52,8 +58,8 @@ describe('render：新区块进 HTML（官方 + 中转两路）', () => {
   function renderWith(cxEp: Record<string, unknown>, ccEp: Record<string, unknown>): string {
     const dir = mkdtempSync(path.join(tmpdir(), 'ccoach-merge-'))
     try {
-      const cx = buildCodex(codexReport(cxEp), null)
-      const cc = buildClaude(ccDaily, ccSession, ccBehavior(ccEp))
+      const cx = buildCodex(codexReport(cxEp))
+      const cc = buildClaude(ccReport(ccEp))
       const merged = { title: 't', generated_at: '2026-06-04', window: { desc: 'w' }, platforms: { claude_code: cc, codex: cx }, combined: { total_cost_usd: 0, total_tokens: 400, total_sessions: 0 } }
       const dataPath = path.join(dir, 'merged.json')
       const insPath = path.join(dir, 'insights.json')
@@ -91,5 +97,44 @@ describe('render：新区块进 HTML（官方 + 中转两路）', () => {
     expect(html).toContain('疑似中转')
     expect(html).toContain('自定义 / 中转端点')
     expect(html).toContain('API / 中转')
+  })
+})
+
+describe('render：sparkline 画每日 token（非平线回归，ADR 0030）', () => {
+  // 回归守卫：daily_series 现在只带 tokens（cost 为 per-model 联网价、无每日成本），
+  // sparkline 必须画 token；若误画 cost(=0) 会退化成基线平线（评审发现的回归）。
+  it('多天 token 有变化时 sparkline polyline 不是平线', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ccoach-spark-'))
+    try {
+      const ccReportMultiDay = {
+        tokens: { input: 600, cached_input: 0, output: 300, reasoning_output: 0, cache_creation: 0, total: 900 },
+        cache_hit_rate: 0, sessions: 3, active_days: 3, estimated_cost_usd: 0,
+        model_tokens: [{ model: 'claude-opus-4-8', tokens: { input: 600, cached_input: 0, output: 300, reasoning_output: 0, cache_creation: 0, total: 900 }, estimated_cost_usd: 0, priced: true }],
+        models_timeline: [{
+          model: 'claude-opus-4-8', first_day: '2026-06-01', last_day: '2026-06-03', tokens: 900, estimated_cost_usd: 0,
+          days: [{ date: '2026-06-01', tokens: 100 }, { date: '2026-06-02', tokens: 700 }, { date: '2026-06-03', tokens: 100 }],
+        }],
+        prompt_signals: {}, endpoints: [],
+      }
+      const cc = buildClaude(ccReportMultiDay)
+      // daily_series 必须带每日 token、且有变化
+      expect(cc.daily_series.map((d: { tokens: number }) => d.tokens)).toEqual([100, 700, 100])
+      // 真实区间来自 models_timeline first/last（未封顶）
+      expect(cc.date_range).toEqual(['2026-06-01', '2026-06-03'])
+      expect(cc.active_days).toBe(3)
+      const merged = { title: 't', generated_at: '2026-06-05', window: { desc: 'w' }, platforms: { claude_code: cc, codex: buildCodex({ tokens: {}, model_tokens: [] }) }, combined: { total_cost_usd: 0, total_tokens: 900, total_sessions: 3 } }
+      const dataPath = path.join(dir, 'm.json'); const insPath = path.join(dir, 'i.json'); const outPath = path.join(dir, 'o.html')
+      writeFileSync(dataPath, JSON.stringify(merged))
+      writeFileSync(insPath, JSON.stringify({ executive_summary: 'x', insights: [], recommendations: [] }))
+      execFileSync('node', [RENDER, '--data', dataPath, '--insights', insPath, '--lang', 'zh', '--output', outPath])
+      const html = readFileSync(outPath, 'utf8')
+      const m = html.match(/<polyline[^>]*points='([^']+)'/)
+      expect(m).toBeTruthy()
+      const ys = m![1].split(' ').map((p) => parseFloat(p.split(',')[1]))
+      const distinct = new Set(ys.map((y) => y.toFixed(1)))
+      expect(distinct.size).toBeGreaterThan(1) // 非平线：中间高、两端低
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
