@@ -1,3 +1,5 @@
+import { tf } from './i18n.js'
+
 export interface WindowOpts { date?: string; since?: string; days?: number }
 export interface Window { fromYmd: string; toYmd: string; desc: string }
 
@@ -19,11 +21,11 @@ export function resolveWindow(o: WindowOpts, now: Date): Window {
   }
   if (o.since) {
     if (!YMD.test(o.since)) throw new Error(`invalid --since ${o.since} (want YYYY-MM-DD)`)
-    return { fromYmd: o.since, toYmd: today, desc: `${o.since} 至 ${today}` }
+    return { fromYmd: o.since, toYmd: today, desc: tf('win_since_to', { since: o.since, today }) }
   }
   if (o.days && o.days > 0) {
     const from = addDaysYmd(today, -(o.days - 1))
-    return { fromYmd: from, toYmd: today, desc: `最近 ${o.days} 天 (${from} 至 ${today})` }
+    return { fromYmd: from, toYmd: today, desc: tf('win_last_days', { days: o.days, from, today }) }
   }
   return { fromYmd: today, toYmd: today, desc: today }
 }

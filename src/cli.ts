@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { cac } from 'cac'
 import { resolveWindow } from './window.js'
+import { setLang } from './i18n.js'
 import { buildReport, VERSION, claudeProjectsDir, codexHome, type Platform, type Scope } from './index.js'
 import { emitJson } from './emit/json.js'
 import { emitText } from './emit/text.js'
@@ -12,17 +13,19 @@ const SCOPES: Scope[] = ['global', 'project', 'session']
 const cli = cac('ccoach')
 
 cli
-  .command('[...filter]', '本机 AI 用量教练：只读分析 Claude Code / Codex 用量与习惯')
-  .option('--date <date>', '单日窗口 (YYYY-MM-DD)')
-  .option('--since <date>', '从某日至今 (YYYY-MM-DD)')
-  .option('--days <n>', '最近 N 天（含今天）')
-  .option('--by-repo', '展开全部仓库（默认仅前 8）')
-  .option('--platform <platform>', '数据源：claude-code | codex | all', { default: 'all' })
-  .option('--scope <scope>', '分析层级：global | project | session（额外给 projects[]/sessions_detail[]）', { default: 'global' })
-  .option('--json', '输出机器可读 JSON（agent 友好）')
-  .option('--no-glossary', '省略 glossary 自描述块（省 ~2KB token）')
+  .command('[...filter]', 'Local AI usage coach: read-only analysis of Claude Code / Codex usage & habits')
+  .option('--date <date>', 'Single-day window (YYYY-MM-DD)')
+  .option('--since <date>', 'From a date until today (YYYY-MM-DD)')
+  .option('--days <n>', 'Last N days (including today)')
+  .option('--by-repo', 'Expand all repos (default: top 8 only)')
+  .option('--platform <platform>', 'Data source: claude-code | codex | all', { default: 'all' })
+  .option('--scope <scope>', 'Analysis level: global | project | session (adds projects[]/sessions_detail[])', { default: 'global' })
+  .option('--lang <lang>', 'Output language: en | zh (default en)', { default: 'en' })
+  .option('--json', 'Emit machine-readable JSON (agent-friendly)')
+  .option('--no-glossary', 'Omit the self-describing glossary block (~2KB token savings)')
   .action((_filter: string[], options: Record<string, unknown>) => {
     try {
+      setLang(options.lang as string | undefined) // 默认 en；先设语言，再 resolveWindow/buildReport/emit
       const platform = String(options.platform ?? 'all') as Platform
       if (!PLATFORMS.includes(platform)) {
         throw new Error(`invalid --platform ${platform} (want claude-code|codex|all)`)
@@ -56,19 +59,21 @@ cli
 
 // 会话钻取：候选清单（数值、零原文）+ opt-in 单会话 redacted prompt 预览（ADR 0018）。
 cli
-  .command('sessions', '会话候选清单 + opt-in 单会话 redacted prompt 预览（content-layer review）')
-  .option('--platform <platform>', '数据源：claude-code | codex', { default: 'claude-code' })
-  .option('--date <date>', '单日窗口 (YYYY-MM-DD)')
-  .option('--since <date>', '从某日至今 (YYYY-MM-DD)')
-  .option('--days <n>', '最近 N 天（含今天）')
-  .option('--repo <substr>', '按 repo 名/路径子串过滤')
-  .option('--id <sessionId>', '钻取的会话 id（子串匹配）')
-  .option('--rollout <path>', 'Codex：指定 rollout JSONL 路径')
-  .option('--top <n>', '候选清单条数', { default: 20 })
-  .option('--include-user-prompts', 'opt-in：产出单会话脱敏 prompt 预览（隐私门控）')
-  .option('--prompt-char-limit <n>', 'prompt 预览截断长度（码点）', { default: 1200 })
+  .command('sessions', 'Session candidate list + opt-in single-session redacted prompt preview (content-layer review)')
+  .option('--platform <platform>', 'Data source: claude-code | codex', { default: 'claude-code' })
+  .option('--date <date>', 'Single-day window (YYYY-MM-DD)')
+  .option('--since <date>', 'From a date until today (YYYY-MM-DD)')
+  .option('--days <n>', 'Last N days (including today)')
+  .option('--repo <substr>', 'Filter by repo name/path substring')
+  .option('--id <sessionId>', 'Session id to drill into (substring match)')
+  .option('--rollout <path>', 'Codex: explicit rollout JSONL path')
+  .option('--top <n>', 'Number of candidates to list', { default: 20 })
+  .option('--include-user-prompts', 'opt-in: emit single-session redacted prompt preview (privacy-gated)')
+  .option('--prompt-char-limit <n>', 'Prompt preview truncation length (code points)', { default: 1200 })
+  .option('--lang <lang>', 'Output language: en | zh (default en)', { default: 'en' })
   .action((options: Record<string, unknown>) => {
     try {
+      setLang(options.lang as string | undefined)
       const platform = String(options.platform ?? 'claude-code')
       if (platform !== 'claude-code' && platform !== 'codex') {
         throw new Error(`invalid --platform ${platform} (want claude-code|codex)`)

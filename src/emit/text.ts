@@ -1,5 +1,6 @@
 import { type Report, type UsageReport, type HourReport } from '../model.js'
 import { comma } from '../text.js'
+import { t, tf } from '../i18n.js'
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + '…'
@@ -10,9 +11,9 @@ function pct(part: number, total: number): number {
 function renderUsageBreakdown(lines: string[], rows: UsageReport[], total: number): void {
   const limit = Math.min(rows.length, 8)
   for (const row of rows.slice(0, limit)) {
-    lines.push(`  ${truncate(row.name, 16).padEnd(16)} ${row.sessions} 会话  ${pct(row.tokens, total).toFixed(1).padStart(5)}%  ${comma(row.tokens)} token`)
+    lines.push(`  ${truncate(row.name, 16).padEnd(16)} ${tf('tx_sessions_n', { n: row.sessions })}  ${pct(row.tokens, total).toFixed(1).padStart(5)}%  ${comma(row.tokens)} token`)
   }
-  if (rows.length > limit) lines.push(`  …另有 ${rows.length - limit} 项`)
+  if (rows.length > limit) lines.push(`  ${tf('tx_more_items', { n: rows.length - limit })}`)
 }
 function renderHours(lines: string[], hours: HourReport[], total: number): void {
   let max = 0
@@ -23,62 +24,75 @@ function renderHours(lines: string[], hours: HourReport[], total: number): void 
   }
 }
 
-const PLATFORM_LABEL: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', all: '全部平台' }
-const BILLING_MODE_LABEL: Record<string, string> = { subscription: '订阅', api_or_relay: 'API/中转', unknown: '未知' }
-const CONFIDENCE_LABEL: Record<string, string> = { high: '高', medium: '中', low: '低' }
+// 专有名词保持原样；'all' 等可本地化项在调用期（setLang 之后）解析。
+const PLATFORM_LABEL: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex' }
+function platformLabel(p: string): string {
+  if (p === 'all') return t('tx_platform_all')
+  return PLATFORM_LABEL[p] ?? p
+}
+function billingModeLabel(m: string): string {
+  const key = 'tx_bill_' + m
+  const s = t(key)
+  return s === key ? m : s
+}
+function confidenceLabel(c: string): string {
+  const key = 'tx_conf_' + c
+  const s = t(key)
+  return s === key ? c : s
+}
 
 // 端点/计费 + 平台特色块（ADR 0022 D2-D4 / 0023 D1-D2）：账户级当前快照 + 历史 token 拆分 + 执行画像。
 function renderExtras(lines: string[], r: Report): void {
   if (r.endpoints?.length) {
-    lines.push('端点 / 计费模式（账户级当前快照，读本机 config）')
+    lines.push(t('tx_endpoint_header'))
     for (const e of r.endpoints) {
-      const host = e.official_host ? `官方(${e.official_host})` : e.endpoint === 'custom' ? '自定义/中转' : '未知端点'
-      const relay = e.relay_suspected ? ' ⚠️疑似中转' : ''
-      const sub = e.subscription_type ? ` · 订阅档 ${e.subscription_type}` : ''
-      const mode = BILLING_MODE_LABEL[e.billing_mode] ?? e.billing_mode
-      lines.push(`  ${(PLATFORM_LABEL[e.platform] ?? e.platform).padEnd(12)} ${host} · 计费 ${mode}（置信${CONFIDENCE_LABEL[e.confidence] ?? e.confidence}）${sub}${relay}`)
+      const host = e.official_host ? tf('tx_ep_official', { host: e.official_host }) : e.endpoint === 'custom' ? t('tx_ep_custom') : t('tx_ep_unknown')
+      const relay = e.relay_suspected ? t('tx_ep_relay_flag') : ''
+      const plan = e.subscription_type ? tf('tx_ep_plan', { tier: e.subscription_type }) : ''
+      const mode = billingModeLabel(e.billing_mode)
+      lines.push(`  ${platformLabel(e.platform).padEnd(12)} ${tf('tx_ep_line', { host, mode, conf: confidenceLabel(e.confidence), plan, relay })}`)
     }
     lines.push('')
   }
   if (r.billing) {
     // 百分比按 Codex 子总额（= 各 tier + 未分类）算，避免 --platform all 下用混合总额误导。
     const billingTotal = Object.values(r.billing.by_plan_tier).reduce((a, c) => a + c, 0) + r.billing.unclassified
-    lines.push('计费拆分（Codex，按订阅 plan tier）')
+    lines.push(t('tx_billing_header'))
     for (const [tier, tok] of Object.entries(r.billing.by_plan_tier).sort((a, b) => b[1] - a[1])) {
       lines.push(`  ${tier.padEnd(12)} ${pct(tok, billingTotal).toFixed(1).padStart(5)}%  ${comma(tok)} token`)
     }
     if (r.billing.unclassified) {
-      lines.push(`  ${'未分类'.padEnd(11)} ${pct(r.billing.unclassified, billingTotal).toFixed(1).padStart(5)}%  ${comma(r.billing.unclassified)} token（有token无plan_type，≠确定API）`)
+      lines.push(`  ${t('tx_unclassified').padEnd(11)} ${pct(r.billing.unclassified, billingTotal).toFixed(1).padStart(5)}%  ${comma(r.billing.unclassified)} token${t('tx_unclassified_note')}`)
     }
-    lines.push(`  ⓘ plan_type 来自后端响应、可被中转伪造（confidence: ${r.billing.confidence}）`)
+    lines.push('  ' + tf('tx_plan_type_note', { conf: r.billing.confidence }))
     lines.push('')
   }
   if (r.codex_specific) {
     const cs = r.codex_specific
-    lines.push('Codex 执行画像')
+    lines.push(t('tx_codex_profile'))
     const dist = (label: string, rec?: Record<string, number>): void => {
       if (rec && Object.keys(rec).length) {
         lines.push(`  ${label}: ` + Object.entries(rec).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}(${v})`).join(' '))
       }
     }
-    dist('推理强度', cs.effort)
-    dist('审批策略', cs.approval_policy)
-    dist('沙箱', cs.sandbox)
-    dist('协作模式', cs.collaboration_mode)
-    dist('客户端', cs.originators)
+    dist(t('tx_effort'), cs.effort)
+    dist(t('tx_approval'), cs.approval_policy)
+    dist(t('tx_sandbox'), cs.sandbox)
+    dist(t('tx_collab'), cs.collaboration_mode)
+    dist(t('tx_client'), cs.originators)
     const misc: string[] = []
-    if (cs.compactions) misc.push(`上下文压缩 ${cs.compactions}`)
-    if (cs.aborted_turns) misc.push(`放弃回合 ${cs.aborted_turns}`)
-    if (cs.context_window) misc.push(`上下文窗口 ${comma(cs.context_window)}`)
-    if (cs.personality && Object.keys(cs.personality).length) misc.push('人格 ' + Object.keys(cs.personality).join('/'))
-    if (cs.git_repo_identity) misc.push('git 仓库身份 ✓')
+    if (cs.compactions) misc.push(tf('tx_compactions', { n: cs.compactions }))
+    if (cs.aborted_turns) misc.push(tf('tx_aborted', { n: cs.aborted_turns }))
+    if (cs.context_window) misc.push(tf('tx_ctxwin', { n: comma(cs.context_window) }))
+    if (cs.personality && Object.keys(cs.personality).length) misc.push(tf('tx_personality', { names: Object.keys(cs.personality).join('/') }))
+    if (cs.git_repo_identity) misc.push(t('tx_git_identity'))
     if (misc.length) lines.push('  ' + misc.join(' · '))
     lines.push('')
   }
   if (r.claude_specific) {
     const c = r.claude_specific
     if (c.web_search_requests || c.web_fetch_requests) {
-      lines.push(`Claude 服务端工具: web 搜索 ${comma(c.web_search_requests)} · web 抓取 ${comma(c.web_fetch_requests)}`)
+      lines.push(tf('tx_claude_server', { s: comma(c.web_search_requests), f: comma(c.web_fetch_requests) }))
       lines.push('')
     }
   }
@@ -86,24 +100,24 @@ function renderExtras(lines: string[], r: Report): void {
 
 export function emitText(r: Report, byRepo: boolean): string {
   const lines: string[] = []
-  const label = PLATFORM_LABEL[r.platform] ?? r.platform
-  lines.push(`AI 用量报告 · ${label} · ${r.generated_for} · ${r.timezone}`)
-  lines.push(`仅本机数据 (来源: ${r.source}) · ${r.sessions} 个会话 · 时长 ${r.duration}`)
+  const label = platformLabel(r.platform)
+  lines.push(`${t('tx_report_title')} · ${label} · ${r.generated_for} · ${r.timezone}`)
+  lines.push(tf('tx_local_meta', { source: r.source, sessions: r.sessions, dur: r.duration }))
   lines.push('')
 
   if (r.tokens.total === 0) {
-    lines.push('（该时间窗口内没有使用记录）')
+    lines.push(t('tx_no_records'))
     return lines.join('\n') + '\n'
   }
 
   lines.push('Token')
   lines.push(`  input ${comma(r.tokens.input)} · cached ${comma(r.tokens.cached_input)} · output ${comma(r.tokens.output)} · reasoning ${comma(r.tokens.reasoning_output)} · cache_creation ${comma(r.tokens.cache_creation)} · total ${comma(r.tokens.total)}`)
-  lines.push(`  缓存命中率 ${(r.cache_hit_rate * 100).toFixed(1)}% · reasoning 占 output ${(r.reasoning_ratio * 100).toFixed(1)}%`)
-  const modelNote = r.models.length ? ' · 模型: ' + r.models.join(', ') : ''
-  lines.push(`  估算成本 $${r.estimated_cost_usd.toFixed(2)}（估算价，仅供参考${modelNote}）`)
-  if (r.unpriced_models?.length) lines.push(`  注意: 以下模型无内置价格，未计入成本: ${r.unpriced_models.join(', ')}`)
+  lines.push('  ' + tf('tx_cache_reasoning', { chr: (r.cache_hit_rate * 100).toFixed(1), rr: (r.reasoning_ratio * 100).toFixed(1) }))
+  const modelNote = r.models.length ? tf('tx_models_suffix', { m: r.models.join(', ') }) : ''
+  lines.push('  ' + tf('tx_est_cost', { cost: '$' + r.estimated_cost_usd.toFixed(2), models: modelNote }))
+  if (r.unpriced_models?.length) lines.push('  ' + tf('tx_unpriced', { m: r.unpriced_models.join(', ') }))
   if (r.models_timeline && r.models_timeline.length > 1) {
-    lines.push('  模型时间线 (首次→最后, 本机时区):')
+    lines.push('  ' + t('tx_timeline_header'))
     for (const mt of r.models_timeline) {
       const span = mt.last_day !== mt.first_day ? `${mt.first_day}→${mt.last_day}` : mt.first_day
       lines.push(`    ${truncate(mt.model, 16).padEnd(16)} ${span} · ${comma(mt.tokens)} token`)
@@ -111,37 +125,37 @@ export function emitText(r: Report, byRepo: boolean): string {
   }
   lines.push('')
 
-  lines.push(`工具调用 (共 ${r.tools.total_calls})`)
-  lines.push(`  shell ${r.tools.shell_calls} · web 搜索 ${r.tools.web_searches} · 改文件 ${r.tools.file_changes}`)
+  lines.push(tf('tx_tool_calls', { n: r.tools.total_calls }))
+  lines.push('  ' + tf('tx_tool_breakdown', { a: r.tools.shell_calls, b: r.tools.web_searches, c: r.tools.file_changes }))
   if (r.tools.top_commands.length) {
-    lines.push('  top 命令: ' + r.tools.top_commands.map((c) => `${c.command}(${c.count})`).join(' '))
+    lines.push('  ' + t('tx_top_commands') + r.tools.top_commands.map((c) => `${c.command}(${c.count})`).join(' '))
   }
   lines.push('')
 
   if (r.sources.length) {
-    lines.push('按来源')
+    lines.push(t('tx_by_source'))
     renderUsageBreakdown(lines, r.sources, r.tokens.total)
     lines.push('')
   }
   if (r.languages.length) {
-    lines.push('按语言（根据本机仓库文件估算）')
+    lines.push(t('tx_by_language'))
     renderUsageBreakdown(lines, r.languages, r.tokens.total)
     lines.push('')
   }
 
   const es = r.error_signals
   if (es.tool_calls > 0 || es.interrupted > 0 || es.api_errors > 0) {
-    lines.push('错误 / 卡顿')
-    lines.push(`  工具失败 ${es.tool_errors}/${es.tool_calls} (${(es.error_rate * 100).toFixed(1)}%) · 中断 ${es.interrupted} · API 错误 ${es.api_errors}`)
-    if (es.by_category?.length) lines.push('  按类别: ' + es.by_category.map((c) => `${c.command}(${c.count})`).join(' '))
-    if (es.by_tool?.length) lines.push('  按工具: ' + es.by_tool.map((c) => `${c.command}(${c.count})`).join(' '))
+    lines.push(t('tx_errors_header'))
+    lines.push('  ' + tf('tx_errors_line', { e: es.tool_errors, n: es.tool_calls, r: (es.error_rate * 100).toFixed(1), i: es.interrupted, a: es.api_errors }))
+    if (es.by_category?.length) lines.push('  ' + t('tx_by_category') + es.by_category.map((c) => `${c.command}(${c.count})`).join(' '))
+    if (es.by_tool?.length) lines.push('  ' + t('tx_by_tool') + es.by_tool.map((c) => `${c.command}(${c.count})`).join(' '))
     lines.push('')
   }
 
   const rw = r.rework_signals
   if (rw.edits > 0) {
-    lines.push('返工 / 改动')
-    lines.push(`  编辑 ${rw.edits} 次 · 手改率 ${(rw.user_modified_rate * 100).toFixed(1)}% · +${rw.lines_added}/-${rw.lines_removed} 行`)
+    lines.push(t('tx_rework_header'))
+    lines.push('  ' + tf('tx_rework_line', { n: rw.edits, r: (rw.user_modified_rate * 100).toFixed(1), a: rw.lines_added, d: rw.lines_removed }))
     lines.push('')
   }
   if (r.skills?.length) {
@@ -151,38 +165,38 @@ export function emitText(r: Report, byRepo: boolean): string {
   const env = r.environment
   if (env) {
     const parts: string[] = []
-    if (env.claude_versions?.length) parts.push('版本 ' + env.claude_versions.join('/'))
-    if (env.permission_modes?.length) parts.push('权限 ' + env.permission_modes.map((c) => `${c.command}(${c.count})`).join(' '))
-    if (env.attachments) parts.push(`附件 ${env.attachments}`)
-    if (env.subagent_messages) parts.push(`子代理消息 ${env.subagent_messages}`)
+    if (env.claude_versions?.length) parts.push(tf('tx_env_version', { v: env.claude_versions.join('/') }))
+    if (env.permission_modes?.length) parts.push(tf('tx_env_perm', { p: env.permission_modes.map((c) => `${c.command}(${c.count})`).join(' ') }))
+    if (env.attachments) parts.push(tf('tx_env_attachments', { n: env.attachments }))
+    if (env.subagent_messages) parts.push(tf('tx_env_subagent', { n: env.subagent_messages }))
     if (parts.length) {
-      lines.push('环境: ' + parts.join(' · '))
+      lines.push(t('tx_env_label') + parts.join(' · '))
       lines.push('')
     }
   }
 
   renderExtras(lines, r)
 
-  lines.push('习惯')
-  lines.push(`  Git 命令 ${r.git_habits.command_count} 次 · 分支上下文 ${r.git_habits.branch_count} 个 · 多分支仓库 ${r.git_habits.multi_branch_repos} 个`)
-  if (r.project_management.signals?.length) lines.push(`  项目管理: ${r.project_management.signals.join('；')}`)
+  lines.push(t('tx_habits_header'))
+  lines.push('  ' + tf('tx_habits_git', { a: r.git_habits.command_count, b: r.git_habits.branch_count, c: r.git_habits.multi_branch_repos }))
+  if (r.project_management.signals?.length) lines.push('  ' + tf('tx_pm_prefix', { s: r.project_management.signals.join('; ') }))
   lines.push('')
 
   if (r.repos.length) {
-    lines.push('按仓库')
+    lines.push(t('tx_by_repo'))
     let limit = r.repos.length
     if (!byRepo && limit > 8) limit = 8
     for (const rr of r.repos.slice(0, limit)) {
       const branch = byRepo && rr.branches?.length ? ` [${rr.branches.join(',')}]` : ''
       const detail = rr.language ? ` · ${rr.language}` : ''
-      lines.push(`  ${truncate(rr.repo, 24).padEnd(24)} ${rr.sessions} 会话  ${comma(rr.tokens)} token  $${rr.estimated_cost_usd.toFixed(2)}${branch}${detail}`)
+      lines.push(`  ${truncate(rr.repo, 24).padEnd(24)} ${tf('tx_sessions_n', { n: rr.sessions })}  ${comma(rr.tokens)} token  $${rr.estimated_cost_usd.toFixed(2)}${branch}${detail}`)
     }
-    if (!byRepo && r.repos.length > limit) lines.push(`  …另有 ${r.repos.length - limit} 个仓库（用 --by-repo 查看全部）`)
+    if (!byRepo && r.repos.length > limit) lines.push(`  ${tf('tx_more_repos', { n: r.repos.length - limit })}`)
     lines.push('')
   }
 
   if (r.hours.length) {
-    lines.push('按时段 (本机时间)')
+    lines.push(t('tx_by_hour'))
     renderHours(lines, r.hours, r.tokens.total)
   }
 

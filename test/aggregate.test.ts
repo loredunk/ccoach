@@ -26,7 +26,7 @@ describe('Aggregator', () => {
     expect(r.repos[0].repo).toBe('ccoach')
     expect(r.estimated_cost_usd).toBeGreaterThan(0)
     expect(r.rate_limits).toBeNull()
-    expect(r.glossary?._about).toContain('仅本机')
+    expect(r.glossary?._about).toContain('Local-machine data only')
   })
   it('活跃时长只累计 ≤5min 的相邻间隔', () => {
     const agg = new Aggregator('codex')

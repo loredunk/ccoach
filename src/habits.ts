@@ -1,4 +1,5 @@
 import { type CommandCount, type GitHabitsReport, type ProjectMgmtReport } from './model.js'
+import { t, tf } from './i18n.js'
 
 // 通用：把计数表转成按 count 降序、command 升序的 top-n（移植 Go topCommands 排序）。
 export function topCounts(counts: Record<string, number>, n: number): CommandCount[] {
@@ -26,15 +27,15 @@ export function buildGitHabits(
   const push = gitCommands.push ?? 0
 
   const reviewSignals: string[] = []
-  if (status > 0) reviewSignals.push(`经常检查工作区状态: git status ${status} 次`)
-  if (diff > 0) reviewSignals.push(`会查看差异: git diff ${diff} 次`)
-  if (log > 0 || show > 0) reviewSignals.push('会读取历史上下文')
+  if (status > 0) reviewSignals.push(tf('hab_review_status', { n: status }))
+  if (diff > 0) reviewSignals.push(tf('hab_review_diff', { n: diff }))
+  if (log > 0 || show > 0) reviewSignals.push(t('hab_review_history'))
 
   const riskSignals: string[] = []
   if (commit === 0 && (diff > 0 || status > 0)) {
-    riskSignals.push('只看到 diff/status 等检查、没有 commit 提交；可能偏向让人类最后提交')
+    riskSignals.push(t('hab_risk_nocommit'))
   }
-  if (push > 0) riskSignals.push('观察到 push 命令；适合在 AGENTS.md 中写清推送前检查')
+  if (push > 0) riskSignals.push(t('hab_risk_push'))
 
   return {
     command_count: commandCount,
@@ -55,9 +56,9 @@ export function buildProjectMgmt(repos: RepoFacts[]): ProjectMgmtReport {
 
   const signals: string[] = []
   if (repos.length > 0) {
-    if (reposWithTests === 0) signals.push('活跃项目中没有观察到测试命令')
-    else signals.push(`${reposWithTests}/${repos.length} 个活跃项目观察到测试命令`)
-    if (reposWithCI > 0) signals.push(`${reposWithCI} 个活跃项目检测到 GitHub Actions`)
+    if (reposWithTests === 0) signals.push(t('hab_pm_notests'))
+    else signals.push(tf('hab_pm_tests', { a: reposWithTests, b: repos.length }))
+    if (reposWithCI > 0) signals.push(tf('hab_pm_ci', { n: reposWithCI }))
   }
 
   return {

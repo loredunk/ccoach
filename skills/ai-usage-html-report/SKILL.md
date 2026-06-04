@@ -43,18 +43,20 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
 
    Let `<W>` be the window flag derived from `$period` (default: **no flag = today**; `--date <d>` / `--days <n>` / `--since <d>` otherwise). Use the **same `<W>`** for every command below.
 
+   Let `<L>` be the language flag `--lang en|zh` (**default English**; pass `--lang zh` etc. to match the user's language). **Use the same `<L>` on every `ccoach report` call AND on `scorecard.mjs` / `render_*.mjs`** — the CLI localizes its habit/behavior signals and window description by `--lang` (ADR 0026), so a Chinese report needs `--lang zh` on ccoach too, or those signals stay English. Omit `<L>` for the English default.
+
 1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
    - Prefer `ccoach` from `PATH`; otherwise `npx @loredunk/ccoach@latest`.
    - If this is the ccoach source repo, run `npm ci && npm run build`, then invoke `node dist/cli.js` (or `npm run dev --` to run `tsx src/cli.ts`).
    - Generate the Codex report (token + `model_tokens[]` + behavior dimensions):
-     - `ccoach report --platform codex <W> --json > /tmp/codex-usage-report.json`
+     - `ccoach report --platform codex <W> <L> --json > /tmp/codex-usage-report.json`
 2. Pull Claude Code tokens with `ccusage` (offline cross-check for per-model token attribution; no upload). Match `<W>` (ccusage uses `--since YYYYMMDD`):
    - `npx ccusage@latest claude daily --json --offline --breakdown > /tmp/cc-daily.json`
    - `npx ccusage@latest claude session --json --offline > /tmp/cc-session.json`
    - `npx ccusage@latest codex daily --json --offline > /tmp/cc-codex.json` (optional — Codex sparkline history; skip if it fails)
    - Use `ccusage ...` directly if on `PATH`; otherwise `npx ccusage@latest ...`.
 3. Collect the Claude Code **behavior** profile from ccoach (offline, local parse), same `<W>`:
-   - `ccoach report --platform claude-code <W> --json > /tmp/claude-behavior.json`
+   - `ccoach report --platform claude-code <W> <L> --json > /tmp/claude-behavior.json`
    - This report also carries `model_tokens[]` (per-model token buckets for pricing) and `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
    - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-daily /tmp/cc-daily.json --cc-session /tmp/cc-session.json --cc-behavior /tmp/claude-behavior.json --codex-report /tmp/codex-usage-report.json --codex-ccusage /tmp/cc-codex.json --output /tmp/ai-usage.json`

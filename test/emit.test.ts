@@ -13,16 +13,16 @@ function sample() {
 }
 
 describe('emit', () => {
-  it('JSON 含 glossary 与 rate_limits:null，可解析', () => {
+  it('JSON 含 glossary 与 rate_limits:null，可解析（默认英文 glossary，ADR 0026）', () => {
     const out = emitJson(sample())
     const parsed = JSON.parse(out)
     expect(parsed.rate_limits).toBeNull()
-    expect(parsed.glossary._about).toContain('仅本机')
+    expect(parsed.glossary._about).toContain('Local-machine data only')
     expect(parsed.tokens.total).toBe(200)
   })
-  it('文本含 token 行与“仅本机”声明', () => {
+  it('文本默认英文：含 token 行与 local-only 声明', () => {
     const out = emitText(sample(), false)
-    expect(out).toContain('仅本机')
+    expect(out).toContain('Local-only data')
     expect(out).toContain('total')
   })
 })
