@@ -1,6 +1,7 @@
 import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
   type ReworkSignals, type EnvironmentSignals, type FileLanguage,
+  type BillingReport, type CodexSpecific,
   type ScopeBucket, type ProjectScope, type SessionScope,
   type ModelTimeline, type ModelDayCount, type ModelTokenBreakdown,
   REPORT_GLOSSARY, emptyTokens,
@@ -103,6 +104,17 @@ export class Aggregator {
   private permModes = new Map<string, number>()
   private attachments = 0
   private subagentMsgs = 0
+  // 计费维度（仅 Codex 喂入，ADR 0022 D1）：按 plan tier 攒 token + 未分类桶
+  private billingByTier = new Map<string, number>()
+  private billingUnclassified = 0
+  private billingSessionsWithPlan = 0
+  private billingSessionsUnclassified = 0
+  // Codex 执行画像（仅 Codex 喂入，ADR 0023 D1）：派生计数/枚举标签
+  private cxLabels = new Map<string, Map<string, number>>() // field -> (label -> count)
+  private cxCompactions = 0
+  private cxAbortedTurns = 0
+  private cxContextWindow = new Map<number, number>() // 窗口规格 -> 出现次数（取众数）
+  private cxGitIdentity = false
   // 分层 scope（默认 global）：!=global 时按桶攒派生信号，每条记录前由适配器 beginRecord 设当前桶。
   private scope: Scope
   private groups = new Map<string, GroupAcc>()
@@ -296,6 +308,31 @@ export class Aggregator {
   markAttachment(): void { this.attachments++ }
   markSubagentMessage(): void { this.subagentMsgs++ }
 
+  // 计费维度（ADR 0022 D1）：适配器按 rollout 调用一次——传该会话观测到的 plan_type（无则 null）与窗口内 token 总数。
+  // 只攒「token 归类」，绝不存配额%/余额/重置（rate_limits 顶层仍恒 null）。plan_type 可被中转伪造，故附固定告警标签。
+  applyBillingRollout(planType: string | null, tokens: number): void {
+    if (tokens <= 0) return
+    if (planType) {
+      this.billingByTier.set(planType, (this.billingByTier.get(planType) ?? 0) + tokens)
+      this.billingSessionsWithPlan++
+    } else {
+      this.billingUnclassified += tokens
+      this.billingSessionsUnclassified++
+    }
+  }
+
+  // Codex 执行画像（ADR 0023 D1）：按字段攒白名单枚举标签计数（仅标签，绝不含 developer_instructions 等正文）。
+  applyCodexLabel(field: string, label: string): void {
+    if (!field || !label) return
+    let m = this.cxLabels.get(field)
+    if (!m) { m = new Map(); this.cxLabels.set(field, m) }
+    m.set(label, (m.get(label) ?? 0) + 1)
+  }
+  markCodexCompaction(): void { this.cxCompactions++ }
+  markCodexAbortedTurn(): void { this.cxAbortedTurns++ }
+  applyCodexContextWindow(n: number): void { if (n > 0) this.cxContextWindow.set(n, (this.cxContextWindow.get(n) ?? 0) + 1) }
+  markCodexGitIdentity(): void { this.cxGitIdentity = true }
+
   touchSession(id: string): void { if (id) this.sessionIds.add(id) }
 
   markActive(ts: Date): void {
@@ -420,6 +457,46 @@ export class Aggregator {
       if (this.versions.size) env.claude_versions = [...this.versions].sort()
       if (this.permModes.size) env.permission_modes = topCounts(permRec, 8)
       report.environment = env
+    }
+    // 计费维度（仅 Codex 有喂入；Claude-only 时三者皆空 → 不输出）。
+    if (this.billingByTier.size || this.billingUnclassified || this.billingSessionsWithPlan || this.billingSessionsUnclassified) {
+      const byTier: Record<string, number> = {}
+      for (const [k, v] of this.billingByTier) byTier[k] = v
+      const billing: BillingReport = {
+        by_plan_tier: byTier,
+        unclassified: this.billingUnclassified,
+        sessions_with_plan: this.billingSessionsWithPlan,
+        sessions_unclassified: this.billingSessionsUnclassified,
+        confidence: 'spoofable-by-relay',
+      }
+      report.billing = billing
+    }
+    // Codex 执行画像（仅 Codex 有喂入）。
+    if (this.cxLabels.size || this.cxCompactions || this.cxAbortedTurns || this.cxContextWindow.size || this.cxGitIdentity) {
+      const cs: CodexSpecific = {
+        compactions: this.cxCompactions,
+        aborted_turns: this.cxAbortedTurns,
+        git_repo_identity: this.cxGitIdentity,
+      }
+      const asRec = (m: Map<string, number> | undefined): Record<string, number> | undefined => {
+        if (!m || !m.size) return undefined
+        const r: Record<string, number> = {}
+        for (const [k, v] of m) r[k] = v
+        return r
+      }
+      cs.effort = asRec(this.cxLabels.get('effort'))
+      cs.approval_policy = asRec(this.cxLabels.get('approval_policy'))
+      cs.sandbox = asRec(this.cxLabels.get('sandbox'))
+      cs.collaboration_mode = asRec(this.cxLabels.get('collaboration_mode'))
+      cs.personality = asRec(this.cxLabels.get('personality'))
+      cs.originators = asRec(this.cxLabels.get('originators'))
+      if (this.cxContextWindow.size) {
+        let best = 0
+        let bestC = -1
+        for (const [n, c] of this.cxContextWindow) if (c > bestC) { bestC = c; best = n }
+        cs.context_window = best
+      }
+      report.codex_specific = cs
     }
     if (this.scope !== 'global') {
       report.scope = this.scope

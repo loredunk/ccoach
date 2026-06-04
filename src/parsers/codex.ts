@@ -127,6 +127,7 @@ export function parseCodex(home: string, window: Window, scope: Scope = 'global'
 
 // 把 Codex 用量喂进（可共享的）聚合器——--platform all 时与 Claude 喂同一个 agg。
 export function feedCodex(agg: Aggregator, home: string, window: Window): void {
+  const inWin = (d: Date): boolean => !Number.isNaN(d.getTime()) && inLocalRange(d, window)
   for (const file of globRollouts(home)) {
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
@@ -140,6 +141,10 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
     let repo = '(unknown)'
     let source = '(unknown)'
     let threadTouched = false
+    let originator = ''
+    let gitIdentity = false
+    let rolloutPlanType: string | null = null // 该会话首个非空 plan_type（计费维度，ADR 0022 D1）
+    let billingTokens = 0                       // 该 rollout 窗口内 token 总数（计费归类用）
     const callNames = new Map<string, string>() // call_id -> 工具名（把 *_output 错误归因到工具）
     for (const line of lines) {
       const trimmed = line.trim(); if (!trimmed) continue
@@ -153,19 +158,51 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           if (!sessionId && typeof payload.id === 'string') sessionId = payload.id
           if (source === '(unknown)' && typeof payload.source === 'string') source = sourceKey(payload.source)
           if (typeof payload.cwd === 'string' && payload.cwd) repo = repoName(payload.cwd)
+          // Codex 执行画像（ADR 0023 D1）：客户端身份 + 是否带 git 仓库身份（仅布尔，绝不存 repository_url 原文）。
+          if (typeof payload.originator === 'string' && payload.originator) originator = payload.originator
+          const git = payload.git
+          if (git && typeof git === 'object' && (git.repository_url || git.commit_hash)) gitIdentity = true
+          break
+        }
+        case 'compacted': {
+          // 上下文压缩（顶层记录类型；另有 event_msg context_compacted 变体，见下）。窗口内、非子代理。
+          if (!sidechain && inWin(ts)) agg.markCodexCompaction()
           break
         }
         case 'turn_context': {
           if (typeof payload.model === 'string' && payload.model) curModel = payload.model
+          // Codex 执行画像（ADR 0023 D1）：仅窗口内、非子代理（习惯信号）；只取枚举/mode 名，绝不读 developer_instructions。
+          if (!sidechain && inWin(ts)) {
+            if (typeof payload.effort === 'string') agg.applyCodexLabel('effort', payload.effort)
+            if (typeof payload.approval_policy === 'string') agg.applyCodexLabel('approval_policy', payload.approval_policy)
+            const sb = payload.sandbox_policy
+            if (sb && typeof sb === 'object') {
+              const mode = typeof sb.mode === 'string' ? sb.mode : typeof sb.type === 'string' ? sb.type : ''
+              if (mode) agg.applyCodexLabel('sandbox', mode)
+            }
+            const cm = payload.collaboration_mode
+            const cmMode = cm && typeof cm === 'object' && typeof cm.mode === 'string' ? cm.mode : typeof cm === 'string' ? cm : ''
+            if (cmMode) agg.applyCodexLabel('collaboration_mode', cmMode) // 仅 mode 名；绝不读 cm.settings.developer_instructions
+            if (typeof payload.personality === 'string') agg.applyCodexLabel('personality', payload.personality)
+          }
           break
         }
         case 'event_msg': {
           // API/网络/流式错误事件（类型推断）：窗口内则计入 api_errors；子代理不计入（习惯信号）。
           if (payload.type === 'error' || payload.type === 'stream_error') {
-            if (!sidechain && !Number.isNaN(ts.getTime()) && inLocalRange(ts, window)) agg.applyApiError()
+            if (!sidechain && inWin(ts)) agg.applyApiError()
             break
           }
+          // Codex 执行画像（ADR 0023 D1）：上下文压缩 / 主动放弃回合（窗口内、非子代理）。
+          if (payload.type === 'context_compacted') { if (!sidechain && inWin(ts)) agg.markCodexCompaction(); break }
+          if (payload.type === 'turn_aborted') { if (!sidechain && inWin(ts)) agg.markCodexAbortedTurn(); break }
           if (payload.type !== 'token_count') break
+          // 计费维度（ADR 0022 D1）：从 rate_limits 取首个非空 plan_type（会话级属性，不限窗口）。
+          // 只取标签值，绝不读 used_percent/credits/resets（rate_limits 顶层在报告里仍恒 null）。
+          const rl = payload.rate_limits
+          if (rl && typeof rl === 'object' && rolloutPlanType === null && typeof rl.plan_type === 'string' && rl.plan_type) {
+            rolloutPlanType = rl.plan_type
+          }
           const info = payload.info
           if (!info) break
           let delta: CodexTokens
@@ -191,6 +228,10 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           // 用量/成本计入全部（含子代理 rollout），与 ccusage 一致；子代理 sessionId 传空避免污染会话/scope 桶。
           agg.beginRecord(repo, sidechain ? '' : sessionId, ts) // 分层 scope 桶（project=repo / session=sessionId）
           agg.applyTokens(tokens, curModel, repo, sidechain ? '' : sessionId, ts)
+          // 计费归类（ADR 0022 D1）：窗口内 token 累加（含子代理，保 billing 总数 == tokens.total）。
+          billingTokens += delta.total
+          // Codex 上下文窗口规格（ADR 0023 D1）：非子代理习惯信号。
+          if (!sidechain && typeof info.model_context_window === 'number') agg.applyCodexContextWindow(info.model_context_window)
           if (sidechain) {
             agg.markSubagentMessage()
           } else {
@@ -231,6 +272,13 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
         }
       }
     }
-    if (threadTouched) agg.touchSession(sessionId)
+    // 计费归类（ADR 0022 D1）：每 rollout 一次，窗口内 token 按该会话 plan_type 归桶（含子代理，保 billing 总数==tokens.total）。
+    agg.applyBillingRollout(rolloutPlanType, billingTokens)
+    if (threadTouched) {
+      agg.touchSession(sessionId)
+      // Codex 执行画像（ADR 0023 D1）：客户端身份 / git 仓库身份只反映有窗口活动的主会话（非子代理习惯信号）。
+      if (originator) agg.applyCodexLabel('originators', originator)
+      if (gitIdentity) agg.markCodexGitIdentity()
+    }
   }
 }
