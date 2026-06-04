@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "本机 AI 用量教练：只读分析 Claude Code / Codex 用量与习惯（A local AI usage coach for Claude Code / Codex）",
   "type": "module",
-  "bin": { "ccoach": "./dist/cli.js" },
+  "bin": { "ccoach": "dist/cli.js" },
   "main": "./dist/index.js",
   "exports": { ".": "./dist/index.js" },
   "files": ["dist"],
