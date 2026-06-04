@@ -134,17 +134,19 @@ export function scoreDiligence(combined, cc) {
   return 2 // Zen Coder
 }
 
+// Generic per-locale lookup: `${lang}_name` / `${lang}_roast`, falling back to en then zh.
+// Adding a new locale needs no code change — just add {lang}_name/{lang}_roast to each tier.
 function pick(copy, axisKey, idx, lang) {
   const tiers = copy.axes[axisKey].tiers
   idx = clamp(idx, 0, tiers.length - 1)
   const t = tiers[idx]
-  const name = lang === 'en' ? t.en_name : t.zh_name
-  const roast = lang === 'en' ? t.en_roast : t.zh_roast
+  const name = t[`${lang}_name`] ?? t.en_name ?? t.zh_name
+  const roast = t[`${lang}_roast`] ?? t.en_roast ?? t.zh_roast
   return { name, roast, i: idx, count: tiers.length }
 }
 
 export function build(data, copy, lang) {
-  lang = lang === 'zh' ? 'zh' : 'en' // 默认英文（ADR 0025）；只在显式 zh 时用中文
+  lang = lang || 'en' // 默认英文（ADR 0025/0026）；任意 locale 透传，缺失键逐键回退（pick / ui 各自 fallback）
   const ui = copy.ui[lang] ?? copy.ui.en ?? copy.ui.zh
   const platforms = data.platforms ?? {}
   const cc = platforms.claude_code ?? {}
@@ -197,7 +199,7 @@ function main() {
     process.stderr.write('missing --data (merged dual-platform JSON)\n')
     process.exit(2)
   }
-  const lang = a.lang === 'zh' ? 'zh' : 'en' // 默认英文（ADR 0025）
+  const lang = a.lang || 'en' // 默认英文（ADR 0025/0026）；任意 locale 透传，build/pick 内逐键回退
   const data = load(a.data)
   const copy = load(a.copy ?? DEFAULT_COPY)
   const card = build(data, copy, lang)
