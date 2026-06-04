@@ -255,6 +255,9 @@ export function buildClaude(ccDaily, ccSession, ccBehavior = null) {
     top_sessions: top,
     behavior: claudeBehavior(ccBehavior),
     prompt_signals: (ccBehavior ?? {}).prompt_signals ?? {},
+    // 平台特色 + 端点/计费（ADR 0023 D2 / 0022 D2-D4）：均为派生白名单标签，不含 key/token/完整 URL。
+    claude_specific: (ccBehavior ?? {}).claude_specific ?? null,
+    endpoint: ((ccBehavior ?? {}).endpoints ?? []).find((e) => e.platform === 'claude-code') ?? null,
   }
 }
 
@@ -295,6 +298,10 @@ export function buildCodex(codexReport, codexCcusage = null) {
     models,
     daily_series: series,
     behavior: codexBehavior(r),
+    // 计费维度 + 执行画像 + 端点（ADR 0022 D1-D4 / 0023 D1）：均为派生计数/白名单标签，不含敏感内容。
+    billing: r.billing ?? null,
+    codex_specific: r.codex_specific ?? null,
+    endpoint: (r.endpoints ?? []).find((e) => e.platform === 'codex') ?? null,
   }
 }
 

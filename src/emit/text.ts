@@ -24,6 +24,65 @@ function renderHours(lines: string[], hours: HourReport[], total: number): void 
 }
 
 const PLATFORM_LABEL: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex', all: '全部平台' }
+const BILLING_MODE_LABEL: Record<string, string> = { subscription: '订阅', api_or_relay: 'API/中转', unknown: '未知' }
+const CONFIDENCE_LABEL: Record<string, string> = { high: '高', medium: '中', low: '低' }
+
+// 端点/计费 + 平台特色块（ADR 0022 D2-D4 / 0023 D1-D2）：账户级当前快照 + 历史 token 拆分 + 执行画像。
+function renderExtras(lines: string[], r: Report): void {
+  if (r.endpoints?.length) {
+    lines.push('端点 / 计费模式（账户级当前快照，读本机 config）')
+    for (const e of r.endpoints) {
+      const host = e.official_host ? `官方(${e.official_host})` : e.endpoint === 'custom' ? '自定义/中转' : '未知端点'
+      const relay = e.relay_suspected ? ' ⚠️疑似中转' : ''
+      const sub = e.subscription_type ? ` · 订阅档 ${e.subscription_type}` : ''
+      const mode = BILLING_MODE_LABEL[e.billing_mode] ?? e.billing_mode
+      lines.push(`  ${(PLATFORM_LABEL[e.platform] ?? e.platform).padEnd(12)} ${host} · 计费 ${mode}（置信${CONFIDENCE_LABEL[e.confidence] ?? e.confidence}）${sub}${relay}`)
+    }
+    lines.push('')
+  }
+  if (r.billing) {
+    // 百分比按 Codex 子总额（= 各 tier + 未分类）算，避免 --platform all 下用混合总额误导。
+    const billingTotal = Object.values(r.billing.by_plan_tier).reduce((a, c) => a + c, 0) + r.billing.unclassified
+    lines.push('计费拆分（Codex，按订阅 plan tier）')
+    for (const [tier, tok] of Object.entries(r.billing.by_plan_tier).sort((a, b) => b[1] - a[1])) {
+      lines.push(`  ${tier.padEnd(12)} ${pct(tok, billingTotal).toFixed(1).padStart(5)}%  ${comma(tok)} token`)
+    }
+    if (r.billing.unclassified) {
+      lines.push(`  ${'未分类'.padEnd(11)} ${pct(r.billing.unclassified, billingTotal).toFixed(1).padStart(5)}%  ${comma(r.billing.unclassified)} token（有token无plan_type，≠确定API）`)
+    }
+    lines.push(`  ⓘ plan_type 来自后端响应、可被中转伪造（confidence: ${r.billing.confidence}）`)
+    lines.push('')
+  }
+  if (r.codex_specific) {
+    const cs = r.codex_specific
+    lines.push('Codex 执行画像')
+    const dist = (label: string, rec?: Record<string, number>): void => {
+      if (rec && Object.keys(rec).length) {
+        lines.push(`  ${label}: ` + Object.entries(rec).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}(${v})`).join(' '))
+      }
+    }
+    dist('推理强度', cs.effort)
+    dist('审批策略', cs.approval_policy)
+    dist('沙箱', cs.sandbox)
+    dist('协作模式', cs.collaboration_mode)
+    dist('客户端', cs.originators)
+    const misc: string[] = []
+    if (cs.compactions) misc.push(`上下文压缩 ${cs.compactions}`)
+    if (cs.aborted_turns) misc.push(`放弃回合 ${cs.aborted_turns}`)
+    if (cs.context_window) misc.push(`上下文窗口 ${comma(cs.context_window)}`)
+    if (cs.personality && Object.keys(cs.personality).length) misc.push('人格 ' + Object.keys(cs.personality).join('/'))
+    if (cs.git_repo_identity) misc.push('git 仓库身份 ✓')
+    if (misc.length) lines.push('  ' + misc.join(' · '))
+    lines.push('')
+  }
+  if (r.claude_specific) {
+    const c = r.claude_specific
+    if (c.web_search_requests || c.web_fetch_requests) {
+      lines.push(`Claude 服务端工具: web 搜索 ${comma(c.web_search_requests)} · web 抓取 ${comma(c.web_fetch_requests)}`)
+      lines.push('')
+    }
+  }
+}
 
 export function emitText(r: Report, byRepo: boolean): string {
   const lines: string[] = []
@@ -101,6 +160,8 @@ export function emitText(r: Report, byRepo: boolean): string {
       lines.push('')
     }
   }
+
+  renderExtras(lines, r)
 
   lines.push('习惯')
   lines.push(`  Git 命令 ${r.git_habits.command_count} 次 · 分支上下文 ${r.git_habits.branch_count} 个 · 多分支仓库 ${r.git_habits.multi_branch_repos} 个`)

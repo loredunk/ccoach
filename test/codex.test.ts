@@ -38,4 +38,40 @@ describe('parseCodex（glob）', () => {
     // 隐私：不含原始输出
     expect(JSON.stringify(parseCodex('test/fixtures/codex-errors', window))).not.toContain('fatal: not a git repository')
   })
+
+  it('billing（ADR 0022 D1）：按 plan_type 拆 token，子代理无 plan_type 入未分类，总和守恒', () => {
+    const r = parseCodex('test/fixtures/codex', window)
+    const b = r.billing!
+    expect(b.by_plan_tier).toEqual({ plus: 150 }) // 主会话 c1 标了 plus
+    expect(b.unclassified).toBe(10000) // 子代理 c2 无 rate_limits → 未分类（≠确定API）
+    expect(b.sessions_with_plan).toBe(1)
+    expect(b.sessions_unclassified).toBe(1)
+    expect(b.confidence).toBe('spoofable-by-relay')
+    // 守恒不变式：sum(by_plan_tier) + unclassified === tokens.total
+    const sumTier = Object.values(b.by_plan_tier).reduce((a, c) => a + c, 0)
+    expect(sumTier + b.unclassified).toBe(r.tokens.total)
+  })
+
+  it('codex_specific（ADR 0023 D1）：执行画像计数/枚举标签（子代理不计入习惯）', () => {
+    const cs = parseCodex('test/fixtures/codex', window).codex_specific!
+    expect(cs.effort).toEqual({ high: 1 })
+    expect(cs.approval_policy).toEqual({ 'on-request': 1 })
+    expect(cs.sandbox).toEqual({ 'workspace-write': 1 })
+    expect(cs.collaboration_mode).toEqual({ default: 1 }) // 仅 mode 名
+    expect(cs.personality).toEqual({ pragmatic: 1 })
+    expect(cs.originators).toEqual({ codex_cli_rs: 1 }) // 子代理 c2 originator 不计入
+    expect(cs.compactions).toBe(1) // 顶层 compacted 记录
+    expect(cs.aborted_turns).toBe(1) // event_msg turn_aborted
+    expect(cs.context_window).toBe(258400)
+    expect(cs.git_repo_identity).toBe(true) // 仅布尔，绝不存 repository_url
+  })
+
+  it('隐私红线：rate_limits 恒 null；配额%/余额/重置/developer_instructions/repository_url 绝不泄露', () => {
+    const r = parseCodex('test/fixtures/codex', window)
+    expect(r.rate_limits).toBeNull() // CLAUDE.md 红线：rate_limits 顶层恒 null
+    const blob = JSON.stringify(r)
+    for (const leak of ['used_percent', 'resets_at', 'window_minutes', 'balance', 'SECRET_DEV_INSTRUCTIONS_SHOULD_NOT_LEAK', 'private-ccoach', 'deadbeef']) {
+      expect(blob).not.toContain(leak)
+    }
+  })
 })

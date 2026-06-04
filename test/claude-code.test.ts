@@ -78,4 +78,8 @@ describe('parseClaudeCode', () => {
     expect(by.cli).toMatchObject({ sessions: 1, tokens: 150 })
     expect(by.vscode).toMatchObject({ sessions: 1, tokens: 300 })
   })
+  it('claude_specific（ADR 0023 D2）：server_tool_use 计数（仅主会话，去重后取保留记录）', () => {
+    const r = parseClaudeCode('test/fixtures/claude', window)
+    expect(r.claude_specific).toEqual({ web_search_requests: 3, web_fetch_requests: 2 })
+  })
 })

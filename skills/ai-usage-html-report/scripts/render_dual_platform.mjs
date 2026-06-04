@@ -237,6 +237,84 @@ function sparkline(series, color) {
   )
 }
 
+const BILLING_MODE_ZH = { subscription: '订阅', api_or_relay: 'API / 中转', unknown: '未知' }
+const CONFIDENCE_ZH = { high: '高', medium: '中', low: '低' }
+
+// 端点 / 计费模式卡片（账户级当前快照，ADR 0022 D2-D4）：两平台是否走官方/中转 + 计费模式。
+function endpointBillingCard(cc, cx) {
+  const row = (e, name) => {
+    if (!e) return ''
+    const host = e.official_host ? `官方 ${esc(e.official_host)}` : e.endpoint === 'custom' ? '自定义 / 中转端点' : '未知端点'
+    const mode = BILLING_MODE_ZH[e.billing_mode] ?? esc(e.billing_mode)
+    const conf = CONFIDENCE_ZH[e.confidence] ?? esc(e.confidence)
+    const flag = e.relay_suspected
+      ? "<span class='chip' style='background:#fef2f2;color:#991b1b'>⚠️ 疑似中转</span>"
+      : "<span class='chip' style='background:#ecfdf5;color:#065f46'>官方直连</span>"
+    const sub = e.subscription_type ? ` · 订阅档 <b>${esc(e.subscription_type)}</b>` : ''
+    return `<div class='ep-row'><b>${esc(name)}</b> ${flag} <span class='muted'>${host} · 计费 ${mode}（置信${conf}）${sub}</span></div>`
+  }
+  const body = row(cc?.endpoint, 'Claude Code') + row(cx?.endpoint, 'Codex')
+  if (!body) return ''
+  return (
+    "<section class='panel'><h2>端点 / 计费模式（账户级当前快照）</h2>" +
+    body +
+    "<p class='muted'>读本机 config 派生（只白名单标签，不含 key/token/完整 URL）。" +
+    'plan_type 来自后端响应、可被中转伪造，故端点非官方时计费保守判为「API / 中转」。</p></section>'
+  )
+}
+
+// Codex 计费拆分（订阅 plan tier，ADR 0022 D1）。
+function codexBillingBreakdown(cx) {
+  const b = cx?.billing
+  if (!b) return ''
+  const tiers = Object.entries(b.by_plan_tier ?? {}).sort((a, c) => c[1] - a[1])
+  const total = tiers.reduce((a, [, v]) => a + Number(v || 0), 0) + Number(b.unclassified || 0)
+  if (!total) return ''
+  const rows = tiers.map(([tier, tok]) => barRow(`plan: ${tier}`, tok, total))
+  if (b.unclassified) rows.push(barRow('未分类（无 plan_type）', b.unclassified, total))
+  return (
+    '<h3>计费拆分（订阅 plan tier）</h3>' +
+    rows.join('') +
+    `<p class='muted'>plan_type 可被中转伪造（${esc(b.confidence ?? '')}）；「未分类」= 有 token 无 plan_type，≠ 确定 API。</p>`
+  )
+}
+
+// Codex 执行画像（ADR 0023 D1）：effort / 审批 / 沙箱 / 协作模式 / 客户端 + 压缩 / 放弃 / 窗口 / git 身份。
+function codexExecProfile(cx) {
+  const cs = cx?.codex_specific
+  if (!cs) return ''
+  const chips = (rec) =>
+    Object.entries(rec ?? {})
+      .sort((a, c) => c[1] - a[1])
+      .map(([k, v]) => `<span class='chip'>${esc(k)} ${comma(v)}</span>`)
+      .join('')
+  const blocks = []
+  const add = (label, rec) => {
+    if (rec && Object.keys(rec).length) blocks.push(`<div class='ex-row'><span class='ex-label'>${esc(label)}</span>${chips(rec)}</div>`)
+  }
+  add('推理强度', cs.effort)
+  add('审批策略', cs.approval_policy)
+  add('沙箱', cs.sandbox)
+  add('协作模式', cs.collaboration_mode)
+  add('客户端', cs.originators)
+  const misc = []
+  if (cs.compactions) misc.push(`上下文压缩 ${comma(cs.compactions)}`)
+  if (cs.aborted_turns) misc.push(`放弃回合 ${comma(cs.aborted_turns)}`)
+  if (cs.context_window) misc.push(`上下文窗口 ${comma(cs.context_window)}`)
+  if (cs.personality && Object.keys(cs.personality).length) misc.push('人格 ' + Object.keys(cs.personality).map(esc).join('/'))
+  if (cs.git_repo_identity) misc.push('git 仓库身份 ✓')
+  if (misc.length) blocks.push(`<p class='muted'>${misc.join(' · ')}</p>`)
+  if (!blocks.length) return ''
+  return '<h3>执行画像（Codex 独有）</h3>' + blocks.join('')
+}
+
+// Claude 服务端工具（ADR 0023 D2）：web 搜索 / 抓取计数（常为 0，非零才显示）。
+function claudeServerTools(cc) {
+  const c = cc?.claude_specific
+  if (!c || (!c.web_search_requests && !c.web_fetch_requests)) return ''
+  return `<p class='muted'>服务端工具：web 搜索 ${comma(c.web_search_requests)} · web 抓取 ${comma(c.web_fetch_requests)}</p>`
+}
+
 // Render the shareable cover scorecard (vertical, screenshot-friendly).
 // `sc` is the JSON from scripts/scorecard.mjs; fully bilingual via its own copy.
 function scorecardHtml(sc) {
@@ -292,6 +370,9 @@ function render(data, insights, scorecard = null) {
   p.push(metric('Claude Code 成本', money(cc.cost_usd), `${cc.active_days} 活跃天`))
   p.push(metric('Codex 成本', money(cx.cost_usd), `${cx.active_days} 活跃天`))
   p.push('</section>')
+
+  // 端点 / 计费模式（账户级当前快照：官方 vs 中转）
+  p.push(endpointBillingCard(cc, cx))
 
   // AI executive summary (prominent, near the top)
   const execSummary = insights.executive_summary
@@ -383,7 +464,9 @@ function render(data, insights, scorecard = null) {
         `<td>${esc((s.models ?? []).join(', '))}</td></tr>`,
     )
   }
-  p.push('</table></div>')
+  p.push('</table>')
+  p.push(claudeServerTools(cc))
+  p.push('</div>')
 
   // Codex panel
   p.push("<div class='panel'><h2>Codex</h2>")
@@ -401,6 +484,8 @@ function render(data, insights, scorecard = null) {
       `<p class='muted'>token <b>${comma((cx.tokens ?? {}).total ?? 0)}</b> · ` +
         `成本 <b>${money(cx.cost_usd)}</b> · 缓存命中 <b>${pct(cx.cache_hit_rate)}</b></p>`,
     )
+    p.push(codexBillingBreakdown(cx))
+    p.push(codexExecProfile(cx))
   }
   p.push('</div>')
   p.push('</section>')
@@ -478,6 +563,9 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:12px}ul{margin:0;padding
 .section-h{margin:18px 0 10px;font-size:18px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
 .chip{font-size:11px;background:var(--line);border-radius:10px;padding:2px 9px;color:var(--fg)}
+.ep-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+.ex-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin:5px 0}
+.ex-label{font-size:12px;color:var(--muted);min-width:64px}
 .mbar{display:grid;grid-template-columns:120px 1fr 96px;gap:8px;align-items:center;margin:3px 0}
 .mlabel{font-size:12px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mtrack{height:12px;background:var(--line);border-radius:4px;overflow:hidden}.mfill{height:100%}

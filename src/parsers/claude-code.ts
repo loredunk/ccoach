@@ -227,6 +227,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
           // 来源（entrypoint）：按 token 加权填入 sources（如 cli / vscode），供双平台「来源」面板对称。
           const ep = sessionEntrypoint.get(session)
           if (ep) agg.applyUsageSource(ep, tokens, session)
+          // 服务端工具计数（ADR 0023 D2）：usage.server_tool_use 的 web 搜索/抓取请求数（纯计数）。
+          const stu = (msg.usage ?? {}).server_tool_use
+          if (stu && typeof stu === 'object') agg.applyClaudeServerTool(num(stu.web_search_requests), num(stu.web_fetch_requests))
           const blocks = Array.isArray(msg.content) ? msg.content : []
           for (const b of blocks) {
             if (!b || b.type !== 'tool_use') continue
