@@ -26,6 +26,9 @@ function renderHours(lines: string[], hours: HourReport[], total: number): void 
 
 // 专有名词保持原样；'all' 等可本地化项在调用期（setLang 之后）解析。
 const PLATFORM_LABEL: Record<string, string> = { 'claude-code': 'Claude Code', codex: 'Codex' }
+function styleLabel(s: string): string {
+  return s === 'micro-manager' ? t('tx_style_micro') : s === 'free-range' ? t('tx_style_free') : t('tx_style_balanced')
+}
 function platformLabel(p: string): string {
   if (p === 'all') return t('tx_platform_all')
   return PLATFORM_LABEL[p] ?? p
@@ -156,6 +159,17 @@ export function emitText(r: Report, byRepo: boolean): string {
   if (rw.edits > 0) {
     lines.push(t('tx_rework_header'))
     lines.push('  ' + tf('tx_rework_line', { n: rw.edits, r: (rw.user_modified_rate * 100).toFixed(1), a: rw.lines_added, d: rw.lines_removed }))
+    lines.push('')
+  }
+  const ep = r.episode_summary
+  if (ep && ep.episodes > 0) {
+    lines.push(t('tx_episodes_header'))
+    lines.push('  ' + tf('tx_episodes_line', {
+      n: ep.episodes, a: (ep.autonomy_rate * 100).toFixed(0), s: styleLabel(ep.intervention_style), sp: ep.spiral_episodes,
+    }))
+    const mix = Object.entries(ep.task_mix).sort((a, b) => b[1] - a[1]).slice(0, 3)
+    if (mix.length) lines.push('  ' + t('tx_episode_taskmix') + mix.map(([k, v]) => `${k}(${Math.round(v * 100)}%)`).join(' '))
+    if (ep.deepest_pit) lines.push('  ' + tf('tx_episode_deepest', { type: ep.deepest_pit.task_type, sev: ep.deepest_pit.severity, tok: comma(ep.deepest_pit.tokens) }))
     lines.push('')
   }
   if (r.skills?.length) {

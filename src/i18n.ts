@@ -93,6 +93,14 @@ const EN: Dict = {
   tx_by_repo: 'By repo',
   tx_more_repos: '…and {n} more repos (use --by-repo to see all)',
   tx_by_hour: 'By hour (local time)',
+  // emit/text.ts — episodes (ADR 0032/0034)
+  tx_episodes_header: 'Episodes',
+  tx_episodes_line: '{n} episodes · autonomy {a}% · style {s} · spirals {sp}',
+  tx_episode_taskmix: 'task mix: ',
+  tx_episode_deepest: 'deepest pit: {type} · severity {sev} · {tok} token',
+  tx_style_micro: 'micro-manager',
+  tx_style_balanced: 'balanced',
+  tx_style_free: 'free-range',
 }
 
 // zh 值逐字对齐当前硬编码中文，保证 `--lang zh` 复现今日输出。
@@ -169,6 +177,13 @@ const ZH: Dict = {
   tx_by_repo: '按仓库',
   tx_more_repos: '…另有 {n} 个仓库（用 --by-repo 查看全部）',
   tx_by_hour: '按时段 (本机时间)',
+  tx_episodes_header: '回合',
+  tx_episodes_line: '{n} 个回合 · 自主完成率 {a}% · 干预风格 {s} · 绕圈 {sp}',
+  tx_episode_taskmix: '任务构成: ',
+  tx_episode_deepest: '最深的坑: {type} · 严重度 {sev} · {tok} token',
+  tx_style_micro: '微操型',
+  tx_style_balanced: '均衡型',
+  tx_style_free: '放养型',
 }
 
 const TABLES: Record<Lang, Dict> = { en: EN, zh: ZH }

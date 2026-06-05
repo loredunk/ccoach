@@ -17,3 +17,18 @@ describe('buildReport', () => {
     expect(r.tokens.input).toBe(300)
   })
 })
+
+describe('buildReport · episode scope', () => {
+  const w = { fromYmd: '2026-06-05', toYmd: '2026-06-05', desc: 'd' }
+  it('--scope episode 产出 episodes_detail + episode_summary', () => {
+    const r = buildReport({ platform: 'claude-code', window: w, scope: 'episode', claudeDir: 'test/fixtures/claude-episodes-dir' })
+    expect(r.scope).toBe('episode')
+    expect(r.episode_summary!.episodes).toBe(2)
+    expect(r.episodes_detail!.length).toBe(2)
+  })
+  it('默认 global 加性：有 episode_summary、无 episodes_detail', () => {
+    const g = buildReport({ platform: 'claude-code', window: w, claudeDir: 'test/fixtures/claude-episodes-dir' })
+    expect(g.episodes_detail).toBeUndefined()
+    expect(g.episode_summary).toBeDefined()
+  })
+})

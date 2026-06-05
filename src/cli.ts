@@ -8,7 +8,7 @@ import { emitText } from './emit/text.js'
 import { listClaudeSessions, listCodexSessions, type SessionsOpts } from './sessions.js'
 
 const PLATFORMS: Platform[] = ['claude-code', 'codex', 'all']
-const SCOPES: Scope[] = ['global', 'project', 'session']
+const SCOPES: Scope[] = ['global', 'project', 'session', 'episode']
 
 const cli = cac('ccoach')
 
@@ -19,7 +19,7 @@ cli
   .option('--days <n>', 'Last N days (including today)')
   .option('--by-repo', 'Expand all repos (default: top 8 only)')
   .option('--platform <platform>', 'Data source: claude-code | codex | all', { default: 'all' })
-  .option('--scope <scope>', 'Analysis level: global | project | session (adds projects[]/sessions_detail[])', { default: 'global' })
+  .option('--scope <scope>', 'Analysis level: global | project | session | episode (adds projects[]/sessions_detail[]/episodes_detail[])', { default: 'global' })
   .option('--lang <lang>', 'Output language: en | zh (default en)', { default: 'en' })
   .option('--json', 'Emit machine-readable JSON (agent-friendly)')
   .option('--no-glossary', 'Omit the self-describing glossary block (~2KB token savings)')
@@ -32,7 +32,7 @@ cli
       }
       const scope = String(options.scope ?? 'global') as Scope
       if (!SCOPES.includes(scope)) {
-        throw new Error(`invalid --scope ${scope} (want global|project|session)`)
+        throw new Error(`invalid --scope ${scope} (want global|project|session|episode)`)
       }
       const daysRaw = options.days
       const days = daysRaw != null ? Number(daysRaw) : undefined
