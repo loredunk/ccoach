@@ -151,8 +151,10 @@ export class EpisodeBuilder {
   // 无后续边界时收尾（文件/rollout 末尾、或 assemble 兜底）：以内部最后活动时间为终点，确定性、不引入墙钟。
   finalizeOpen(): EpisodeRaw { return this.finalize(new Date(this.endMs)) }
 
-  // 连续 ≥NOPROG_MIN 次工具调用未引入新文件 → 原地打转（红转绿在错误段难判，简化为新文件停滞窗口）。
+  // 连续 ≥NOPROG_MIN 次工具调用未引入新文件 → 原地打转。仅当回合在「尝试改东西」（有编辑或有错误）时才算；
+  // 纯探索（read/search、无错误无编辑）是正常进展、不算 spiral（spec §4.1「无新文件且无红转绿」的保守落地）。
   private computeNoProgress(): boolean {
+    if (this.edits === 0 && this.errorCount === 0) return false
     const seenFiles = new Set<number>()
     let windowNoNew = 0
     for (const ev of this.seq) {
@@ -174,7 +176,13 @@ function p90(sorted: number[]): number {
 
 export class EpisodeAccumulator {
   private raws: EpisodeRaw[] = []
-  add(raw: EpisodeRaw): void { this.raws.push(raw) }
+  // 跳过空回合（无 token、无工具）——用户连发消息 / Codex 连续 turn_context / 文件末尾空 prompt 会开出无活动回合，
+  // 计入会稀释 task_mix、污染 autonomy/interrupted 率。也跳过非法时间戳（健壮性，避免 build 抛 Invalid time value）。
+  add(raw: EpisodeRaw): void {
+    if (!Number.isFinite(raw.startMs)) return
+    if (raw.toolCalls === 0 && raw.tokens.total === 0) return
+    this.raws.push(raw)
+  }
   get count(): number { return this.raws.length }
 
   build(): { details: EpisodeDetail[]; summary: EpisodeSummary } {

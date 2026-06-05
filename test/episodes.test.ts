@@ -103,3 +103,28 @@ describe('EpisodeAccumulator', () => {
     expect(['micro-manager', 'balanced', 'free-range']).toContain(summary.intervention_style)
   })
 })
+
+describe('EpisodeAccumulator · 评审修复', () => {
+  it('Finding 1：空回合（无 token、无工具）不计入', () => {
+    const acc = new EpisodeAccumulator()
+    acc.add(new EpisodeBuilder('s', 'r', 0, T(0)).finalize(T(0)))   // 空回合（连发消息/aborted turn/末尾空 prompt）
+    const work = new EpisodeBuilder('s', 'r', 1, T(0)); work.addTool('shell', false)
+    acc.add(work.finalize(T(1)))
+    expect(acc.build().summary.episodes).toBe(1)
+  })
+})
+describe('EpisodeBuilder · 评审修复', () => {
+  it('Finding 2：纯探索（多次 search/read、无错误无编辑）不判 no_progress', () => {
+    const b = new EpisodeBuilder('s', 'r', 0, T(0))
+    b.addTool('search', false); b.addTool('search', false); b.addTool('search', false); b.addTool('search', false)
+    b.addTool('file', false, 'x.ts', 'ts')
+    expect(b.finalize(T(5)).spiral.no_progress).toBe(false)
+  })
+  it('Finding 2：反复改同几个文件、无新文件 → 仍判 no_progress', () => {
+    const b = new EpisodeBuilder('s', 'r', 0, T(0))
+    b.addTool('file', true, 'a.ts', 'ts')
+    b.addTool('file', true, 'a.ts', 'ts'); b.addTool('file', true, 'a.ts', 'ts')
+    b.addTool('file', true, 'a.ts', 'ts'); b.addTool('file', true, 'a.ts', 'ts')
+    expect(b.finalize(T(5)).spiral.no_progress).toBe(true)
+  })
+})
