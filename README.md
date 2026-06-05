@@ -41,26 +41,19 @@ It prompts you to pick the agents (Claude Code / Codex) and scope (global / proj
 
 ### Use it
 
-Once installed, you can just ask in plain language — e.g. *"review my Claude Code + Codex usage for the last 7 days"* — and the agent picks up the skill. To invoke it explicitly:
+You don't run a command — you just talk to your agent. Once the skill is installed, ask in plain language and the agent picks it up:
 
-- **Claude Code** — a slash command; the optional argument is a number of days back or a `YYYY-MM-DD` date:
+- *"Review my Claude Code and Codex usage for the last 7 days."*
+- *"How much did I spend on Codex this week, and which projects burned the most tokens?"*
+- *"Build me an HTML dashboard of how I used AI today."*
 
-  ```text
-  /ccoach-insight              # today, both platforms
-  /ccoach-insight 7            # the last 7 days
-  /ccoach-insight 2026-06-01   # a specific day
-  ```
+Prefer to call it by name? In **Claude Code** type `/ccoach-insight`, in **Codex** type `$ccoach-insight` — on its own it covers **today**; add a number of days (`7`) or a date (`2026-06-01`) to widen the window.
 
-- **Codex** — once it's in your skills dir, the skill auto-triggers from a matching request (e.g. *"how much did I spend on Codex this week?"*). To invoke it explicitly, type `$` to mention it and add the window in words:
+The report is **English by default** — just ask in Chinese (or for a Chinese report) and the agent renders it in Chinese (see the skill's [SKILL.md](skills/ccoach-insight/SKILL.md)).
 
-  ```text
-  $ccoach-insight              # today
-  $ccoach-insight last 7 days  # widen the window
-  ```
+## Install CLI
 
-No time argument means **today**. The report is **English by default** — ask for Chinese, or pass `--lang zh` to the skill's scripts (see the skill's [SKILL.md](skills/ccoach-insight/SKILL.md)).
-
-## Install
+The `ccoach-insight` skill runs the **`ccoach` CLI** under the hood — you can also use it directly to see the raw usage report the skill builds on. Here's how to install and use it.
 
 ccoach is a TypeScript / Node package (ESM, Node ≥ 18); the CLI binary is `ccoach`. Distribution is "everything is npx".
 

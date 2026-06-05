@@ -38,26 +38,19 @@ npx skills add loredunk/ccoach
 
 ### 怎么用
 
-装好后，直接用自然语言说一句——比如*“看看我最近 7 天 Claude Code + Codex 的用量”*——agent 就会自动唤起 skill。也可以显式调用：
+你不用敲命令——直接跟你的 agent 说话就行。装好 skill 后，用自然语言问一句，agent 就会自动唤起它：
 
-- **Claude Code** —— 斜杠命令，可选参数是「往回数几天」或某个 `YYYY-MM-DD` 日期：
+- *“看看我最近 7 天 Claude Code 和 Codex 的用量。”*
+- *“我这周在 Codex 上花了多少，哪些项目最烧 token？”*
+- *“把我今天用 AI 的情况做成一张 HTML 报告。”*
 
-  ```text
-  /ccoach-insight              # 今天，两平台
-  /ccoach-insight 7            # 最近 7 天
-  /ccoach-insight 2026-06-01   # 指定某一天
-  ```
+想点名调用？在 **Claude Code** 里输入 `/ccoach-insight`，在 **Codex** 里输入 `$ccoach-insight`——单独用就是**今天**；想放宽窗口就加「往回数几天」（`7`）或某个日期（`2026-06-01`）。
 
-- **Codex** —— 装进 skills 目录后，相关请求会自动触发该 skill（比如*“我这周在 Codex 上花了多少？”*）。也可显式调用：输入 `$` 提及它、再用自然语言补上时间窗口：
+报告**默认英文**——用中文问（或直接说要中文），agent 就会渲染成中文（见 [SKILL.md](skills/ccoach-insight/SKILL.md)）。
 
-  ```text
-  $ccoach-insight              # 今天
-  $ccoach-insight 最近 7 天     # 放宽窗口
-  ```
+## 安装 CLI
 
-不带时间参数就是**今天**。报告**默认英文**——要中文就说一声，或给 skill 脚本传 `--lang zh`（见 [SKILL.md](skills/ccoach-insight/SKILL.md)）。
-
-## 安装
+ccoach-insight skill 底层调用的就是 **`ccoach` CLI**——你也可以直接用它，查看 skill 所基于的原始用量报告。下面是安装与使用方式。
 
 ccoach 是 TypeScript / Node 包（ESM，Node ≥ 18），CLI 命令为 `ccoach`，分发统一成「一切皆 npx」。
 
