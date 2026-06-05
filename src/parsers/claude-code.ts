@@ -30,6 +30,11 @@ function num(x: unknown): number {
   return typeof x === 'number' && isFinite(x) ? x : 0
 }
 
+// 纠错词启发式（ADR 0032 D3）：瞬时判定下一条 user prompt 是否在纠正上一回合；派生布尔、绝不存原文。
+const CORRECTION_RE = /\b(actually|sorry|wait|wrong|instead|nope|no,)\b|不对|不是|错了|重来|撤销|改成/i
+// 长任务弱信号（experiment 分型；仅瞬时匹配命令、不存命令全行）。
+const LONGRUN_RE = /\b(train|fit|pytest|jest|vitest|benchmark|bench|notebook|jupyter)\b/i
+
 // 仅取 user 自述文本（纯字符串或 type==='text' 块）；瞬时派生信号、绝不存储。
 function userText(message: any): string {
   const content = message?.content
@@ -103,6 +108,7 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
   }
   for (const file of files) {
     agg.resetActive() // 每个文件独立计活跃时长，避免跨文件桥接
+    agg.endEpisodeBoundary() // 收尾上一个文件未关闭的 episode，绝不跨文件桥接（ADR 0032 D4）
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
     for (const line of content.split('\n')) {
@@ -155,7 +161,11 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
         if (!sidechain) {
           agg.touchSession(session)
           const text = userText(rec.message)
-          if (text) agg.applyPrompt(text)
+          if (text) {
+            // 用户 prompt = 一个新回合的边界（ADR 0032 D2）；纠错词命中则把上一回合标记为 corrected。
+            agg.beginEpisode(session, repo, ts, CORRECTION_RE.test(text))
+            agg.applyPrompt(text)
+          }
           // 错误/卡顿信号：扫描 tool_result（is_error）+ toolUseResult.interrupted。
           // 隐私：错误文本只**瞬时**分类成白名单类别标签，绝不存原始 stderr/输出。
           const blocks = Array.isArray(rec.message?.content) ? rec.message.content : []
@@ -238,12 +248,15 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
             // 全量计数 + 类别 + 工具名（仅名字，不含参数）；修正旧版只数 shell/web/file 的漏计。
             agg.applyToolName(name)
             if (name === 'Bash') {
-              agg.applyTool('shell', typeof inp.command === 'string' ? inp.command : undefined)
+              const cmd = typeof inp.command === 'string' ? inp.command : ''
+              agg.applyTool('shell', cmd || undefined, { longRun: LONGRUN_RE.test(cmd) })
             } else if (name === 'WebFetch' || name === 'WebSearch') {
               agg.applyTool('web')
             } else if (name === 'Edit' || name === 'Write' || name === 'Read' || name === 'NotebookEdit') {
-              agg.applyTool('file')
-              const ext = extOf(typeof inp.file_path === 'string' ? inp.file_path : '')
+              const fp = typeof inp.file_path === 'string' ? inp.file_path : ''
+              const ext = extOf(fp)
+              // fileKey=basename 仅瞬时传给 episode 层映射成局部 id（ADR 0032 D5），不存全路径。
+              agg.applyTool('file', undefined, { isEdit: name !== 'Read', fileKey: fp ? fp.split('/').pop() : undefined, ext })
               agg.applyFileChangeExt(repo, ext)
               agg.applyLanguageFile(ext)
             } else if (name === 'Glob' || name === 'Grep' || name === 'ToolSearch') {

@@ -83,3 +83,17 @@ describe('parseClaudeCode', () => {
     expect(r.claude_specific).toEqual({ web_search_requests: 3, web_fetch_requests: 2 })
   })
 })
+
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+const EP_FX = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'claude-episodes-dir')
+
+describe('Claude episode 切分', () => {
+  it('边界=user-text；corrected / interrupted 归因', () => {
+    const r = parseClaudeCode(EP_FX, { fromYmd: '2026-06-05', toYmd: '2026-06-05', desc: 'd' }, 'episode')
+    expect(r.episode_summary!.episodes).toBe(2)
+    const eps = r.episodes_detail!
+    expect(eps.find((e) => e.index === 0)!.end_type).toBe('corrected')
+    expect(eps.find((e) => e.index === 1)!.end_type).toBe('interrupted')
+  })
+})
