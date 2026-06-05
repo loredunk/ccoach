@@ -51,6 +51,9 @@ function globRollouts(home: string): string[] {
 
 function num(x: unknown): number { return typeof x === 'number' && isFinite(x) ? x : 0 }
 
+// 长任务弱信号（experiment 分型；仅瞬时匹配命令、不存命令全行）。
+const LONGRUN_RE = /\b(train|fit|pytest|jest|vitest|benchmark|bench|notebook|jupyter)\b/i
+
 interface CodexTokens { input: number; cached: number; output: number; reasoning: number; total: number }
 function fromCodex(o: any): CodexTokens {
   return {
@@ -135,6 +138,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
     // 子代理 rollout：token 仍计入用量，但工具/会话/活跃时长等习惯信号不计（对齐 Claude sidechain）。
     const sidechain = isSubagentRollout(lines)
     agg.resetActive()
+    agg.endEpisodeBoundary() // 收尾上一个 rollout 未关闭的 episode，绝不跨 rollout 桥接（ADR 0032 D4）
     let prevTotal: CodexTokens = { input: 0, cached: 0, output: 0, reasoning: 0, total: 0 }
     let curModel = ''
     let sessionId = ''
@@ -177,6 +181,8 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           if (typeof payload.model === 'string' && payload.model) curModel = payload.model
           // Codex 执行画像（ADR 0023 D1）：仅窗口内、非子代理（习惯信号）；只取枚举/mode 名，绝不读 developer_instructions。
           if (!sidechain && inWin(ts)) {
+            // 回合边界（ADR 0032 D2）：Codex 无用户消息记录，turn_context≈一次用户指令；无 corrected（不读 prompt，ADR 0041）。
+            agg.beginEpisode(sessionId || '(unknown)', repo, ts, false)
             if (typeof payload.effort === 'string') agg.applyCodexLabel('effort', payload.effort)
             if (typeof payload.approval_policy === 'string') agg.applyCodexLabel('approval_policy', payload.approval_policy)
             const sb = payload.sandbox_policy
@@ -254,7 +260,8 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
             const name = payload.name
             if (typeof payload.call_id === 'string') callNames.set(payload.call_id, name)
             if (name === 'exec_command' || name === 'local_shell_call' || name === 'shell') {
-              agg.applyTool('shell', normalizedCommandLine(typeof payload.arguments === 'string' ? payload.arguments : ''))
+              const cmd = normalizedCommandLine(typeof payload.arguments === 'string' ? payload.arguments : '')
+              agg.applyTool('shell', cmd, { longRun: LONGRUN_RE.test(cmd) })
             } else {
               agg.applyTool('other')
             }

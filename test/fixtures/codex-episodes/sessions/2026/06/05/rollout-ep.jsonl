@@ -1,0 +1,9 @@
+{"type":"session_meta","timestamp":"2026-06-05T03:00:00Z","payload":{"id":"cx1","cwd":"/Users/x/repo","source":"cli"}}
+{"type":"turn_context","timestamp":"2026-06-05T03:00:01Z","payload":{"model":"gpt-5.1-codex"}}
+{"type":"event_msg","timestamp":"2026-06-05T03:00:02Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":0,"output_tokens":50,"reasoning_output_tokens":0,"total_tokens":150}}}}
+{"type":"response_item","timestamp":"2026-06-05T03:00:03Z","payload":{"type":"function_call","name":"shell","call_id":"c1","arguments":"{\"command\":[\"bash\",\"-lc\",\"npm test\"]}"}}
+{"type":"response_item","timestamp":"2026-06-05T03:00:04Z","payload":{"type":"function_call_output","call_id":"c1","output":"{\"metadata\":{\"exit_code\":1}}"}}
+{"type":"turn_context","timestamp":"2026-06-05T03:05:00Z","payload":{"model":"gpt-5.1-codex"}}
+{"type":"event_msg","timestamp":"2026-06-05T03:05:01Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":40,"cached_input_tokens":0,"output_tokens":20,"reasoning_output_tokens":0,"total_tokens":60}}}}
+{"type":"response_item","timestamp":"2026-06-05T03:05:02Z","payload":{"type":"function_call","name":"shell","call_id":"c2","arguments":"{\"command\":[\"bash\",\"-lc\",\"ls\"]}"}}
+{"type":"response_item","timestamp":"2026-06-05T03:05:03Z","payload":{"type":"function_call_output","call_id":"c2","output":"{\"metadata\":{\"interrupted\":true}}"}}

@@ -75,3 +75,17 @@ describe('parseCodex（glob）', () => {
     }
   })
 })
+
+import { parseCodex as parseCodexEp } from '../src/parsers/codex.js'
+import { dirname as dn, join as jn } from 'node:path'
+import { fileURLToPath as f2url } from 'node:url'
+const CX_EP = jn(dn(f2url(import.meta.url)), 'fixtures', 'codex-episodes')
+
+describe('Codex episode 切分', () => {
+  it('边界=turn_context；interrupted 归因；无 corrected', () => {
+    const r = parseCodexEp(CX_EP, { fromYmd: '2026-06-05', toYmd: '2026-06-05', desc: 'd' }, 'episode')
+    expect(r.episode_summary!.episodes).toBe(2)
+    expect(r.episode_summary!.corrected_rate).toBe(0)
+    expect(r.episodes_detail!.find((e) => e.index === 1)!.end_type).toBe('interrupted')
+  })
+})
