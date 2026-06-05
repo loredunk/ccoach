@@ -27,7 +27,6 @@ agent 活动」。
 | L5 语义层 | E8 打断归因（CLI 结构 / skill 语义） | 0039（提议中） | ❌ 蓝图 |
 | | E9 风格空间 / 原型人格 | 0040（提议中） | ❌ 蓝图 |
 | 缺口 | Codex prompt 语义对齐 + `~/.codex/sessions` 深度优化 | 0041（提议中 · pending） | ❌ pending |
-| v2 | 实时 hook（杀手锏） | PRD 蓝图 + TODO（pending） | ❌ v2 |
 
 **为什么 E2 必须与 E3 同切片**：E3 的「耗时 > p90」「错误密度」是百分位信号；若不按任务类型归一化，会系统性冤枉
 某些用户（算法同学挂训练两小时，在全局基线下被判 spiral/p99，但在「实验型」基线下完全正常）。因此**第一版就必须带
@@ -238,7 +237,7 @@ interface EpisodeSummary {
 ## 9. 蓝图占位（E4–E9 / Codex 缺口 / v2，本切片不实现）
 
 详见各 proposed ADR：0035 缓存+profile · 0036 反事实基线 · 0037 单平台默认+compare · 0038 隐私分级两段式 ·
-0039 打断归因 · 0040 风格空间原型人格 · 0041 Codex prompt 对齐+sessions 深度优化（pending）。v2 实时 hook 见
-PRD 蓝图 + TODO（pending）。每条都遵循「依赖 E1 episode 层」+「红线不放宽」+「能测的绝不问」。
+0039 打断归因 · 0040 风格空间原型人格 · 0041 Codex prompt 对齐+sessions 深度优化（pending）。
+每条都遵循「依赖 E1 episode 层」+「红线不放宽」+「能测的绝不问」。
 </content>
 </invoke>

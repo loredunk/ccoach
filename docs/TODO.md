@@ -262,12 +262,6 @@
 - [ ] 现状 `src/parsers/codex.ts` 完全不读用户 prompt，需对齐 Claude 口径。
 - [ ] 待 brainstorm + 实现。
 
-## T27 · v2 实时 hook（杀手锏，pending）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
-
-> 决策：尚无设计、暂不立 ADR；在 Episode 地基与隐私分级成熟后再 brainstorm。
-
-- [ ] 待 brainstorm + 实现。
-
 ---
 
 ## 已完成（历史）
