@@ -24,3 +24,20 @@ describe('隐私红线', () => {
     expect(JSON.parse(out).rate_limits).toBeNull()
   })
 })
+
+describe('隐私红线 · episodes', () => {
+  const r = buildReport({
+    platform: 'claude-code',
+    window: { fromYmd: '2026-06-05', toYmd: '2026-06-05', desc: 'd' },
+    scope: 'episode',
+    claudeDir: 'test/fixtures/claude-episodes-dir',
+  })
+  const out = JSON.stringify({ episodes_detail: r.episodes_detail, episode_summary: r.episode_summary })
+  it('episodes 输出不含文件名 / 路径 / prompt 原文 / 命令全行', () => {
+    expect(r.episodes_detail!.length).toBeGreaterThan(0)
+    expect(out).not.toContain('parser.ts')            // 文件名不泄
+    expect(out).not.toContain('/Users/')              // 绝对路径不泄
+    expect(out).not.toMatch(/npm test/)               // 命令原文不泄
+    expect(out).not.toMatch(/redo it|implement the parser/) // prompt 原文不泄
+  })
+})
