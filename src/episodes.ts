@@ -148,6 +148,9 @@ export class EpisodeBuilder {
     }
   }
 
+  // 无后续边界时收尾（文件/rollout 末尾、或 assemble 兜底）：以内部最后活动时间为终点，确定性、不引入墙钟。
+  finalizeOpen(): EpisodeRaw { return this.finalize(new Date(this.endMs)) }
+
   // 连续 ≥NOPROG_MIN 次工具调用未引入新文件 → 原地打转（红转绿在错误段难判，简化为新文件停滞窗口）。
   private computeNoProgress(): boolean {
     const seenFiles = new Set<number>()

@@ -50,3 +50,31 @@ describe('Aggregator', () => {
     expect(mt.first_day).toBe('2026-01-01') // first_day 不受 days[] 截断影响
   })
 })
+
+describe('Aggregator · episodes', () => {
+  it('--scope episode 出 episodes_detail + 主报告恒附 episode_summary', () => {
+    const agg = new Aggregator('claude-code', 'episode')
+    const t0 = new Date('2026-06-05T03:00:00Z')
+    agg.beginEpisode('s1', 'repo', t0, false)
+    agg.applyTokens({ input: 100, cached_input: 0, output: 50, reasoning_output: 0, cache_creation: 0, total: 150 }, 'claude-opus-4-8', 'repo', 's1', t0)
+    agg.markActive(t0)
+    agg.applyTool('file', undefined, { isEdit: true, fileKey: 'a.ts', ext: 'ts' })
+    agg.applyToolResult('Edit', false, null)
+    const r = agg.assemble({ fromYmd: '2026-06-05', toYmd: '2026-06-05', desc: 'd' }, 'glob')
+    expect(r.scope).toBe('episode')
+    expect(r.episode_summary!.episodes).toBe(1)
+    expect(r.episodes_detail!.length).toBe(1)
+    expect(r.episodes_detail![0].tokens.total).toBe(150)
+    expect(r.projects).toBeUndefined()
+    expect(r.sessions_detail).toBeUndefined()
+  })
+  it('默认 scope=global：有 episode_summary、无 episodes_detail（契约加性）', () => {
+    const agg = new Aggregator('claude-code')
+    const t0 = new Date('2026-06-05T03:00:00Z')
+    agg.beginEpisode('s1', 'repo', t0, false)
+    agg.applyTokens({ input: 10, cached_input: 0, output: 5, reasoning_output: 0, cache_creation: 0, total: 15 }, 'claude-opus-4-8', 'repo', 's1', t0)
+    const r = agg.assemble({ fromYmd: '2026-06-05', toYmd: '2026-06-05', desc: 'd' }, 'glob')
+    expect(r.episode_summary).toBeDefined()
+    expect(r.episodes_detail).toBeUndefined()
+  })
+})

@@ -12,6 +12,7 @@ import { firstToken, gitSubcommand } from './text.js'
 import { buildGitHabits, buildProjectMgmt, topCounts, type RepoFacts } from './habits.js'
 import { dominantLanguage, EXT_LANG } from './language.js'
 import { newPromptAcc, promptAccUpdate, promptSignals, type PromptAcc } from './prompt-signals.js'
+import { EpisodeAccumulator, EpisodeBuilder, EPISODES_MAX } from './episodes.js'
 
 const IDLE_CAP_MS = 5 * 60 * 1000
 
@@ -40,7 +41,7 @@ interface ModelDayAgg {
   input: number; cached_input: number; output: number; reasoning_output: number; cache_creation: number
 }
 
-export type Scope = 'global' | 'project' | 'session'
+export type Scope = 'global' | 'project' | 'session' | 'episode'
 // 分层 scope 桶（按 repo 或 sessionId）：只攒派生数值/计数 + prompt 数值信号，绝不存 prompt 原文。
 interface GroupAcc {
   key: string
@@ -123,6 +124,10 @@ export class Aggregator {
   private scope: Scope
   private groups = new Map<string, GroupAcc>()
   private curBucket: GroupAcc | null = null
+  // 回合（episode）层（ADR 0032）：beginEpisode 切边界，apply* 顺带转发，assemble 派生 summary/details。
+  private episodes = new EpisodeAccumulator()
+  private curEpisode: EpisodeBuilder | null = null
+  private epIndexBySession = new Map<string, number>()
 
   constructor(platform: string, scope: Scope = 'global') {
     this.platform = platform
@@ -133,7 +138,7 @@ export class Aggregator {
   // sidechain/无键记录传空 → curBucket=null（与全局口径一致：不把子代理/无主记录计进桶）。
   beginRecord(repo: string, session: string, ts: Date | null): void {
     this.curBucket = null
-    if (this.scope === 'global') return
+    if (this.scope === 'global' || this.scope === 'episode') return
     let key: string
     if (this.scope === 'session') {
       if (!session) return
@@ -156,6 +161,21 @@ export class Aggregator {
       if (g.last === null || t > g.last) g.last = t
     }
     this.curBucket = g
+  }
+
+  // 回合边界（ADR 0032 D2，平台特异，由 parser 调用）：finalize 上一个 episode、开一个新的。
+  beginEpisode(session: string, repo: string, ts: Date, correctsPrev: boolean): void {
+    if (this.curEpisode) {
+      if (correctsPrev && !this.curEpisode.isInterrupted) this.curEpisode.markCorrectedByNext()
+      this.episodes.add(this.curEpisode.finalizeOpen())
+    }
+    const idx = this.epIndexBySession.get(session) ?? 0
+    this.epIndexBySession.set(session, idx + 1)
+    this.curEpisode = new EpisodeBuilder(session || '(unknown)', repo || '(unknown)', idx, ts)
+  }
+  // 文件 / rollout 末尾：收尾当前 episode，绝不跨文件桥接（ADR 0032 D4）。
+  endEpisodeBoundary(): void {
+    if (this.curEpisode) { this.episodes.add(this.curEpisode.finalizeOpen()); this.curEpisode = null }
   }
 
   private repoFor(repo: string): RepoAgg {
@@ -201,6 +221,7 @@ export class Aggregator {
       this.curBucket.cacheRead += d.cached_input
       this.curBucket.input += d.input
     }
+    this.curEpisode?.addTokens(d, model)
   }
 
   private applyModelDay(model: string, ts: Date, d: Tokens, cost: number): void {
@@ -218,7 +239,7 @@ export class Aggregator {
     md.cache_creation += d.cache_creation
   }
 
-  applyTool(kind: ToolKind, command?: string): void {
+  applyTool(kind: ToolKind, command?: string, ep?: { isEdit?: boolean; fileKey?: string; ext?: string; longRun?: boolean }): void {
     this.totalCalls++
     this.categories.set(kind, (this.categories.get(kind) ?? 0) + 1)
     if (kind === 'shell') {
@@ -243,6 +264,7 @@ export class Aggregator {
         if (gs) this.curBucket.git.set(gs, (this.curBucket.git.get(gs) ?? 0) + 1)
       }
     }
+    this.curEpisode?.addTool(kind, ep?.isEdit ?? false, ep?.fileKey, ep?.ext, ep?.longRun ?? false)
   }
 
   // 各工具名计数（仅工具名，绝不含命令行/参数；隐私同 skills/environment 标签）。
@@ -295,8 +317,9 @@ export class Aggregator {
       this.errByTool.set(tn, (this.errByTool.get(tn) ?? 0) + 1)
       if (category) this.errByCategory.set(category, (this.errByCategory.get(category) ?? 0) + 1)
     }
+    this.curEpisode?.addToolResult(isError, category === 'test')
   }
-  markInterrupted(): void { this.errInterrupted++ }
+  markInterrupted(): void { this.errInterrupted++; this.curEpisode?.markInterrupted() }
   applyApiError(): void { this.errApiErrors++ }
 
   // 返工/改动：linesAdded/Removed 已由适配器从 structuredPatch 数出（只数行、不读 diff 文本）。
@@ -305,6 +328,7 @@ export class Aggregator {
     if (userModified) this.rwUserModified++
     this.rwLinesAdded += linesAdded
     this.rwLinesRemoved += linesRemoved
+    this.curEpisode?.addLines(linesAdded, linesRemoved)
   }
   applySkill(name: string): void { if (name) this.skillCounts.set(name, (this.skillCounts.get(name) ?? 0) + 1) }
   applyVersion(v: string): void { if (v) this.versions.add(v) }
@@ -351,6 +375,7 @@ export class Aggregator {
       if (gap > 0 && gap <= IDLE_CAP_MS) this.durationMs += gap
     }
     this.prevActive = t
+    this.curEpisode?.mark(ts)
   }
   resetActive(): void { this.prevActive = null } // 线程/文件边界处调用，避免跨会话桥接
   durationSeconds(): number { return Math.floor(this.durationMs / 1000) }
@@ -517,8 +542,8 @@ export class Aggregator {
       const cl: ClaudeSpecific = { web_search_requests: this.clWebSearchReq, web_fetch_requests: this.clWebFetchReq }
       report.claude_specific = cl
     }
-    if (this.scope !== 'global') {
-      report.scope = this.scope
+    report.scope = this.scope
+    if (this.scope === 'project' || this.scope === 'session') {
       const toBucket = (g: GroupAcc): ScopeBucket => {
         const denom = g.cacheRead + g.input
         const cat: Record<string, number> = {}
@@ -548,8 +573,15 @@ export class Aggregator {
           }))
           .sort((a, b) => b.tokens - a.tokens)
       }
-    } else {
-      report.scope = 'global'
+    }
+    // 回合层收尾（ADR 0032 D6）：finalize 未关闭的当前 episode，恒附 episode_summary；--scope episode 出 episodes_detail。
+    this.endEpisodeBoundary()
+    const builtEp = this.episodes.build()
+    report.episode_summary = builtEp.summary
+    if (this.scope === 'episode') {
+      report.episodes_detail = builtEp.details
+        .sort((a, b) => (b.spiral.severity - a.spiral.severity) || (b.tokens.total - a.tokens.total))
+        .slice(0, EPISODES_MAX)
     }
     if (this.missingPrice.size) report.unpriced_models = [...this.missingPrice].sort()
     if (this.byModelDay.size) {
