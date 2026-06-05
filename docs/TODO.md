@@ -1,7 +1,7 @@
 # TODO — ccoach
 
 > 约定：`[ ]` 待办 · `[~]` 进行中 · `[x]` 完成。优先级 P0 > P1 > P2。
-> 最近更新：2026-06-04
+> 最近更新：2026-06-05
 
 ---
 
@@ -187,6 +187,86 @@
 - [x] 复现并定位：是**漏算 cache 输入**（cache_read/cache_creation 没并进展示的 input），非映射颠倒；经独立 agent 对抗式核验确认。
 - [x] 与对账交叉：CI 对账仍绿（`verify-ccusage.ts` 只校 `tokens.total`），故走**展示层**修复——`render_dual_platform.mjs` 纯展示层改，不动解析/`models[].tokens`/计价（ccusage 两平台仍 OK）。
 - [x] 修复 + 回归（`test/token-display.test.ts`）：头对头「输入 Token」改「输入侧总量（含缓存读）」两平台统一、两个「Token 构成」面板改互斥桶（求和=total、Codex reasoning 转脚注）、Codex 模型表「输入」列改 fresh、`model.ts` glossary 更正。真实数据验证：Claude 输入侧总量 924M ≫ output 3.35M。
+
+---
+
+## T17 · Episode 切分层（E1）（P0）— ⏳ 待办（本分支 feat/episodes）
+
+> 决策：[`adr/0032-episode-abstraction-layer.md`](adr/0032-episode-abstraction-layer.md) …
+
+- [ ] 新增 `src/episodes.ts`（`EpisodeBuilder` + `EpisodeAccumulator`）。
+- [ ] `model.ts` 加 `EpisodeDetail` / `SpiralSignals` / `EpisodeSummary` 类型 + glossary，`Scope` 加 `episode`。
+- [ ] `aggregate.ts` 接 episode 转发 + `beginEpisode` + assemble 出 `episode_summary` / `episodes_detail`。
+- [ ] parser 钩子（claude-code user-text 边界 + corrected 探测、codex `turn_context` 边界）。
+- [ ] `cli.ts` `--scope episode`。
+- [ ] `emit/text.ts` 人读概览段（i18n）。
+- [ ] 隐私 + 契约回归。
+
+## T18 · 任务分型 + 类型内归一化（E2）（P0）— ⏳ 待办（本分支 feat/episodes）
+
+> 决策：[`adr/0033-episode-task-typing-within-type-normalization.md`](adr/0033-episode-task-typing-within-type-normalization.md) …
+
+- [ ] 新增 `src/task-type.ts`（`classifyTask` 纯函数，7 类 + unknown）+ 单测。
+- [ ] `EpisodeAccumulator` 做类型内百分位 + 最小样本回退（`MIN_SAMPLES=5`）。
+- [ ] `episode_summary.task_mix`。
+
+## T19 · 绕圈检测 + 最深的坑（E3）（P1）— ⏳ 待办（本分支 feat/episodes）
+
+> 决策：[`adr/0034-spiral-detection-deepest-pit-story.md`](adr/0034-spiral-detection-deepest-pit-story.md) …
+
+- [ ] `EpisodeBuilder` 派生 `SpiralSignals`（`edit_ring` / `error_dense` / `no_progress` / `time_outlier` / `low_confidence` / `severity`，n-gram 有序序列瞬时即弃）。
+- [ ] `deepest_pit` 选取。
+- [ ] `episode_summary` 自主度 / 干预风格 / spiral 计数。
+- [ ] 阈值待真实数据校准。
+
+## T20 · 增量缓存 + per-platform profile（E4）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0035-incremental-cache-per-platform-profile.md`](adr/0035-incremental-cache-per-platform-profile.md)（提议中） …
+
+- [ ] 待 brainstorm + 实现。
+
+## T21 · 量化反事实基线（E5）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0036-quantified-counterfactual-baselines.md`](adr/0036-quantified-counterfactual-baselines.md)（提议中） …
+
+- [ ] 待 brainstorm + 实现。
+
+## T22 · 默认单平台深度 + compare 报告（E6）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0037-single-platform-default-compare-report.md`](adr/0037-single-platform-default-compare-report.md)（提议中） …
+
+- [ ] 待 brainstorm + 实现。
+
+## T23 · 隐私分级 L0–L3 + 两段式 extract→analyze（E7）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0038-privacy-levels-two-stage-extract-analyze.md`](adr/0038-privacy-levels-two-stage-extract-analyze.md)（提议中） …
+
+- [ ] 待 brainstorm + 实现。
+
+## T24 · 打断归因 CLI 结构/skill 语义（E8）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0039-interruption-attribution-cli-structure-skill-semantics.md`](adr/0039-interruption-attribution-cli-structure-skill-semantics.md)（提议中） …
+
+- [ ] 待 brainstorm + 实现。
+
+## T25 · 风格空间 / 原型人格（E9）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0040-style-space-archetype-personas.md`](adr/0040-style-space-archetype-personas.md)（提议中） …
+
+- [ ] 待 brainstorm + 实现。
+
+## T26 · Codex prompt 语义对齐 + ~/.codex/sessions 深度优化（pending）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：[`adr/0041-codex-prompt-parity-sessions-deep-dive.md`](adr/0041-codex-prompt-parity-sessions-deep-dive.md)（提议中 pending） …
+
+- [ ] 现状 `src/parsers/codex.ts` 完全不读用户 prompt，需对齐 Claude 口径。
+- [ ] 待 brainstorm + 实现。
+
+## T27 · v2 实时 hook（杀手锏，pending）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：尚无设计、暂不立 ADR；在 Episode 地基与隐私分级成熟后再 brainstorm。
+
+- [ ] 待 brainstorm + 实现。
 
 ---
 

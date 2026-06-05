@@ -1,6 +1,6 @@
 # PRD — ccoach
 
-> 状态：草拟中 · 最近更新：2026-06-04
+> 状态：草拟中 · 最近更新：2026-06-05
 
 本 PRD 覆盖 ccoach 的整体定位，并重点展开 **AI 用量分析与建议** 能力，以及 **可分享成绩卡**。
 
@@ -217,6 +217,14 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 > **规划中（pending）**：拟加**第 5 轴「编码自主度」**，把「用户多大程度自己改代码 / 不采用 AI 产出」
 > （古法编程 / 人机结对 / AI 全托管 / 甩手提问家）做成称号，复用已有 `rework_signals`、无新采集。
 > 见 [`adr/0020-coding-autonomy-scorecard-axis.md`](adr/0020-coding-autonomy-scorecard-axis.md)（提议中）、TODO T13。
+
+### 3.12 回合级深度分析（Episode / 绕圈 / 任务分型）（规划中，地基切片 feat/episodes）
+
+一句话：在 parser 之上加一层 Episode(回合) 抽象——以每条用户指令为边界把会话切成 episode，记录时长/token/工具序列/触碰文件/错误/是否被打断/结束方式；据此做纯结构离线的「绕圈检测」与「任务分型 + 类型内归一化」，并产出新的可分享维度(AI 自主完成率/干预风格/最深的坑故事卡)。隐私红线零放宽：全部从已读结构信号派生、瞬时序列即弃、无 prompt 原文/路径/diff。决策见 [ADR 0032](adr/0032-episode-abstraction-layer.md)(Episode 抽象层)/[ADR 0033](adr/0033-episode-task-typing-within-type-normalization.md)(任务分型+类型内归一化)/[ADR 0034](adr/0034-spiral-detection-deepest-pit-story.md)(绕圈检测+最深的坑)。强调 E2 必须与 E3 同切片：百分位若不按任务类型归一化会系统性冤枉某些用户(算法同学挂训练两小时被判 spiral)。
+
+### 3.13 教练深化蓝图（pending，逐子项目单独 brainstorm + 实现）
+
+在 Episode 地基(§3.12)之上，按依赖顺序推进，均留 ADR 占位、本期不实现：E4 增量缓存 + per-platform profile([ADR 0035](adr/0035-incremental-cache-per-platform-profile.md)，解 2x 慢 + 撑历史基线与漂移检测，黄金法则「数据能测的绝不问」)；E5 量化反事实基线([ADR 0036](adr/0036-quantified-counterfactual-baselines.md)，finding 带 频次/折算成本/feature 解法 三件套)；E6 默认单平台深度报告 + compare 独立报告类型([ADR 0037](adr/0037-single-platform-default-compare-report.md))；E7 隐私分级 L0–L3 + per-project 覆盖 + extract→analyze 两段式 + 脱敏即数据([ADR 0038](adr/0038-privacy-levels-two-stage-extract-analyze.md)，定位语 you can diff what leaves your machine)；E8 打断归因 CLI 出结构/skill 做语义([ADR 0039](adr/0039-interruption-attribution-cli-structure-skill-semantics.md))；E9 风格空间/原型人格 把用户投影到 harness 态度锚点([ADR 0040](adr/0040-style-space-archetype-personas.md)，叙事层 vs 建议层分开)。另有两条 pending：Codex prompt 语义对齐 + ~/.codex/sessions 深度优化([ADR 0041](adr/0041-codex-prompt-parity-sessions-deep-dive.md)，现状 Codex 完全不读用户 prompt)；v2 实时 hook(杀手锏，尚无设计、暂不立 ADR)。
 
 ---
 
