@@ -1,6 +1,9 @@
-import { type Tokens, type SpiralSignals, emptyTokens } from './model.js'
+import {
+  type Tokens, type SpiralSignals, type TaskType,
+  type EpisodeDetail, type EpisodeSummary, emptyTokens,
+} from './model.js'
 import type { ToolKind } from './aggregate.js'
-import { type TaskFeatures } from './task-type.js'
+import { classifyTask, type TaskFeatures } from './task-type.js'
 import { estimateCost } from './pricing.js'
 
 // 阈值常量（ADR 0034 OQ1：草案，待真实数据校准）
@@ -156,5 +159,85 @@ export class EpisodeBuilder {
       if (windowNoNew >= NOPROG_MIN) return true
     }
     return false
+  }
+}
+
+// 收集已 finalize 的 episode，做类型内归一化 + 派生 EpisodeDetail/EpisodeSummary（ADR 0033/0034）。
+function p90(sorted: number[]): number {
+  if (!sorted.length) return Infinity
+  const idx = Math.min(sorted.length - 1, Math.ceil(0.9 * sorted.length) - 1)
+  return sorted[idx]
+}
+
+export class EpisodeAccumulator {
+  private raws: EpisodeRaw[] = []
+  add(raw: EpisodeRaw): void { this.raws.push(raw) }
+  get count(): number { return this.raws.length }
+
+  build(): { details: EpisodeDetail[]; summary: EpisodeSummary } {
+    // 1) 分类
+    const typed = this.raws.map((r) => ({ raw: r, ...classifyTask(r.features) }))
+    // 2) 类型内时长 p90（最小样本回退全局）
+    const byType = new Map<TaskType, number[]>()
+    for (const t of typed) { const a = byType.get(t.type) ?? []; a.push(t.raw.durationMs); byType.set(t.type, a) }
+    const globalDur = this.raws.map((r) => r.durationMs).sort((x, y) => x - y)
+    const p90ByType = new Map<TaskType, { v: number; low: boolean }>()
+    for (const [k, arr] of byType) {
+      if (arr.length >= MIN_SAMPLES) p90ByType.set(k, { v: p90([...arr].sort((x, y) => x - y)), low: false })
+      else p90ByType.set(k, { v: p90(globalDur), low: true })
+    }
+    // 3) 终值 spiral + EpisodeDetail
+    const details: EpisodeDetail[] = typed.map(({ raw, type, confidence }) => {
+      const baseLine = p90ByType.get(type)!
+      const timeOutlier = raw.durationMs > baseLine.v && raw.durationMs > TIME_FLOOR_MS
+      const spiral: SpiralSignals = {
+        edit_ring: raw.spiral.edit_ring, error_dense: raw.spiral.error_dense,
+        no_progress: raw.spiral.no_progress, time_outlier: timeOutlier, low_confidence: baseLine.low, severity: 0,
+      }
+      spiral.severity =
+        (spiral.edit_ring ? 2 : 0) + (spiral.error_dense ? 2 : 0) +
+        (spiral.no_progress ? 1 : 0) + (spiral.time_outlier ? 1 : 0)
+      const endType: EpisodeDetail['end_type'] =
+        raw.interrupted ? 'interrupted' : raw.correctedByNext ? 'corrected' : 'natural'
+      return {
+        session_id: raw.sessionId, repo: raw.repo, index: raw.index,
+        start_ts: new Date(raw.startMs).toISOString(), end_ts: new Date(raw.endMs).toISOString(),
+        duration_seconds: Math.floor(raw.durationMs / 1000),
+        tokens: raw.tokens, estimated_cost_usd: raw.cost,
+        tool_calls: raw.toolCalls, files_touched: raw.filesTouched, max_edits_per_file: raw.maxEditsPerFile,
+        error_count: raw.errorCount, error_rate: Math.round(raw.errorRate * 1e4) / 1e4,
+        interrupted: raw.interrupted, end_type: endType,
+        task_type: type, task_type_confidence: Math.round(confidence * 100) / 100, spiral,
+      }
+    })
+    // 4) summary
+    const n = details.length
+    const interrupted = details.filter((d) => d.interrupted).length
+    const corrected = details.filter((d) => d.end_type === 'corrected').length
+    const spiralN = details.filter((d) => d.spiral.severity > 0).length
+    const mix: Record<string, number> = {}
+    for (const d of details) mix[d.task_type] = (mix[d.task_type] ?? 0) + 1
+    for (const k of Object.keys(mix)) mix[k] = Math.round((mix[k] / Math.max(1, n)) * 1e4) / 1e4
+    const interruptedRate = n ? interrupted / n : 0
+    const correctedRate = n ? corrected / n : 0
+    const style: EpisodeSummary['intervention_style'] =
+      interruptedRate + correctedRate >= 0.35 ? 'micro-manager'
+        : interruptedRate + correctedRate <= 0.1 ? 'free-range' : 'balanced'
+    let deepest: EpisodeSummary['deepest_pit']
+    for (const d of details) {
+      if (d.spiral.severity <= 0) continue
+      const score = d.spiral.severity * d.tokens.total
+      if (!deepest || score > deepest.severity * deepest.tokens)
+        deepest = { session_id: d.session_id, index: d.index, severity: d.spiral.severity, tokens: d.tokens.total, task_type: d.task_type }
+    }
+    const summary: EpisodeSummary = {
+      episodes: n,
+      autonomy_rate: n ? Math.round((1 - interruptedRate) * 1e4) / 1e4 : 0,
+      interrupted_rate: Math.round(interruptedRate * 1e4) / 1e4,
+      corrected_rate: Math.round(correctedRate * 1e4) / 1e4,
+      intervention_style: style, spiral_episodes: spiralN, task_mix: mix,
+    }
+    if (deepest) summary.deepest_pit = deepest
+    return { details, summary }
   }
 }
