@@ -62,6 +62,51 @@ export interface ScopeBucket {
 }
 export interface ProjectScope extends ScopeBucket { repo: string; sessions: number }
 export interface SessionScope extends ScopeBucket { session_id: string; repo: string; duration_seconds: number }
+// 回合（Episode）抽象（ADR 0032/0033/0034）：以用户指令为边界切分会话；全部派生信号、瞬时序列即弃。
+export type TaskType =
+  | 'explore' | 'implement' | 'debug' | 'refactor'
+  | 'experiment' | 'scripting' | 'docs' | 'unknown'
+// 绕圈（spiral）结构化子信号（ADR 0034）：纯结构离线派生，不读内容。
+export interface SpiralSignals {
+  edit_ring: boolean        // 同一文件被 edit ≥ 阈值次（尤其 edit→test→error→edit n-gram）
+  error_dense: boolean      // 连续错误 / 高错误率且文件集合不再扩大
+  no_progress: boolean      // 连续多次调用无新文件触碰、无红转绿
+  time_outlier: boolean     // 活跃时长 > 类型内 p90 且 > 绝对地板
+  low_confidence: boolean   // 类型内样本不足、退全局基线
+  severity: number          // 触发子信号加权计数，0=无 spiral
+}
+// 单回合派生记录（ADR 0032）：无 prompt 原文/路径/文件名/diff，只数值+布尔+白名单标签。
+export interface EpisodeDetail {
+  session_id: string
+  repo: string
+  index: number             // 会话内回合序号（0 起）
+  start_ts: string          // ISO-8601
+  end_ts: string
+  duration_seconds: number  // gap-capped 活跃时长
+  tokens: Tokens
+  estimated_cost_usd: number // 离线 fallback（权威成本走 skill 层联网官方价，ADR 0019）
+  tool_calls: number
+  files_touched: number     // 去重计数，不含文件名
+  max_edits_per_file: number
+  error_count: number
+  error_rate: number
+  interrupted: boolean
+  end_type: 'natural' | 'interrupted' | 'corrected'
+  task_type: TaskType
+  task_type_confidence: number
+  spiral: SpiralSignals
+}
+// 主报告恒附的回合概览（ADR 0034）：加性、契约安全；token 之和仅主会话，故 ≤ report.tokens.total。
+export interface EpisodeSummary {
+  episodes: number
+  autonomy_rate: number       // 无打断 episode 占比（AI 自主完成率）
+  interrupted_rate: number
+  corrected_rate: number      // Claude only（Codex 恒 0，ADR 0041）
+  intervention_style: 'micro-manager' | 'balanced' | 'free-range'
+  spiral_episodes: number     // severity>0 的 episode 数
+  task_mix: Record<string, number>   // task_type -> 占比 0–1
+  deepest_pit?: { session_id: string; index: number; severity: number; tokens: number; task_type: TaskType }
+}
 // 错误/卡顿信号——只由工具结果派生的数值与白名单类别，绝不含原始 stderr/输出/文件内容（ADR 0016）。
 export interface ErrorSignals {
   tool_calls: number            // 观测到的 tool_result 总数（分母）
@@ -175,6 +220,8 @@ export interface Report {
   scope?: string              // "global" | "project" | "session"
   projects?: ProjectScope[]   // --scope project：每项目跨会话的派生信号桶
   sessions_detail?: SessionScope[] // --scope session：每会话的派生信号桶
+  episode_summary?: EpisodeSummary // 回合概览（恒附，ADR 0034）
+  episodes_detail?: EpisodeDetail[] // --scope episode：每回合派生记录（ADR 0032）
   glossary?: Record<string, string>
 }
 
@@ -207,6 +254,8 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   scope: 'Analysis level: global (default, cross-project aggregate) / project (adds projects[]) / session (adds sessions_detail[]).',
   projects: 'Per-project cross-session derived-signal buckets (tokens/tool_calls/cache_hit_rate/categories/git_top/prompt_signals); only with --scope project.',
   sessions_detail: 'Per-session derived-signal buckets (incl. session_id/duration_seconds); only with --scope session; contains no raw prompt text.',
+  episode_summary: 'Per-turn (episode) rollup; an episode is "one user instruction -> the next". autonomy_rate=share of episodes with no interruption; intervention_style derived from interrupt+correction rates; spiral_episodes=episodes with any structural loop signal; task_mix=share of episodes per task type; deepest_pit=worst spiral episode (severity x tokens). Episode token sums are main-session only (sidechain excluded), so they are <= report.tokens.total. Always present (additive).',
+  episodes_detail: 'Per-episode derived signals (only with --scope episode): duration/tokens/tool_calls/files_touched(count only)/error stats/interrupted/end_type/task_type/spiral. Contains no prompt text, no paths, no file names, no diff text (ADR 0016/0017). end_type=corrected is Claude-only (Codex does not read user prompts, ADR 0041).',
   duration: 'Active duration (counted only when adjacent events are ≤5 minutes apart), not wall-clock span.',
   active_days: 'Number of distinct local-timezone days with token activity in the window — true full count, not bounded by the models_timeline display caps (top-10 models / last-31 days).',
 }
