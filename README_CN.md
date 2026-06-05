@@ -18,41 +18,7 @@
 
 > **隐私**：所有分析在你本地完成，prompt 内容不离开你的机器。
 
-## 安装
-
-ccoach 是 TypeScript / Node 包（ESM，Node ≥ 18），CLI 命令为 `ccoach`，分发统一成「一切皆 npx」。
-
-```bash
-npx @loredunk/ccoach          # 免安装直接跑（发布后）
-npm i -g @loredunk/ccoach     # 或全局安装
-```
-
-### 从源码运行（当前）
-
-```bash
-npm install
-npm run build                 # -> dist/cli.js（bin: ccoach）
-node dist/cli.js --json --days 7
-# 或 `npm link`，之后 `ccoach` 即在 PATH 中
-```
-
-## 用法
-
-裸命令即出今天的用量报告（两平台合并）：
-
-```bash
-ccoach                          # 今天，全部平台
-ccoach --date 2026-05-13        # 指定某一天
-ccoach --since 2026-05-01       # 从某天起到今天
-ccoach --days 7                 # 最近 7 天
-ccoach --platform claude-code   # claude-code | codex | all（默认 all）
-ccoach --by-repo                # 按 git 仓库展开（含分支）
-ccoach --scope project          # global | project | session（额外给 projects[] / sessions_detail[]）
-ccoach --lang zh                # 输出语言：en | zh（默认 en）
-ccoach --json                   # 输出 JSON，脚本 / agent 友好
-```
-
-## 使用建议 skill
+## ccoach skills
 
 更深入的 AI 解读与 HTML 报告，用可复用的 skill
 [skills/ccoach-insight](skills/ccoach-insight/SKILL.md)：它从 `ccoach report --json` 读取
@@ -90,6 +56,40 @@ npx skills add loredunk/ccoach
   ```
 
 不带时间参数就是**今天**。报告**默认英文**——要中文就说一声，或给 skill 脚本传 `--lang zh`（见 [SKILL.md](skills/ccoach-insight/SKILL.md)）。
+
+## 安装
+
+ccoach 是 TypeScript / Node 包（ESM，Node ≥ 18），CLI 命令为 `ccoach`，分发统一成「一切皆 npx」。
+
+```bash
+npx @loredunk/ccoach          # 免安装直接跑（发布后）
+npm i -g @loredunk/ccoach     # 或全局安装
+```
+
+### 从源码运行（当前）
+
+```bash
+npm install
+npm run build                 # -> dist/cli.js（bin: ccoach）
+node dist/cli.js --json --days 7
+# 或 `npm link`，之后 `ccoach` 即在 PATH 中
+```
+
+## 用法
+
+裸命令即出今天的用量报告（两平台合并）：
+
+```bash
+ccoach                          # 今天，全部平台
+ccoach --date 2026-05-13        # 指定某一天
+ccoach --since 2026-05-01       # 从某天起到今天
+ccoach --days 7                 # 最近 7 天
+ccoach --platform claude-code   # claude-code | codex | all（默认 all）
+ccoach --by-repo                # 按 git 仓库展开（含分支）
+ccoach --scope project          # global | project | session（额外给 projects[] / sessions_detail[]）
+ccoach --lang zh                # 输出语言：en | zh（默认 en）
+ccoach --json                   # 输出 JSON，脚本 / agent 友好
+```
 
 ## 说明与边界
 

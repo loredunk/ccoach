@@ -19,41 +19,7 @@
 
 > **Privacy**: all analysis runs locally — your prompts never leave your machine.
 
-## Install
-
-ccoach is a TypeScript / Node package (ESM, Node ≥ 18); the CLI binary is `ccoach`. Distribution is "everything is npx".
-
-```bash
-npx @loredunk/ccoach          # run without installing (once published)
-npm i -g @loredunk/ccoach     # or install globally
-```
-
-### From source (today)
-
-```bash
-npm install
-npm run build                 # -> dist/cli.js (bin: ccoach)
-node dist/cli.js --json --days 7
-# or `npm link`, then `ccoach` is on your PATH
-```
-
-## Usage
-
-A bare invocation prints today's usage report, both platforms merged:
-
-```bash
-ccoach                          # today, all platforms
-ccoach --date 2026-05-13        # a specific day
-ccoach --since 2026-05-01       # from a day through today
-ccoach --days 7                 # the last 7 days
-ccoach --platform claude-code   # claude-code | codex | all (default: all)
-ccoach --by-repo                # per-repository breakdown (with branches)
-ccoach --scope project          # global | project | session (adds projects[] / sessions_detail[])
-ccoach --lang zh                # output language: en | zh (default: en)
-ccoach --json                   # JSON output, script / agent friendly
-```
-
-## Advice skill
+## ccoach skills
 
 For richer AI-written HTML reports, use the reusable skill
 [skills/ccoach-insight](skills/ccoach-insight/SKILL.md): it reads local **Claude Code + Codex**
@@ -93,6 +59,40 @@ Once installed, you can just ask in plain language — e.g. *"review my Claude C
   ```
 
 No time argument means **today**. The report is **English by default** — ask for Chinese, or pass `--lang zh` to the skill's scripts (see the skill's [SKILL.md](skills/ccoach-insight/SKILL.md)).
+
+## Install
+
+ccoach is a TypeScript / Node package (ESM, Node ≥ 18); the CLI binary is `ccoach`. Distribution is "everything is npx".
+
+```bash
+npx @loredunk/ccoach          # run without installing (once published)
+npm i -g @loredunk/ccoach     # or install globally
+```
+
+### From source (today)
+
+```bash
+npm install
+npm run build                 # -> dist/cli.js (bin: ccoach)
+node dist/cli.js --json --days 7
+# or `npm link`, then `ccoach` is on your PATH
+```
+
+## Usage
+
+A bare invocation prints today's usage report, both platforms merged:
+
+```bash
+ccoach                          # today, all platforms
+ccoach --date 2026-05-13        # a specific day
+ccoach --since 2026-05-01       # from a day through today
+ccoach --days 7                 # the last 7 days
+ccoach --platform claude-code   # claude-code | codex | all (default: all)
+ccoach --by-repo                # per-repository breakdown (with branches)
+ccoach --scope project          # global | project | session (adds projects[] / sessions_detail[])
+ccoach --lang zh                # output language: en | zh (default: en)
+ccoach --json                   # JSON output, script / agent friendly
+```
 
 ## Notes & boundaries
 
