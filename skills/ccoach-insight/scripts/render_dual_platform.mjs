@@ -209,6 +209,32 @@ function hoursChart(hours, color) {
   return `<div class='hours'>${cols.join('')}</div>`
 }
 
+// Per-turn (episode) summary panel for one platform (ADR 0032/0034): autonomy / intervention
+// style / task mix / spiral count / deepest pit. All derived aggregates — no prompt text/paths.
+function episodePanel(ep, platform) {
+  if (!ep || !ep.episodes) {
+    return `<div class='panel'><h2>${esc(tr('ep_title', { platform }))}</h2>` +
+      `<p class='muted'>${esc(tr('ep_nodata'))}</p></div>`
+  }
+  const p = [`<div class='panel'><h2>${esc(tr('ep_title', { platform }))}</h2>`]
+  p.push(metric(tr('ep_count'), comma(ep.episodes)))
+  p.push(metric(tr('ep_autonomy'), pct(ep.autonomy_rate)))
+  p.push(metric(tr('ep_style'), tr('ep_style_' + ep.intervention_style)))
+  p.push(metric(tr('ep_spirals'), comma(ep.spiral_episodes)))
+  const mix = Object.entries(ep.task_mix ?? {}).sort((a, b) => b[1] - a[1]).filter(([, v]) => v > 0)
+  if (mix.length) {
+    const chips = mix.map(([k, v]) => `<span class='chip'>${esc(tr('task_' + k))} ${(v * 100).toFixed(0)}%</span>`).join('')
+    p.push(`<h3>${esc(tr('ep_taskmix'))}</h3><div class='chips'>${chips}</div>`)
+  }
+  if (ep.deepest_pit) {
+    const dp = ep.deepest_pit
+    p.push(`<h3>${esc(tr('ep_deepest'))}</h3>`)
+    p.push(`<p class='muted'>${esc(tr('ep_deepest_line', { type: tr('task_' + dp.task_type), sev: dp.severity, tok: comma(dp.tokens) }))}</p>`)
+  }
+  p.push('</div>')
+  return p.join('')
+}
+
 // Symmetric behavior block for one platform.
 // Map the language-unit token from merge ('files'/'sessions') to a localized label; pass other
 // values through (older data may carry a literal unit).
@@ -577,6 +603,12 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + "<div class='grid2'>")
   p.push(behaviorPanel(cc.behavior, '#0f766e', 'Claude Code'))
   p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
+  p.push('</div></section>')
+
+  // per-turn episode analysis (ADR 0032/0034): autonomy / spirals / task mix / deepest pit
+  p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + "<div class='grid2'>")
+  p.push(episodePanel(cc.episode_summary, 'Claude Code'))
+  p.push(episodePanel(cx.episode_summary, 'Codex'))
   p.push('</div></section>')
 
   // data provenance / privacy
