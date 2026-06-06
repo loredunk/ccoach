@@ -1,6 +1,7 @@
 // test/sessions.test.ts — ccoach sessions（采集并入 ccoach·块C，取代 session_drilldown.py / claude_session_prompts.py）
 import { describe, it, expect } from 'vitest'
 import { listClaudeSessions, listCodexSessions, redact } from '../src/sessions.js'
+import { parseClaudeCode } from '../src/parsers/claude-code.js'
 
 const window = { fromYmd: '2026-06-02', toYmd: '2026-06-02', desc: '2026-06-02' }
 
@@ -39,6 +40,32 @@ describe('ccoach sessions', () => {
     expect(p.signals).toMatchObject({ structured: true, file_ref: true, constraint: true, correction: false })
     expect(typeof p.preview).toBe('string')
     expect(p.idx).toBe(0)
+  })
+
+  // ADR 0043 钻取路径补丁：machine-injected user 记录不算 prompt（与主解析器同一谓词）。
+  it('claude 列表：machine-injected 记录被排除，prompt 计数与比例不虚高', () => {
+    const o = listClaudeSessions('test/fixtures/claude-noise', window, { top: 10 }) as Record<string, any>
+    const s = (o.sessions as Array<Record<string, any>>)[0]
+    expect(s.prompts).toBe(1) // 真人 prompt 只有 1 条（旧实现把 isMeta/命令桩/中断哨兵算成 5）
+    expect(s.prompt_signals.constraint_ratio).toBe(1) // 分母不被注入记录撑大（旧为 1/5=0.2）
+    expect(s.prompt_signals.file_ref_ratio).toBe(1)
+  })
+
+  it('claude：sessions 命令与主报告的 prompt 计数一致（同一窗口/fixture）', () => {
+    const main = parseClaudeCode('test/fixtures/claude-noise', window)
+    const o = listClaudeSessions('test/fixtures/claude-noise', window, { top: 10 }) as Record<string, any>
+    const sumSessions = (o.sessions as Array<Record<string, any>>).reduce((a, x) => a + x.prompts, 0)
+    expect(sumSessions).toBe(main.prompt_signals.prompts)
+  })
+
+  it('claude 预览：machine-injected 文本不进 redacted preview（守 ADR 0015 红线）', () => {
+    const o = listClaudeSessions('test/fixtures/claude-noise', window, { includePrompts: true }) as Record<string, any>
+    expect(o.selected_session.prompts).toHaveLength(1)
+    const j = JSON.stringify(o)
+    expect(j).not.toContain('system-reminder')
+    expect(j).not.toContain('command-name')
+    expect(j).not.toContain('Request interrupted')
+    expect(j).not.toContain('local-command-stdout')
   })
 
   it('codex 列表：候选会话（数值），零 user_prompts', () => {

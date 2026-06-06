@@ -11,6 +11,7 @@ import { homedir } from 'node:os'
 import { inLocalRange, type Window } from './window.js'
 import { repoName } from './text.js'
 import { promptFlags, type PromptFlags } from './prompt-signals.js'
+import { isHumanPrompt } from './human-prompt.js'
 
 export interface SessionsOpts {
   repo?: string
@@ -152,6 +153,7 @@ export function listClaudeSessions(dir: string, window: Window, opts: SessionsOp
       if (rec.type === 'user') {
         const text = userText(rec.message).trim()
         if (!text) continue // 纯 tool_result 消息，非人类 prompt
+        if (!isHumanPrompt(rec, text)) continue // isMeta/命令桩/中断哨兵：机器注入，非真人 prompt（ADR 0043，与主解析器同一谓词）
         s.prompts += 1
         const fl = promptFlags(text)
         s.len_sum += fl.len
@@ -376,7 +378,9 @@ function parseRolloutSession(file: string, window: Window, include: boolean, cha
 
     if (include && inWin) {
       const text = extractUserPrompt(lineType, payload)
-      if (text) prompts.push({ timestamp: tsv ? tsv.toISOString() : null, text: redact(text, charLimit) })
+      // Codex rollout 无 isMeta/命令桩/中断哨兵这类机器注入 user 记录，此门对现有数据是 no-op；
+      // 用同一谓词保持与 Claude 路径对称（单一真相源），格式若演进出注入记录则自动挡住（ADR 0011/0043）。
+      if (text && isHumanPrompt(payload, text)) prompts.push({ timestamp: tsv ? tsv.toISOString() : null, text: redact(text, charLimit) })
     }
   }
 
