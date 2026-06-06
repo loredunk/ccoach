@@ -1,0 +1,6 @@
+{"type":"user","timestamp":"2026-06-02T03:00:00.000Z","sessionId":"s1","cwd":"/home/u/ccoach","uuid":"u-real","message":{"role":"user","content":"please refactor src/parser.ts and must keep existing tests"}}
+{"type":"assistant","timestamp":"2026-06-02T03:00:00.500Z","sessionId":"s1","cwd":"/home/u/ccoach","requestId":"r1","message":{"id":"m1","role":"assistant","usage":{"input_tokens":10,"output_tokens":20},"content":[{"type":"text","text":"ok"}]}}
+{"type":"user","timestamp":"2026-06-02T03:00:01.000Z","sessionId":"s1","cwd":"/home/u/ccoach","isMeta":true,"uuid":"u-meta","message":{"role":"user","content":"<system-reminder>background context that is not a user instruction</system-reminder>"}}
+{"type":"user","timestamp":"2026-06-02T03:00:02.000Z","sessionId":"s1","cwd":"/home/u/ccoach","uuid":"u-cmd","message":{"role":"user","content":"<command-name>/clear</command-name><command-message>clear</command-message>"}}
+{"type":"user","timestamp":"2026-06-02T03:00:03.000Z","sessionId":"s1","cwd":"/home/u/ccoach","uuid":"u-int","message":{"role":"user","content":"[Request interrupted by user]"}}
+{"type":"user","timestamp":"2026-06-02T03:00:04.000Z","sessionId":"s1","cwd":"/home/u/ccoach","uuid":"u-lcmd","message":{"role":"user","content":"<local-command-stdout>some command output</local-command-stdout>"}}
