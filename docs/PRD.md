@@ -6,6 +6,18 @@
 
 ---
 
+## 0. 愿景 · North Star
+
+> **把 harness 从黑箱变成你能调优的仪表盘 —— Make the harness legible.**
+
+ccoach 让用户**更清晰地驾驭自己的 harness（Claude Code / Codex）**：看见工作流里**默默发生的事**
+（空转的 token、反复纠错的回合、没用上的原生特性），从而**优化自己的流程、降低出现无意义推理的概率、
+探索更多「能 build 什么」的可能性**。
+
+**这是统领一切的取舍标准**：任何特性先问——*它是否让用户更看得清、更少浪费、更敢 build？* 不满足就不做。
+
+---
+
 ## 1. 产品定位
 
 ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只读分析你在 **Claude Code / Codex**
