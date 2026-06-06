@@ -1,4 +1,5 @@
 import { dirname } from 'node:path'
+import pkg from '../package.json'
 import { type Report, type EndpointDetection } from './model.js'
 import { type Window } from './window.js'
 import { Aggregator, type Scope } from './aggregate.js'
@@ -6,7 +7,7 @@ import { feedClaudeCode, claudeProjectsDir } from './parsers/claude-code.js'
 import { feedCodex, codexHome } from './parsers/codex.js'
 import { detectCodexEndpoint, detectClaudeEndpoint } from './endpoint.js'
 
-export const VERSION = '0.1.0'
+export const VERSION: string = pkg.version
 export { claudeProjectsDir, codexHome }
 export type { Report } from './model.js'
 export type { Scope } from './aggregate.js'
