@@ -615,6 +615,18 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
       p.push(sparkline(cx.daily_series, '#b45309'))
       p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
       p.push(modelTable(cx.models, 'codex'))
+      // Top Sessions(按项目)表，与 Claude 面板对称（ADR 0011/0041）；仅在有 --codex-sessions 数据时渲染。
+      if ((cx.top_sessions ?? []).length) {
+        p.push(`<h3>${esc(tr('h_top_sessions'))}</h3><table><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_model'))}</th></tr>`)
+        for (const s of cx.top_sessions) {
+          p.push(
+            `<tr><td>${esc(s.project)}<br><span class='muted'>${esc(s.last)}</span></td>` +
+              `<td>${comma(s.tokens)}</td>` +
+              `<td>${esc((s.models ?? []).join(', '))}</td></tr>`,
+          )
+        }
+        p.push('</table>')
+      }
       p.push(
         `<p class='muted'>${tr('cx_tokline', { tokens: comma((cx.tokens ?? {}).total ?? 0), cost: money(cx.cost_usd), hit: pct(cx.cache_hit_rate) })}</p>`,
       )

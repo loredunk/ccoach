@@ -48,6 +48,12 @@ describe('render: single-platform (ADR 0042)', () => {
     expect(html).not.toContain('<h2>Claude Code</h2>')
     expect(html).toContain('Platform: Codex')
   })
+  it('Codex-only with sessions → Top Sessions table renders in the Codex panel (parity with Claude)', () => {
+    const cx = buildCodex(cxRaw, { sessions: [{ repo: 'pod_trans', model: 'gpt-5.4', last_seen: '2026-04-26T13:38:03.163Z', tokens: { total: 20163619 } }] })
+    const html = renderMerged({ generated_at: '2026-06-06', window: { desc: 'today' }, platforms: { codex: cx }, combined: { total_cost_usd: 2.0, total_tokens: 400, total_sessions: 3 } })
+    expect(html).toContain('Top Sessions') // h_top_sessions header now present in the Codex panel
+    expect(html).toContain('2026-04-26') // session date — unique to the top-sessions table (not the repos panel)
+  })
   it('dual → both panels + comparison (regression)', () => {
     const cc = buildClaude(ccRaw); const cx = buildCodex(cxRaw)
     const html = renderMerged({ generated_at: '2026-06-06', window: { desc: 'today' }, platforms: { claude_code: cc, codex: cx }, combined: { total_cost_usd: 3.5, total_tokens: 600, total_sessions: 2 } })

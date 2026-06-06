@@ -10,6 +10,7 @@
 //   --cc-report       ccoach report --platform claude-code --json   (OPTIONAL; Claude tokens + model_tokens + models_timeline + behavior)
 //   --cc-sessions     ccoach sessions --platform claude-code --top N (OPTIONAL; top sessions by token, numeric only — no prompt text)
 //   --codex-report    ccoach report --platform codex --json         (OPTIONAL; Codex tokens + model_tokens + behavior)
+//   --codex-sessions  ccoach sessions --platform codex --top N       (OPTIONAL; Codex top sessions by token, numeric only — no prompt text)
 //   --output          merged dual-platform JSON path
 //
 // At least one of --cc-report / --codex-report is required (single-platform is OK; both = dual).
@@ -70,6 +71,22 @@ function topClaudeSessions(sessionsJson, n = 5) {
       last: typeof s.last === 'string' ? s.last.slice(0, 10) : '', // date only
       tokens: s.tokens ?? 0,
       models: (s.models ?? []).filter((m) => m && m !== '<synthetic>'),
+    }))
+}
+// Top Codex sessions by token — symmetric with topClaudeSessions but for the Codex session shape
+// (`ccoach sessions --platform codex --top N`: tokens is an object {total}, model is a single string,
+// date is last_seen). Maps to the same {project,last,tokens,models} the renderer's table expects.
+// Numeric only — repo basename + token count + model name, NO prompt text (ADR 0011/0041 parity).
+function topCodexSessions(sessionsJson, n = 5) {
+  const list = sessionsJson?.sessions ?? (Array.isArray(sessionsJson) ? sessionsJson : [])
+  return [...list]
+    .sort((a, b) => (b.tokens?.total ?? 0) - (a.tokens?.total ?? 0))
+    .slice(0, n)
+    .map((s) => ({
+      project: s.repo ?? '(unknown)',
+      last: typeof s.last_seen === 'string' ? s.last_seen.slice(0, 10) : '', // date only
+      tokens: s.tokens?.total ?? 0,
+      models: s.model && s.model !== '<synthetic>' ? [s.model] : [],
     }))
 }
 // Derive a daily {date,tokens} series from a CLI report's models_timeline (used for both
@@ -275,7 +292,7 @@ export function buildClaude(report, sessions = null, lang = 'en') {
 // Codex from the ccoach CLI (authoritative tokens + per-model breakdown, offline local parse).
 // Cost is computed later by apply_pricing.mjs from online official prices over the CLI's
 // model_tokens[]. Daily sparkline derives from the report's models_timeline (same as Claude).
-export function buildCodex(codexReport, lang = 'en') {
+export function buildCodex(codexReport, codexSessions = null, lang = 'en') {
   const r = codexReport ?? {}
   const tok = r.tokens ?? {}
   const afTotal = tok.total ?? 0
@@ -305,6 +322,7 @@ export function buildCodex(codexReport, lang = 'en') {
     cache_hit_rate: round(r.cache_hit_rate ?? 0, 4),
     models,
     daily_series: series,
+    top_sessions: topCodexSessions(codexSessions), // Top Sessions(按项目)表，与 Claude 对称（ADR 0011/0041）
     behavior: codexBehavior(r, lang),
     prompt_signals: r.prompt_signals ?? {}, // 单平台(宿主=Codex)时供成绩卡 Prompt Skill 轴（ADR 0008/0042）
     episode_summary: r.episode_summary ?? null, // 回合概览（ADR 0032/0034）
@@ -347,8 +365,9 @@ function main() {
   const ccReport = a['cc-report'] ? load(a['cc-report']) : null
   const codexReport = a['codex-report'] ? load(a['codex-report']) : null
   const ccSessions = a['cc-sessions'] ? load(a['cc-sessions']) : null
+  const codexSessions = a['codex-sessions'] ? load(a['codex-sessions']) : null
   const claude = ccReport ? buildClaude(ccReport, ccSessions, lang) : null
-  const codex = codexReport ? buildCodex(codexReport, lang) : null
+  const codex = codexReport ? buildCodex(codexReport, codexSessions, lang) : null
 
   const platforms = {}
   if (claude) platforms.claude_code = claude

@@ -23,7 +23,7 @@ Keep responsibilities separate:
 Separate **tokens/models** (authoritative local facts, offline) from **cost** (computed in this skill from official online prices):
 
 - **Tokens & model list = authoritative, offline, from ccoach — for BOTH platforms.** `ccoach report --platform claude-code|codex --json` parses the local JSONL into the unified Report — tokens + per-model token buckets (`model_tokens[]`) + `models_timeline` (per-day series) + behavior. ccoach never leaves the machine. **ccusage is NOT used at skill runtime**: ccoach's own per-model attribution now matches ccusage within ~0.04% (ADR 0030; the older ~20% gap predated ccoach's streaming "final/max usage" dedup fix). ccusage stays purely a dev/CI cross-check of the CLI (`npm run verify:ccusage`) — this skill never invokes it.
-- **Both platforms are symmetric.** Tokens / models / daily sparkline (`models_timeline`) / behavior all come from each platform's `ccoach report --json`. The Claude **top-sessions** table is sourced from `ccoach sessions --platform claude-code --top N` (numeric only — repo/tokens/models, NO prompt text, NO per-session cost); skip it and that table just renders empty.
+- **Both platforms are symmetric.** Tokens / models / daily sparkline (`models_timeline`) / behavior all come from each platform's `ccoach report --json`. The **top-sessions** table (either platform) is sourced from `ccoach sessions --platform <P> --top N` (numeric only — repo/tokens/models, NO prompt text, NO per-session cost); skip it and that table just renders empty.
 - **Cost is NOT a bundled/snapshot price.** This skill looks up the **official API price of each actually-observed model name online** (including third-party cc-switch models like kimi/deepseek), then `apply_pricing.mjs` computes cost deterministically from each model's token buckets. See "Online official pricing" below.
 - **NEVER use `~/.claude/stats-cache.json`.** It is polluted by cc-switch swapping in third-party providers (kimi, etc.), so its model/cost attribution is wrong, and it stopped updating after 2026-04-09 — stale and inaccurate. Do not read or fall back to it under any circumstances.
 - ccoach emits only aggregates: Bash → first token / git subcommand only, repo → cwd basename, file → extension only. Never prompt text, file contents, full commands, or absolute paths.
@@ -67,15 +67,16 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - `ccoach report --platform <P> <W> <L> --json > /tmp/<P>-report.json`
    - (Only the **Dual-platform comparison (opt-in)** path runs BOTH `--platform codex` and `--platform claude-code`.)
    - Each report carries `tokens` + `model_tokens[]` (per-model token buckets for pricing) + `models_timeline` (the daily sparkline series) + `behavior` + `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
-3. (Only when `<P>` = claude-code; optional) Top Claude sessions for the sessions table — numeric only, **NO prompt text**, same `<W>`:
-   - `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
-   - Skip it and the Claude top-sessions table just renders empty (it has no `--include-user-prompts`, so it's repo/tokens/models counts only).
+3. (Optional) Top sessions for the **host platform's** Top Sessions table — numeric only, **NO prompt text** (no `--include-user-prompts`, so it's repo/tokens/models counts only), same `<W>`:
+   - `<P>`=claude-code: `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
+   - `<P>`=codex: `ccoach sessions --platform codex <W> --top 5 > /tmp/codex-sessions.json`
+   - Skip it and that platform's top-sessions table just renders empty (both platforms support it symmetrically, ADR 0041).
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
    - Single platform (default), `<P>=claude-code`:
      `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-report /tmp/claude-code-report.json [--cc-sessions /tmp/cc-sessions.json] <L> --output /tmp/ai-usage.json`
    - Single platform (default), `<P>=codex`:
-     `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --codex-report /tmp/codex-report.json <L> --output /tmp/ai-usage.json`
-   - Dual comparison (opt-in): pass BOTH — `--cc-report /tmp/claude-code-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-report.json`.
+     `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --codex-report /tmp/codex-report.json [--codex-sessions /tmp/codex-sessions.json] <L> --output /tmp/ai-usage.json`
+   - Dual comparison (opt-in): pass BOTH — `--cc-report /tmp/claude-code-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-report.json --codex-sessions /tmp/codex-sessions.json`.
    - Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
 4.5. **Price from official online prices** (cost layer; see "Online official pricing" below):
    - Read `/tmp/ai-usage.json`, collect every model name from each `platforms.<plat>.models[]` (skip `<synthetic>` / zero-token entries).

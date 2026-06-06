@@ -26,6 +26,14 @@ const codexReport = {
   generated_for: 'today', endpoints: [],
 }
 
+// `ccoach sessions --platform codex --top N` shape (numeric only): tokens as object, model as string, last_seen.
+const codexSessions = {
+  sessions: [
+    { repo: 'pod_trans', model: 'gpt-5.4', last_seen: '2026-04-26T13:38:03.163Z', tokens: { total: 20163619 } },
+    { repo: 'knock', model: 'gpt-5.1', last_seen: '2026-04-20T10:00:00.000Z', tokens: { total: 500 } },
+  ],
+}
+
 function runMerge(args: string[], dir: string): any {
   const out = path.join(dir, 'merged.json')
   execFileSync('node', [MERGE, ...args, '--output', out], { encoding: 'utf8' })
@@ -57,6 +65,28 @@ describe('merge: single-platform tolerance (ADR 0042)', () => {
       expect(m.combined.prompt_signals.prompts).toBe(3)
       expect(m.platforms.codex.prompt_signals.prompts).toBe(3) // buildCodex now carries prompt_signals
       expect(m.platforms.codex.sessions).toBe(3) // buildCodex now carries top-level sessions (scorecard Engineering axis)
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+  it('--codex-sessions → codex panel gets top_sessions (project/tokens/model, symmetric with Claude)', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ccoach-merge-cxs-'))
+    try {
+      const cxPath = path.join(dir, 'cx.json'); writeFileSync(cxPath, JSON.stringify(codexReport))
+      const csPath = path.join(dir, 'cx-sessions.json'); writeFileSync(csPath, JSON.stringify(codexSessions))
+      const m = runMerge(['--codex-report', cxPath, '--codex-sessions', csPath], dir)
+      const ts = m.platforms.codex.top_sessions
+      expect(ts).toHaveLength(2)
+      expect(ts[0].project).toBe('pod_trans') // sorted by tokens desc
+      expect(ts[0].tokens).toBe(20163619)
+      expect(ts[0].models).toEqual(['gpt-5.4'])
+      expect(ts[0].last).toBe('2026-04-26') // date only
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+  it('codex without --codex-sessions → top_sessions empty (no crash)', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'ccoach-merge-cxs0-'))
+    try {
+      const cxPath = path.join(dir, 'cx.json'); writeFileSync(cxPath, JSON.stringify(codexReport))
+      const m = runMerge(['--codex-report', cxPath], dir)
+      expect(m.platforms.codex.top_sessions).toEqual([])
     } finally { rmSync(dir, { recursive: true, force: true }) }
   })
   it('both reports → platforms has both (dual unchanged)', () => {
