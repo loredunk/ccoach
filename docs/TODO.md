@@ -283,6 +283,25 @@
 - [ ] **CLI / skill 边界**：哪些魔法值 CLI 确定性可算、哪些需 skill 层（联网价 / 人格化）——用户明确要的是 CLI 侧可算的那批。
 - [ ] 待 brainstorm + 立 ADR + 实现。
 
+## T28 · 上游平台版本漂移监控：changelog + fixture/对账回归（运维护栏）（P1）— ⏳ pending（蓝图，逐子项目单独 brainstorm）
+
+> 决策：待立 ADR / runbook（编号顺延，尚未起草）。
+
+**意图**（用户设定的固定工作流，忠实记录）：解析层（`src/parsers/{claude-code,codex}.ts`）依赖 Codex /
+Claude Code 各自 JSONL 的字段形状；**大版本发布可能悄悄改格式 → 解析漂移 → 数字失真**。尤其
+`src/parsers/codex.ts` 的输出形状目前是**推断**（无真实 `~/.codex` 数据验证、不匹配时静默产出 0），漂移风险最高。
+
+固定动作（开发收尾时 / 每次上游大版本发布后）：
+
+- [ ] 看官方 changelog：**Codex 与 Claude Code 对称**（ADR 0011，两者都是一等数据源，勿只盯 Codex）。
+- [ ] 跑 `npm test`（fixture 回归）+ `npm run verify:ccusage`（token/成本对账，已接 CI），提前发现格式漂移。
+- [ ] 漂移时：补/改 fixture 复现新形状 → 改适配器 → 回归绿；必要时记一篇 ADR。
+
+潜在自动化（后期，单独 brainstorm，**勿现在就建**）：
+
+- [ ] 定时 changelog 探针（`/schedule` 例行 agent 或 CI 定时任务）diff 上游 release notes，命中关键字再触发回归。
+- [ ] 待 brainstorm + 实现。
+
 ---
 
 ## 已完成（历史）
