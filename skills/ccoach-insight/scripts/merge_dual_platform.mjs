@@ -290,6 +290,7 @@ export function buildCodex(codexReport, lang = 'en') {
     models,
     daily_series: series,
     behavior: codexBehavior(r, lang),
+    prompt_signals: r.prompt_signals ?? {}, // 单平台(宿主=Codex)时供成绩卡 Prompt Skill 轴（ADR 0008/0042）
     episode_summary: r.episode_summary ?? null, // 回合概览（ADR 0032/0034）
     // 计费维度 + 执行画像 + 端点（ADR 0022 D1-D4 / 0023 D1）：均为派生计数/白名单标签，不含敏感内容。
     billing: r.billing ?? null,
@@ -316,39 +317,45 @@ function buildWindow(reports) {
 
 function main() {
   const a = parseArgs(process.argv.slice(2))
-  // Required: --cc-report / --codex-report (both ccoach offline parses) + --output.
-  // --cc-sessions is OPTIONAL (top Claude sessions table; degrades to empty if absent).
-  for (const k of ['cc-report', 'codex-report', 'output']) {
-    if (!a[k]) {
-      process.stderr.write(`missing --${k}\n`)
-      process.exit(2)
-    }
+  // 至少一个平台 report + --output（单平台默认；两个都给 = 双平台 opt-in，ADR 0042）。
+  // --cc-sessions 仍可选（Claude top-sessions 表；缺省即空表）。
+  if (!a.output) {
+    process.stderr.write('missing --output\n')
+    process.exit(2)
+  }
+  if (!a['cc-report'] && !a['codex-report']) {
+    process.stderr.write('need at least one of --cc-report / --codex-report\n')
+    process.exit(2)
   }
   const lang = a.lang || 'en' // 默认英文（ADR 0026）；与 ccoach report / scorecard / render 同传
-  const ccReport = load(a['cc-report'])
-  const codexReport = load(a['codex-report'])
+  const ccReport = a['cc-report'] ? load(a['cc-report']) : null
+  const codexReport = a['codex-report'] ? load(a['codex-report']) : null
   const ccSessions = a['cc-sessions'] ? load(a['cc-sessions']) : null
-  const claude = buildClaude(ccReport, ccSessions, lang)
-  const codex = buildCodex(codexReport, lang)
+  const claude = ccReport ? buildClaude(ccReport, ccSessions, lang) : null
+  const codex = codexReport ? buildCodex(codexReport, lang) : null
+
+  const platforms = {}
+  if (claude) platforms.claude_code = claude
+  if (codex) platforms.codex = codex
 
   const merged = {
-    title: 'Dual-Platform AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题，ADR 0025）；保留字段兼容
-
+    title: 'AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题，ADR 0025）；保留字段兼容
     generated_at: todayIso(),
-    window: buildWindow([codexReport, ccReport]),
-    platforms: { claude_code: claude, codex: codex },
+    window: buildWindow([codexReport, ccReport].filter(Boolean)),
+    platforms,
     combined: {
-      total_cost_usd: round(claude.cost_usd + codex.cost_usd, 2),
-      total_tokens: claude.tokens.total + codex.tokens.total,
-      total_sessions: claude.sessions, // Claude 会话数（Codex 会话数在其面板单列）
-      prompt_signals: ccReport.prompt_signals ?? {},
+      total_cost_usd: round((claude?.cost_usd ?? 0) + (codex?.cost_usd ?? 0), 2),
+      total_tokens: (claude?.tokens.total ?? 0) + (codex?.tokens.total ?? 0),
+      // 会话数：优先 Claude（dual 行为不变）；单 Codex 时取 Codex behavior 会话数（成绩卡用）。
+      total_sessions: claude?.sessions ?? codex?.behavior?.sessions ?? 0,
+      prompt_signals: ccReport?.prompt_signals ?? codexReport?.prompt_signals ?? {},
     },
   }
   writeFileSync(a.output, JSON.stringify(merged, null, 2))
   console.log(`wrote ${a.output}`)
   console.log(`  统计窗口: ${merged.window.desc ?? '(unknown)'}`)
-  console.log(`  Claude Code: ${claude.sessions} sessions, $${claude.cost_usd}, ${comma(claude.tokens.total)} tokens`)
-  console.log(`  Codex: ${codex.active_days} days, $${codex.cost_usd}, ${comma(codex.tokens.total)} tokens (empty=${codex.tokens.total === 0})`)
+  if (claude) console.log(`  Claude Code: ${claude.sessions} sessions, $${claude.cost_usd}, ${comma(claude.tokens.total)} tokens`)
+  if (codex) console.log(`  Codex: ${codex.active_days} days, $${codex.cost_usd}, ${comma(codex.tokens.total)} tokens (empty=${codex.tokens.total === 0})`)
   console.log('  注：成本为离线 fallback；跑 apply_pricing.mjs 用联网官方价覆盖。')
 }
 
