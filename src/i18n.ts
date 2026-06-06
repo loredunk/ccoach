@@ -38,6 +38,9 @@ const EN: Dict = {
   // emit/text.ts — breakdown
   tx_sessions_n: '{n} sessions',
   tx_more_items: '…and {n} more',
+  tx_skills_label: 'Skill: ',
+  tx_mcp_servers: 'MCP: ',
+  tx_mcp_tools: 'MCP tools: ',
   // emit/text.ts — endpoint / billing / codex profile
   tx_endpoint_header: 'Endpoint / billing mode (account-level snapshot, from local config)',
   tx_ep_official: 'Official ({host})',
@@ -126,6 +129,9 @@ const ZH: Dict = {
   tx_conf_low: '低',
   tx_sessions_n: '{n} 会话',
   tx_more_items: '…另有 {n} 项',
+  tx_skills_label: '技能: ',
+  tx_mcp_servers: 'MCP: ',
+  tx_mcp_tools: 'MCP 工具: ',
   tx_endpoint_header: '端点 / 计费模式（账户级当前快照，读本机 config）',
   tx_ep_official: '官方({host})',
   tx_ep_custom: '自定义/中转',

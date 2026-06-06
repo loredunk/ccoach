@@ -135,6 +135,14 @@ export function emitText(r: Report, byRepo: boolean): string {
   }
   lines.push('')
 
+  if (r.tools.mcp && r.tools.mcp.top_servers.length) {
+    lines.push(t('tx_mcp_servers') + r.tools.mcp.top_servers.map((c) => `${c.name}(${c.count})`).join(' '))
+    if (r.tools.mcp.top_tools.length) {
+      lines.push('  ' + t('tx_mcp_tools') + r.tools.mcp.top_tools.slice(0, 8).map((m) => `${m.tool || m.server}·${m.server}(${m.count})`).join(' '))
+    }
+    lines.push('')
+  }
+
   if (r.sources.length) {
     lines.push(t('tx_by_source'))
     renderUsageBreakdown(lines, r.sources, r.tokens.total)
@@ -175,7 +183,11 @@ export function emitText(r: Report, byRepo: boolean): string {
     lines.push('')
   }
   if (r.skills?.length) {
-    lines.push('Skill: ' + r.skills.map((c) => `${c.command}(${c.count})`).join(' '))
+    lines.push(t('tx_skills_label') + r.skills.map((c) => {
+      const i = c.command.indexOf(':')
+      const name = i > 0 ? c.command.slice(i + 1) : c.command
+      return c.plugin ? `${name}·${c.plugin}(${c.count})` : `${name}(${c.count})`
+    }).join(' '))
     lines.push('')
   }
   const env = r.environment
