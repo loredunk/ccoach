@@ -275,6 +275,19 @@ function behaviorPanel(beh, color, platform) {
   p.push(`<h3>${esc(tr('beh_top_commands'))}</h3>`)
   p.push(miniBars(beh.top_commands, 'command', 'count', color))
 
+  const mcp = beh.mcp
+  if (mcp && Array.isArray(mcp.top_tools) && mcp.top_tools.length) {
+    p.push(`<h3>${esc(tr('beh_mcp'))}</h3>`)
+    const items = mcp.top_tools.map((x) => ({ name: `${x.tool || x.server} · ${x.server}`, count: x.count }))
+    p.push(miniBars(items, 'name', 'count', color))
+  }
+  const sk = beh.skills ?? []
+  if (sk.length) {
+    p.push(`<h3>${esc(tr('beh_skills'))}</h3>`)
+    const items = sk.map((x) => ({ name: x.plugin ? `${x.name} (${x.plugin})` : x.name, count: x.count }))
+    p.push(miniBars(items, 'name', 'count', color))
+  }
+
   p.push(`<h3>${esc(tr('beh_git'))}</h3>`)
   p.push(miniBars(beh.git_habits, 'command', 'count', color))
 

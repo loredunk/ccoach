@@ -147,6 +147,15 @@ const MERGE_I18N = {
 }
 const mlang = (lang) => MERGE_I18N[lang] ?? MERGE_I18N.en
 
+// Strip a `plugin:` namespace prefix to the bare skill name (e.g. superpowers:brainstorming → brainstorming).
+function skillShort(cmd) {
+  const i = String(cmd).indexOf(':')
+  return i > 0 ? String(cmd).slice(i + 1) : String(cmd)
+}
+function behaviorSkills(r) {
+  return (r.skills ?? []).map((s) => ({ name: skillShort(s.command), plugin: s.plugin || undefined, count: s.count }))
+}
+
 // Normalize `ccoach report --platform claude-code --json` (a unified Report) into
 // the renderer's behavior shape. Claude tokens / model_tokens / behavior all come from ccoach
 // (offline local parse); cost is recomputed by apply_pricing from official online prices.
@@ -172,6 +181,8 @@ export function claudeBehavior(r, lang = 'en') {
     sessions: r.sessions ?? 0,
     total_tool_calls: tools.total_calls ?? 0,
     tools_by_name: (tools.by_name ?? []).map((x) => ({ name: x.name, count: x.count })),
+    mcp: tools.mcp ?? null,
+    skills: behaviorSkills(r),
     top_commands: cleanCommands(tools.top_commands ?? []),
     tool_categories: cats,
     git_habits: cleanGit(git.top_subcommands ?? []),
@@ -205,6 +216,8 @@ export function codexBehavior(r, lang = 'en') {
     sessions: r.sessions ?? 0,
     total_tool_calls: tools.total_calls ?? 0,
     tools_by_name: [], // ccoach doesn't break tools down by name
+    mcp: tools.mcp ?? null,
+    skills: behaviorSkills(r),
     top_commands: cleanCommands(tools.top_commands ?? []),
     tool_categories: cats,
     git_habits: cleanGit(git.top_subcommands ?? []),
