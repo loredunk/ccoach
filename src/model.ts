@@ -14,6 +14,8 @@ export const emptyTokens = (): Tokens => ({
 
 export interface CommandCount { command: string; count: number }
 export interface NameCount { name: string; count: number }
+export interface McpToolCount { name: string; server: string; tool: string; count: number }
+export interface SkillUsage { command: string; count: number; plugin?: string }
 export interface FileLanguage { name: string; files: number }
 export interface UsageReport { name: string; sessions: number; tokens: number }
 export interface HourReport { hour: number; tokens: number; count?: number }
@@ -199,6 +201,11 @@ export interface Report {
     top_commands: CommandCount[]
     by_name?: NameCount[]              // 各工具被调用次数（Claude：Bash/Edit/Glob/mcp__… 计数）
     categories?: Record<string, number> // 工具类别计数：shell/web/file/search/mcp/other
+    mcp?: {                            // MCP 使用 Top（ADR 0045）：从 mcp__server__tool 工具名派生
+      total_calls: number
+      top_tools: McpToolCount[]        // per-tool 计数（含 server/tool 拆分）
+      top_servers: NameCount[]         // per-server 聚合，为"哪个 MCP 重度/可清理"打底
+    }
   }
   repos: RepoReport[]
   hours: HourReport[]
@@ -210,7 +217,7 @@ export interface Report {
   prompt_signals: PromptSignals
   error_signals: ErrorSignals
   rework_signals: ReworkSignals
-  skills?: CommandCount[]
+  skills?: SkillUsage[]
   environment?: EnvironmentSignals
   billing?: BillingReport      // 计费维度（仅 Codex 填，ADR 0022 D1）：按订阅 plan tier 拆 token
   codex_specific?: CodexSpecific // 平台特色：Codex 执行画像（ADR 0023 D1）
@@ -239,7 +246,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   prompt_signals: 'Numeric signals derived only from user prompts (length / structured ratio / file-reference ratio / constraint ratio / correction rate); contains no raw text.',
   error_signals: 'Tool failure rate / interruptions / API errors, plus failures by tool and by whitelisted category (git/test/build/permission/network/timeout/not-read/other). Derived only as counts + categories from tool results, never raw stderr/output/file contents/full command lines (privacy red line, ADR 0016).',
   rework_signals: 'Edit count, post-hoc user-modified rate (userModified), cumulative added/removed line counts (structuredPatch). Counts only, never diff text (ADR 0017).',
-  skills: 'Times each skill was invoked (by attributionSkill), reflecting the skill usage profile.',
+  skills: 'Times each skill was invoked (by attributionSkill), with optional plugin attribution parsed from a plugin:skill name (e.g. superpowers:brainstorming → plugin=superpowers); reflects the skill usage profile. Non-sensitive labels only (ADR 0017).',
   environment: 'Claude Code versions, permission-mode distribution, attachment count, subagent message count — non-sensitive labels/counts derived only from record metadata (ADR 0017).',
   billing: 'Codex only: token split by subscription plan tier (plus/pro/…) plus an unclassified bucket (has tokens but no plan_type, ≠ definitely API). Derived only from the presence of rate_limits + the plan_type label; emits no quota percentage, remaining-credit, or reset-time fields (top-level rate_limits stays null). confidence=spoofable-by-relay: plan_type comes from the backend response and can be passed through or spoofed by relays, so it cannot prove an "official subscription" (ADR 0022 D1).',
   codex_specific: 'Codex-only execution profile: effort / approval policy / sandbox / collaboration mode / personality / client identity (originators) distributions, plus compactions / aborted_turns / context_window / git repo identity (boolean). All derived counts/whitelisted enum labels; collaboration_mode takes only the mode name, never reading developer_instructions (ADR 0023 D1 / 0017).',
@@ -249,6 +256,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   project_management: 'Whether each repo shows test/build/CI signals.',
   'tools.by_name': 'Times each tool was invoked (tool-name counts only, e.g. Bash/Edit/Glob/mcp__…; no command lines/arguments).',
   'tools.categories': 'Tool-category counts shell/web/file/search/mcp/other (counts only, no content).',
+  'tools.mcp': 'MCP usage top derived from mcp__server__tool tool names (Claude Code only this iteration): total_calls, top_tools (per-tool with server/tool split), top_servers (per-server aggregate). Tool/server names are structural non-sensitive labels, counts only, never tool inputs/outputs (ADR 0017/0045).',
   file_languages: 'Language file counts derived from read/edited file extensions (extension→language mapping only, never paths/file contents).',
   'hours.count': 'Active-event count for the hour (alongside tokens; for activity heat, no content).',
   scope: 'Analysis level: global (default, cross-project aggregate) / project (adds projects[]) / session (adds sessions_detail[]).',

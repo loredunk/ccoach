@@ -60,6 +60,13 @@ interface GroupAcc {
 
 export type ToolKind = 'shell' | 'web' | 'file' | 'search' | 'mcp' | 'other'
 
+// Split an MCP tool name `mcp__server__tool` into parts (tool '' when the trailing segment is missing).
+function parseMcpName(name: string): { server: string; tool: string } {
+  const rest = name.slice(5) // strip 'mcp__'
+  const sep = rest.indexOf('__')
+  return sep >= 0 ? { server: rest.slice(0, sep), tool: rest.slice(sep + 2) } : { server: rest, tool: '' }
+}
+
 // 平台无关聚合器：适配器把每条事件喂进来，assemble 出统一 Report。
 export class Aggregator {
   private platform: string
@@ -80,6 +87,9 @@ export class Aggregator {
   private byHourCount: number[] = new Array<number>(24).fill(0) // 该时段活跃事件数（与 tokens 并列）
   private categories = new Map<string, number>() // 工具类别计数：shell/web/file/search/mcp/other
   private toolByName = new Map<string, number>() // 各工具名调用次数（仅名字，不含参数）
+  private mcpToolCounts = new Map<string, number>() // 完整 mcp__server__tool 名 → 次数
+  private mcpServerCounts = new Map<string, number>() // server 段 → 次数
+  private mcpCalls = 0
   private langFiles = new Map<string, number>() // 按读写/编辑文件扩展名派生的语言文件数
   private bySource = new Map<string, UsageAgg>()
   private byLanguage = new Map<string, UsageAgg>()
@@ -269,7 +279,14 @@ export class Aggregator {
 
   // 各工具名计数（仅工具名，绝不含命令行/参数；隐私同 skills/environment 标签）。
   applyToolName(name: string): void {
-    if (name) this.toolByName.set(name, (this.toolByName.get(name) ?? 0) + 1)
+    if (!name) return
+    this.toolByName.set(name, (this.toolByName.get(name) ?? 0) + 1)
+    if (name.startsWith('mcp__')) {
+      this.mcpToolCounts.set(name, (this.mcpToolCounts.get(name) ?? 0) + 1)
+      const { server } = parseMcpName(name)
+      if (server) this.mcpServerCounts.set(server, (this.mcpServerCounts.get(server) ?? 0) + 1)
+      this.mcpCalls++
+    }
   }
 
   // 按文件扩展名派生语言的文件数（仅扩展名→语言映射，绝不含路径/文件内容）。
@@ -484,13 +501,34 @@ export class Aggregator {
       for (const [k, v] of this.categories) cats[k] = v
       report.tools.categories = cats
     }
+    if (this.mcpToolCounts.size) {
+      const toolRec: Record<string, number> = {}
+      for (const [k, v] of this.mcpToolCounts) toolRec[k] = v
+      const serverRec: Record<string, number> = {}
+      for (const [k, v] of this.mcpServerCounts) serverRec[k] = v
+      report.tools.mcp = {
+        total_calls: this.mcpCalls,
+        top_tools: topCounts(toolRec, 15).map((c) => {
+          const { server, tool } = parseMcpName(c.command)
+          return { name: c.command, server, tool, count: c.count }
+        }),
+        top_servers: topCounts(serverRec, 8).map((c) => ({ name: c.command, count: c.count })),
+      }
+    }
     if (this.langFiles.size) {
       report.file_languages = [...this.langFiles.entries()]
         .sort((a, b) => (b[1] !== a[1] ? b[1] - a[1] : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
         .slice(0, USAGE_MAX)
         .map(([name, files]): FileLanguage => ({ name, files }))
     }
-    if (this.skillCounts.size) report.skills = topCounts(skillRec, 12)
+    if (this.skillCounts.size) {
+      report.skills = topCounts(skillRec, 12).map((c) => {
+        const i = c.command.indexOf(':')
+        return i > 0
+          ? { command: c.command, count: c.count, plugin: c.command.slice(0, i) }
+          : { command: c.command, count: c.count }
+      })
+    }
     if (this.attachments || this.subagentMsgs || this.versions.size || this.permModes.size) {
       const env: EnvironmentSignals = { attachments: this.attachments, subagent_messages: this.subagentMsgs }
       if (this.versions.size) env.claude_versions = [...this.versions].sort()
