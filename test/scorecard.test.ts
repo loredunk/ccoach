@@ -72,9 +72,9 @@ describe('scorecard 回归（.mjs，去 Python）', () => {
       const codexOnly = {
         platforms: {
           codex: {
-            cost_usd: 12, active_days: 6, tokens: { total: 500000 },
+            cost_usd: 12, active_days: 6, sessions: 8, tokens: { total: 500000 },
             models: [{ model: 'gpt-5.4', cost: 12 }],
-            behavior: { tool_categories: { shell: 10, file: 30 }, repos: [{ repo: 'a' }], hours: [{ hour: 14, count: 20 }], sessions: 8 },
+            behavior: { tool_categories: { shell: 10, file: 30 }, repos: [{ repo: 'a' }, { repo: 'b' }], hours: [{ hour: 14, count: 20 }], sessions: 8 },
             prompt_signals: { prompts: 5, avg_len: 300, structured_ratio: 0.6, constraint_ratio: 0.5, file_ref_ratio: 0.4, correction_rate: 0.1 },
           },
         },
@@ -90,6 +90,9 @@ describe('scorecard 回归（.mjs，去 Python）', () => {
       const dil = card.axes.find((a: { key: string }) => a.key === 'diligence')
       // 宿主=Codex 时 active_days=6 → Workhorse(0)；旧逻辑(host={}) active_days=0 → 会落到 index 2
       expect(dil.tier_index).toBe(0)
+      const eng = card.axes.find((a: { key: string }) => a.key === 'engineering')
+      // 宿主=Codex：2 repos / 8 sessions → reposPerSession 0.25 → Architect(0)，不是 Archaeologist(3)
+      expect(eng.tier_index).toBe(0)
     } finally { rmSync(d, { recursive: true, force: true }) }
   })
 })

@@ -71,9 +71,11 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
    - Skip it and the Claude top-sessions table just renders empty (it has no `--include-user-prompts`, so it's repo/tokens/models counts only).
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
-   - Single platform (default): pass only the matching report flag —
-     `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --<P>-report /tmp/<P>-report.json [--cc-sessions /tmp/cc-sessions.json] <L> --output /tmp/ai-usage.json` (use `--cc-report` when `<P>=claude-code`, `--codex-report` when `<P>=codex`; `--cc-sessions` only applies to claude-code).
-   - Dual comparison (opt-in): pass BOTH — `--cc-report /tmp/claude-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-usage-report.json`.
+   - Single platform (default), `<P>=claude-code`:
+     `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-report /tmp/claude-code-report.json [--cc-sessions /tmp/cc-sessions.json] <L> --output /tmp/ai-usage.json`
+   - Single platform (default), `<P>=codex`:
+     `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --codex-report /tmp/codex-report.json <L> --output /tmp/ai-usage.json`
+   - Dual comparison (opt-in): pass BOTH — `--cc-report /tmp/claude-code-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-report.json`.
    - Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
 4.5. **Price from official online prices** (cost layer; see "Online official pricing" below):
    - Read `/tmp/ai-usage.json`, collect every model name from each `platforms.<plat>.models[]` (skip `<synthetic>` / zero-token entries).

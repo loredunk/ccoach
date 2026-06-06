@@ -56,6 +56,7 @@ describe('merge: single-platform tolerance (ADR 0042)', () => {
       expect(m.combined.total_sessions).toBe(3) // codex behavior sessions fallback
       expect(m.combined.prompt_signals.prompts).toBe(3)
       expect(m.platforms.codex.prompt_signals.prompts).toBe(3) // buildCodex now carries prompt_signals
+      expect(m.platforms.codex.sessions).toBe(3) // buildCodex now carries top-level sessions (scorecard Engineering axis)
     } finally { rmSync(dir, { recursive: true, force: true }) }
   })
   it('both reports → platforms has both (dual unchanged)', () => {

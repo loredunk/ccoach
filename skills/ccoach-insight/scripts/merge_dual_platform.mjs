@@ -278,6 +278,7 @@ export function buildCodex(codexReport, lang = 'en') {
     // tokens/模型来自 ccoach 本地解析；成本由 skill 层联网官方价计算（apply_pricing）。
     source: 'ccoach（本地解析，token/模型）· 官方在线定价',
     active_days: r.active_days ?? series.length,
+    sessions: r.sessions ?? 0, // 顶层会话数（与 buildClaude 对称）：单平台宿主=Codex 时成绩卡 Engineering 轴用（ADR 0042 review）
     date_range: dateRange,
     tokens: {
       input: tok.input ?? 0,

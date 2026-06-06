@@ -465,7 +465,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
     p.push(metric(tr('m_cc_cost'), money(cc.cost_usd), tr('active_days_sub', { n: cc.active_days })))
     p.push(metric(tr('m_cx_cost'), money(cx.cost_usd), tr('active_days_sub', { n: cx.active_days })))
   } else {
-    const only = hasCc ? cc : cx
+    const only = cc ?? cx ?? {} // 单平台在场者；空 platforms（不可达，merge 已 exit 2）也不抛
     p.push(metric(tr('m_active_days'), comma(only.active_days)))
   }
   p.push('</section>')
