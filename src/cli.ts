@@ -2,13 +2,9 @@
 import { cac } from 'cac'
 import { resolveWindow } from './window.js'
 import { setLang } from './i18n.js'
-import { buildReport, VERSION, claudeProjectsDir, codexHome, type Platform, type Scope } from './index.js'
-import { emitJson } from './emit/json.js'
-import { emitText } from './emit/text.js'
+import { VERSION, claudeProjectsDir, codexHome } from './index.js'
+import { runReport, type ReportCliOptions } from './run-report.js'
 import { listClaudeSessions, listCodexSessions, type SessionsOpts } from './sessions.js'
-
-const PLATFORMS: Platform[] = ['claude-code', 'codex', 'all']
-const SCOPES: Scope[] = ['global', 'project', 'session', 'episode']
 
 const cli = cac('ccoach')
 
@@ -19,38 +15,15 @@ cli
   .option('--days <n>', 'Last N days (including today)')
   .option('--by-repo', 'Expand all repos (default: top 8 only)')
   .option('--platform <platform>', 'Data source: claude-code | codex | all', { default: 'all' })
+  .option('--claude-dir <dir>', 'Override Claude data dir: path to the projects dir directly (e.g. ~/.claude/projects); bypasses CLAUDE_CONFIG_DIR/projects')
+  .option('--codex-home <dir>', 'Override Codex data dir: path to the Codex home (reads <dir>/sessions; e.g. ~/.codex)')
   .option('--scope <scope>', 'Analysis level: global | project | session | episode (adds projects[]/sessions_detail[]/episodes_detail[])', { default: 'global' })
   .option('--lang <lang>', 'Output language: en | zh (default en)', { default: 'en' })
   .option('--json', 'Emit machine-readable JSON (agent-friendly)')
   .option('--no-glossary', 'Omit the self-describing glossary block (~2KB token savings)')
   .action((_filter: string[], options: Record<string, unknown>) => {
     try {
-      setLang(options.lang as string | undefined) // 默认 en；先设语言，再 resolveWindow/buildReport/emit
-      const platform = String(options.platform ?? 'all') as Platform
-      if (!PLATFORMS.includes(platform)) {
-        throw new Error(`invalid --platform ${platform} (want claude-code|codex|all)`)
-      }
-      const scope = String(options.scope ?? 'global') as Scope
-      if (!SCOPES.includes(scope)) {
-        throw new Error(`invalid --scope ${scope} (want global|project|session|episode)`)
-      }
-      const daysRaw = options.days
-      const days = daysRaw != null ? Number(daysRaw) : undefined
-      if (days !== undefined && !Number.isFinite(days)) {
-        throw new Error(`invalid --days ${String(daysRaw)}`)
-      }
-      const window = resolveWindow(
-        {
-          date: options.date as string | undefined,
-          since: options.since as string | undefined,
-          days,
-        },
-        new Date(),
-      )
-      const report = buildReport({ platform, window, scope })
-      if (options.glossary === false) delete report.glossary // cac：--no-glossary => glossary:false
-      const out = options.json ? emitJson(report) + '\n' : emitText(report, Boolean(options.byRepo))
-      process.stdout.write(out)
+      process.stdout.write(runReport(options as unknown as ReportCliOptions))
     } catch (e) {
       process.stderr.write((e instanceof Error ? e.message : String(e)) + '\n')
       process.exit(1)
