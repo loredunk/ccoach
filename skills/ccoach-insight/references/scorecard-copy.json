@@ -31,11 +31,11 @@
   "axes": {
     "prompt": {
       "tiers": [
-        {"zh_name": "大师级", "en_name": "Prompt Surgeon", "zh_roast": "结构清晰、带约束，需求一次说清", "en_roast": "Structured and specific — the ask lands in one pass."},
-        {"zh_name": "老练", "en_name": "Sharpshooter", "zh_roast": "方向明确，偶尔补一句收尾", "en_roast": "On target; just the occasional follow-up to tidy up."},
-        {"zh_name": "学徒", "en_name": "Apprentice", "zh_roast": "能说清楚，篇幅可以再收一点", "en_roast": "Clear enough — could be a touch more concise."},
-        {"zh_name": "复读机", "en_name": "Broken Record", "zh_roast": "同一个需求改写了好几轮", "en_roast": "The same ask, reworded a few times over."},
-        {"zh_name": "玄学召唤师", "en_name": "Vibe Summoner", "zh_roast": "prompt 偏短、结构化比例低，细节多靠 AI 推断", "en_roast": "Short, loosely-structured prompts — a lot is left for the AI to infer."}
+        {"zh_name": "渡劫飞升", "en_name": "One-Shot", "zh_roast": "结构清晰、带约束、点名文件——需求一次说清，几乎不返工", "en_roast": "Structured, constrained, file-anchored — the ask lands in one pass."},
+        {"zh_name": "结丹有成", "en_name": "Locked In", "zh_roast": "方向准，偶尔补一句收尾", "en_roast": "On target — just the occasional follow-up to tidy up."},
+        {"zh_name": "筑基初成", "en_name": "Mid", "zh_roast": "能说清楚，准头和篇幅还能再收一点", "en_roast": "Clear enough — aim and length could tighten up."},
+        {"zh_name": "卡瓶颈", "en_name": "Vibe Coder", "zh_roast": "结构和约束偏少，常常边问边改", "en_roast": "Light on structure and constraints — lots of fixing as you go."},
+        {"zh_name": "伪灵根", "en_name": "Manifesting", "zh_roast": "prompt 又短又松散，细节多靠 AI 推断", "en_roast": "Short, loosely-structured prompts — much is left for the AI to infer."}
       ]
     },
     "spending": {
