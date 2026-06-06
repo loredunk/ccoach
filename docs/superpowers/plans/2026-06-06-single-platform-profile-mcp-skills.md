@@ -392,7 +392,7 @@ Create `docs/adr/0044-scorecard-title-render-order-guard.md`:
 # ADR 0044 — Scorecard persona title / roast render-order guard
 
 > 状态：已接受 · 日期：2026-06-06
-> · 实现 [`adr/0008`](0008-gamified-shareable-scorecard.md) D3「人格称号由模型撰写」与 [`adr/0029`](0029-model-authored-scorecard-roasts.md) 的兜底定位
+> · 实现 [`adr/0008`](../../adr/0008-gamified-shareable-scorecard.md) D3「人格称号由模型撰写」与 [`adr/0029`](../../adr/0029-model-authored-scorecard-roasts.md) 的兜底定位
 > · 关联 skill 工作流 `skills/ccoach-insight/SKILL.md` step 6/7
 
 ## 背景
@@ -912,8 +912,8 @@ Create `docs/adr/0045-mcp-skills-usage-top.md`:
 # ADR 0045 — MCP / Skills usage top with source attribution
 
 > 状态：已接受 · 日期：2026-06-06
-> · 遵守 [`adr/0017`](0017-derived-non-content-signals.md) 派生非内容信号边界
-> · 不破坏 [`adr/0004`](0004-json-contract.md) / [`adr/0010`](0010-cli-rewrite-node-ccusage.md) 的 `--json` 契约
+> · 遵守 [`adr/0017`](../../adr/0017-derived-non-content-signals.md) 派生非内容信号边界
+> · 不破坏 [`adr/0004`](../../adr/0004-skills-based-analysis.md) / [`adr/0010`](../../adr/0010-cli-rewrite-node-ccusage.md) 的 `--json` 契约
 
 ## 背景
 

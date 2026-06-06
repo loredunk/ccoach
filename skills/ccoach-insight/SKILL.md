@@ -100,7 +100,7 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - The **tier scores and tier names** come from `scorecard.mjs` + the copy table — **do not change the names**
      (stable, recognizable, shareable identity; unsupported locales fall back to English).
    - **Roast lines are yours to write (ADR 0029/0031).** `scorecard.json` ships a safe fixture roast per axis as the
-     default/fallback; you SHOULD **rewrite each `axes[].roast` in `/tmp/scorecard.json`** (before step 7) into the
+     default/fallback. Rewriting each `axes[].roast` is **mandatory** (see the **REQUIRED before step 7** step below) — write it into the
      **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules (ADR 0031):
      **describe a phenomenon backed by a concrete number** in the merged JSON (cost / tokens / cache-replay / late-night
      share / plan-mode count / active days…) — *describing it is enough*; a light wry note is **optional, NOT a savage
@@ -108,13 +108,28 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
      CATEGORIES and counts, not intent — so do not claim "never ran a test", "didn't review the code", or "should've
      used plan mode" (there is no test-execution / review / plan-necessity signal; inventing one is a correctness bug,
      not a joke). Tease **changeable habits, never the person/ability** (ADR 0008); **aggregate-only — never quote or
-     imply prompt text** (the shareable card stays zero-raw-text). If you don't rewrite, the fixture roast renders.
-   - Also write the personality-summary sentence yourself (in that language) into the insights `executive_summary`.
-   - **Compose the persona title yourself (ADR 0008 D3).** `scorecard.json`'s `title` is a deterministic `A × B × C × D` fallback — do NOT present it raw. Write a short, witty persona handle from the four `axes[].tier` names (e.g. 渡劫飞升 + 富哥随意 + 架构师 + 劳模 → "随手烧钱的渡劫劳模"). Guardrails: stay faithful to the computed tiers, never exaggerate beyond them, never invent an axis, never quote prompt text. Write it in the report language.
+     imply prompt text** (the shareable card stays zero-raw-text).
+   - **REQUIRED before step 7 (render).** The scorecard you just generated ships fallback markers
+     (`title_is_fallback: true`, each `axes[].roast_is_fixture: true`). Before rendering you MUST
+     overwrite `/tmp/scorecard.json` in place (Read it, edit the fields, then write it back):
+     1. **Compose the persona title yourself (ADR 0008 D3)** — a short, witty handle from the four
+       `axes[].tier` names (e.g. 渡劫飞升 + 富哥随意 + 架构师 + 劳模 → "随手烧钱的渡劫劳模"); stay
+       faithful to the computed tiers, never invent an axis, never quote prompt text. Set
+       `title` to it **and set `title_is_fallback` to `false`**.
+     2. **Rewrite each `axes[].roast`** in the user's language per the rules above, and set that
+       axis's `roast_is_fixture` to `false`.
+     3. Also write the personality-summary sentence into the insights `executive_summary` — note this field lives in `/tmp/ai-usage-insights.json` (a separate file, not scorecard.json).
+     If you skip this, the renderer keeps the fallback `A × B × C × D` title and fixture roasts,
+     emits a stderr warning, and leaves a `<!-- ccoach:scorecard_title_is_fallback -->` marker in the
+     HTML (ADR 0044). Write-back happens BEFORE render — never render first and patch later.
 7. Render HTML (run step 4.5 `apply_pricing.mjs` first so cost is the official-online figure, not the offline fallback):
    - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ai-usage-report.html`
    - The whole report skeleton is localized from `references/report-copy.json` (default English; ADR 0025). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
    - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
+   - **Self-check (ADR 0044):** after rendering, look at the command's stderr. If you see a
+     `⚠ scorecard:` warning, the persona title / roasts were NOT written back before render — fix
+     `/tmp/scorecard.json` (step 6 write-back) and **re-run this render command**. Do not ship the
+     `ai-usage-report.html` while that warning is present.
 
 ### Dual-platform comparison (opt-in)
 
