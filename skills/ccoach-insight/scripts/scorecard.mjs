@@ -170,7 +170,9 @@ export function build(data, copy, lang) {
   const names = []
   for (const [key, uiLabel, idx] of axesSpec) {
     const { name, roast, i, count } = pick(copy, key, idx, lang)
-    axes.push({ key, label: ui[uiLabel], tier: name, roast, tier_index: i, tier_count: count })
+    // roast_is_fixture: this roast came verbatim from scorecard-copy.json (the fixture/兜底);
+    // the model rewrites axes[].roast before render and clears this flag (ADR 0029/0044).
+    axes.push({ key, label: ui[uiLabel], tier: name, roast, roast_is_fixture: true, tier_index: i, tier_count: count })
     goodness.push(count > 1 ? (count - 1 - i) / (count - 1) : 1.0)
     names.push(name)
   }
@@ -188,6 +190,9 @@ export function build(data, copy, lang) {
     // The shareable persona title is MODEL-WRITTEN at report time from axes[] (ADR 0008 D3);
     // see SKILL.md "compose the persona title". Do not present this raw join as the final title.
     title: names.join(' × '),
+    // title_is_fallback: the renderer warns + marks the HTML if this is still true at render time,
+    // i.e. the model did not write the persona title back before rendering (ADR 0044).
+    title_is_fallback: true,
     rank_pct: rankPct,
     rank_label: ui.beats_pct.replace('{pct}', String(rankPct)),
     rank_is_estimate: true,
