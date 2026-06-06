@@ -7,10 +7,12 @@
 // (per actual model name).
 //
 // Inputs (all JSON files produced beforehand by ccoach):
-//   --cc-report       ccoach report --platform claude-code --json   (Claude tokens + model_tokens + models_timeline + behavior)
+//   --cc-report       ccoach report --platform claude-code --json   (OPTIONAL; Claude tokens + model_tokens + models_timeline + behavior)
 //   --cc-sessions     ccoach sessions --platform claude-code --top N (OPTIONAL; top sessions by token, numeric only — no prompt text)
-//   --codex-report    ccoach report --platform codex --json         (Codex tokens + model_tokens + behavior)
+//   --codex-report    ccoach report --platform codex --json         (OPTIONAL; Codex tokens + model_tokens + behavior)
 //   --output          merged dual-platform JSON path
+//
+// At least one of --cc-report / --codex-report is required (single-platform is OK; both = dual).
 //
 // Both platforms expose a unified `behavior` block (tools / git_habits /
 // languages / repos / hours / sources) so the renderer can show them symmetrically.
