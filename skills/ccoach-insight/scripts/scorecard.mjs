@@ -71,7 +71,7 @@ export function scorePrompt(ps) {
   return 4
 }
 
-// Cost share of opus-class models on Claude Code, 0..1.
+// Cost share of opus-class models on the host platform, 0..1.
 function opusShare(cc) {
   const models = cc.models ?? []
   let tot = 0
@@ -150,7 +150,7 @@ export function build(data, copy, lang) {
   const ui = copy.ui[lang] ?? copy.ui.en ?? copy.ui.zh
   const platforms = data.platforms ?? {}
   // 宿主平台：dual 时取 Claude（行为不变）；单平台时取在场平台（ADR 0042）。
-  const cc = data.platforms.claude_code ?? data.platforms.codex ?? {}
+  const cc = platforms.claude_code ?? platforms.codex ?? {}
   const combined = data.combined ?? {}
   const ps = truthy(cc.prompt_signals)
     ? cc.prompt_signals
