@@ -407,15 +407,33 @@ function claudeServerTools(cc) {
 // `sc` is the JSON from scripts/scorecard.mjs; fully bilingual via its own copy.
 function scorecardHtml(sc) {
   if (!sc) return ''
+  // Render-order guard (ADR 0044): the persona title + roasts are MODEL-WRITTEN before render
+  // (SKILL.md step 6). If they are still the deterministic fallback at render time, leave a
+  // visible HTML marker + warn on stderr so the omission is caught — but still render (offline/
+  // test 兜底 stays valid, ADR 0029).
+  const titleFallback = sc.title_is_fallback === true || /\s×\s/.test(sc.title ?? '')
+  const fixtureRoasts = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
+  if (titleFallback || fixtureRoasts) {
+    const bits = []
+    if (titleFallback) bits.push("persona title is still the fallback 'A × B × C × D'")
+    if (fixtureRoasts) bits.push(`${fixtureRoasts} roast line(s) are still the fixture 兜底`)
+    process.stderr.write(
+      `⚠ scorecard: ${bits.join('; ')} — not written back to /tmp/scorecard.json before render. ` +
+        `Compose the persona title / rewrite roasts, then re-render (ADR 0044).\n`,
+    )
+  }
   const parts = ["<section class='scorecard'>"]
+  if (titleFallback) parts.push('<!-- ccoach:scorecard_title_is_fallback -->')
   parts.push(
     `<span class='sc-kicker'>${esc(sc.scorecard_label ?? '')} · ` + `${esc(sc.title_label ?? '')}</span>`,
   )
   parts.push(`<h2 class='sc-title'>${esc(sc.title ?? '')}</h2>`)
   if (sc.rank_label) parts.push(`<p class='sc-rank'>${esc(sc.rank_label)}</p>`)
   for (const ax of sc.axes ?? []) {
+    const roastMark = ax.roast_is_fixture === true ? '<!-- ccoach:roast_is_fixture -->' : ''
     parts.push(
       "<div class='sc-axis'>" +
+        roastMark +
         `<span class='sc-ax-label'>${esc(ax.label)}</span>` +
         `<span class='sc-tier'>${esc(ax.tier)}</span>` +
         `<span class='sc-roast'>${esc(ax.roast)}</span>` +
