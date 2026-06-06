@@ -37,6 +37,9 @@ ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只
 | 本机用量报告（默认命令） | `ccoach [--json --days N --since … --date … --by-repo]` | 只读 `~/.codex` rollout，输出 Token / 成本 / 工具 / 仓库 / 时段 / 来源 / 语言 / git 习惯 / 配置扫描；裸命令即出报告，`ccoach report …` 亦可 |
 | 双平台 AI 使用报告 skill | `skills/ccoach-insight/` | 已上线：用 `ccoach report --json` 数据（两平台离线解析），产出 Claude Code + Codex 双平台 HTML 报告、行为画像，并支持 Codex 高耗会话钻取 |
 
+- **默认出宿主平台报告（ADR 0042）**：skill 默认只分析「当前调用它的平台」（Claude Code → CC 报告，Codex → Codex 报告），
+  双平台对比为显式 opt-in（用户说「对比 / both / dual」才出两栏）。宿主无法判定时向用户提问。探测仅读 `CLAUDECODE` 布尔，隐私红线不变。
+
 `ccoach --json` 已经是「脚本友好」的结构化输出（见
 [`src/model.ts`](../src/model.ts) 的 `Report` 结构，
 已含 `repos / hours / sources / languages / git_habits / project_management` 等行为维度，由

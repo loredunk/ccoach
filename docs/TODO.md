@@ -177,6 +177,9 @@
 - [x] **默认语言 = 英文**：`render×2` + `scorecard.mjs` 缺省 `--lang` 即 `en`；SKILL.md 示例默认值改 `--lang en`、「Use Chinese unless asked」改为「按用户语言写、不明默认英文」。
 - [x] **语言来源**：agent（SKILL.md 指导）按用户对话语言传 `--lang`，脚本缺省英文；不引入环境探测（决策见 ADR 0025）。
 - [ ]（follow-up，**不在 T15 范围**）**CLI 自身 i18n**：`src/habits.ts` 生成的中文信号短语（经 `--json`→merge `extras`→报告）、merge 的少量 `extras` 前缀、`src/emit/text.ts` 全中文人读输出——英文报告里仍会夹这些 CLI 层中文，需给 CLI 加语言层（信号结构化 / emitter 文案表）。详见 ADR 0025「已知遗留」。
+- [x] **宿主平台默认（ADR 0042）**：`ccoach-insight` 默认出当前宿主平台单报告（`CLAUDECODE` 探测 + 无法判定时提问），
+      双平台对比转 opt-in；`merge`/`render`/`scorecard` 泛化为「N 面板」，标题品牌化为 `ccoach Insight Report` / `ccoach 洞察报告`。
+      回归 `test/merge-single-platform.test.ts` / `test/render-single-platform.test.ts` + scorecard host 用例。
 
 ## T16 · 输入/输出 Token 分布修正（展示口径）（P1）— ✅ 已完成
 
