@@ -435,7 +435,8 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   const hasCc = !!cc
   const hasCx = !!cx
   const both = hasCc && hasCx // dual=完整对比；单平台=隐藏对比区 + 缺席面板（宿主平台默认，ADR 0042）
-  const scope = both ? 'Claude Code + Codex' : hasCc ? 'Claude Code' : 'Codex'
+  const scope = both ? 'Claude Code + Codex' : hasCc ? 'Claude Code' : 'Codex' // 产品名不本地化，仅副标题模板按 --lang 取
+  const gridAttr = both ? " class='grid2'" : '' // dual=并排两栏；单平台=无 class，单面板整宽（ADR 0042）
   const comb = data.combined
   const title = tr('report_title') // 报告标题属骨架文案，按 --lang 取；忽略 merge 写入的固定 data.title
   const htmllang = tr('html_lang')
@@ -546,7 +547,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   }
 
   // platform panels — 按在场平台渲染（单平台不并排、不留空壳，ADR 0042）
-  p.push(`<section class='${both ? 'grid2' : ''}'>`)
+  p.push(`<section${gridAttr}>`)
 
   // Claude Code panel
   if (hasCc) {
@@ -594,7 +595,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   p.push('</section>')
 
   // token composition per platform — 按在场平台渲染（ADR 0042）
-  p.push(`<section class='${both ? 'grid2' : ''}'>`)
+  p.push(`<section${gridAttr}>`)
   // Both panels use disjoint buckets that sum to total (ADR 0024). For Codex this fixes the old
   // double-count where input (incl cached) + cached + reasoning (⊆ output) overshot 100%.
   if (hasCc) {
@@ -621,13 +622,13 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   p.push('</section>')
 
   // symmetric behavior panels (tools / git / languages / repos / hours) — 按在场平台渲染（ADR 0042）
-  p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + `<div class='${both ? 'grid2' : ''}'>`)
+  p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + `<div${gridAttr}>`)
   if (hasCc) p.push(behaviorPanel(cc.behavior, '#0f766e', 'Claude Code'))
   if (hasCx) p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
   p.push('</div></section>')
 
   // per-turn episode analysis (ADR 0032/0034) — 按在场平台渲染（ADR 0042）
-  p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + `<div class='${both ? 'grid2' : ''}'>`)
+  p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + `<div${gridAttr}>`)
   if (hasCc) p.push(episodePanel(cc.episode_summary, 'Claude Code'))
   if (hasCx) p.push(episodePanel(cx.episode_summary, 'Codex'))
   p.push('</div></section>')
