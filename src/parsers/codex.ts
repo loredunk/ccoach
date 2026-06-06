@@ -182,6 +182,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           // Codex 执行画像（ADR 0023 D1）：仅窗口内、非子代理（习惯信号）；只取枚举/mode 名，绝不读 developer_instructions。
           if (!sidechain && inWin(ts)) {
             // 回合边界（ADR 0032 D2）：Codex 无用户消息记录，turn_context≈一次用户指令；无 corrected（不读 prompt，ADR 0041）。
+            // 口径审计（ADR 0043）：Codex rollout 无 isMeta/命令桩/中断哨兵这类机器注入的 user 记录，turn_context 本身已是真实回合边界，无需对称过滤。
             agg.beginEpisode(sessionId || '(unknown)', repo, ts, false)
             if (typeof payload.effort === 'string') agg.applyCodexLabel('effort', payload.effort)
             if (typeof payload.approval_policy === 'string') agg.applyCodexLabel('approval_policy', payload.approval_policy)
