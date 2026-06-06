@@ -1,7 +1,7 @@
 ---
 name: ccoach-insight
-description: Generate an enriched dual-platform (Claude Code + Codex) HTML report of local AI coding usage. Tokens & models come from `ccoach report --json` (offline local parse of both platforms); cost is computed from official online prices the agent looks up per model. Use when the user wants a deeper AI-written review of how they use Claude Code and/or Codex — cost, token, cache, model and active-hours breakdown, habits analysis, project-by-project recommendations, high-token project/session drilldown, or a richer HTML dashboard than the raw text/JSON reports.
-when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage across Claude Code and Codex — for example "how much did I spend on Claude Code / Codex", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my Claude Code and Codex usage", "which projects burned the most tokens", "compare my Claude Code vs Codex usage", "review my most expensive or unclear Codex sessions", "analyze my AI coding habits", or an explicit /ccoach-insight invocation.'
+description: Generate an enriched HTML report of your local AI coding usage. By DEFAULT it reports the platform you're running in (Claude Code if invoked from Claude Code, Codex if invoked from Codex); the dual-platform comparison is opt-in (ask to "compare" or for "both"). Tokens & models come from `ccoach report --json` (offline local parse); cost is computed from official online prices the agent looks up per model. Use when the user wants a deeper AI-written review of how they use Claude Code or Codex — cost, token, cache, model and active-hours breakdown, habits analysis, project-by-project recommendations, high-token project/session drilldown, or a richer HTML dashboard than the raw text/JSON reports.
+when_to_use: 'Trigger when the user wants to review, analyze, or visualize their local AI coding usage — for example "how much did I spend", "how much did I use AI today", "generate an AI usage report", "build an HTML dashboard of my usage", "which projects burned the most tokens", "review my most expensive sessions", "analyze my AI coding habits", or an explicit /ccoach-insight invocation. By DEFAULT report the host platform (the one this skill is invoked from). Trigger the DUAL-platform comparison ONLY when the user explicitly asks to compare ("compare my Claude Code vs Codex usage", "both platforms", "dual report").'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
 allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *)
@@ -38,7 +38,23 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
 
 ## Workflow
 
-### Daily dual-platform report
+### Step 0 — pick the platform (host-aware default)
+
+Decide which platform(s) to report, in this priority order:
+
+1. **Explicit user request wins.** If the user names a platform ("my Codex usage", "Claude Code report") → that single platform. If they ask to **compare / both / dual** ("compare Claude Code vs Codex", "both platforms") → run the **Dual-platform comparison (opt-in)** flow below.
+2. **Otherwise detect the host platform** you are running in:
+
+   ```sh
+   PLAT=$([ -n "$CLAUDECODE" ] && echo claude-code || echo codex)
+   ```
+
+   `CLAUDECODE` is set by Claude Code and absent under Codex. Report that single platform. (You also know your own host; the env probe is the deterministic primary.)
+3. **If the host is indeterminate** (no `CLAUDECODE` and not recognizably Codex — e.g. another harness or a pipe), **ASK the user** which to generate: **① Claude Code ② Codex ③ dual comparison**, then proceed.
+
+Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **default report** below covers `<P>` only; `merge_dual_platform.mjs` now accepts a single `--cc-report` OR `--codex-report` and renders one panel with no comparison section. Only the explicit **Dual-platform comparison (opt-in)** path runs both platforms.
+
+### Default report (single platform `<P>`)
 
    Let `<W>` be the window flag derived from `$period` (default: **no flag = today**; `--date <d>` / `--days <n>` / `--since <d>` otherwise). Use the **same `<W>`** for every command below.
 
@@ -47,16 +63,18 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
 1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
    - Prefer `ccoach` from `PATH`; otherwise `npx @loredunk/ccoach@latest`.
    - If this is the ccoach source repo, run `npm ci && npm run build`, then invoke `node dist/cli.js` (or `npm run dev --` to run `tsx src/cli.ts`).
-2. Generate **both platform reports** from ccoach (offline local parse; same `<W>`/`<L>`):
-   - `ccoach report --platform codex <W> <L> --json > /tmp/codex-usage-report.json`
-   - `ccoach report --platform claude-code <W> <L> --json > /tmp/claude-report.json`
+2. Generate the **host platform report** from ccoach (offline local parse; same `<W>`/`<L>`):
+   - `ccoach report --platform <P> <W> <L> --json > /tmp/<P>-report.json`
+   - (Only the **Dual-platform comparison (opt-in)** path runs BOTH `--platform codex` and `--platform claude-code`.)
    - Each report carries `tokens` + `model_tokens[]` (per-model token buckets for pricing) + `models_timeline` (the daily sparkline series) + `behavior` + `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
 3. (Optional) Top Claude sessions for the sessions table — numeric only, **NO prompt text**, same `<W>`:
    - `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
    - Skip it and the Claude top-sessions table just renders empty (it has no `--include-user-prompts`, so it's repo/tokens/models counts only).
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
-   - `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-report /tmp/claude-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-usage-report.json <L> --output /tmp/ai-usage.json`
-   - `--cc-sessions` is optional (the top-sessions table degrades to empty). Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
+   - Single platform (default): pass only the matching report flag —
+     `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --<P>-report /tmp/<P>-report.json [--cc-sessions /tmp/cc-sessions.json] <L> --output /tmp/ai-usage.json` (use `--cc-report` when `<P>=claude-code`, `--codex-report` when `<P>=codex`; `--cc-sessions` only applies to claude-code).
+   - Dual comparison (opt-in): pass BOTH — `--cc-report /tmp/claude-report.json --cc-sessions /tmp/cc-sessions.json --codex-report /tmp/codex-usage-report.json`.
+   - Cost in this output is an offline fallback — step 4.5 overwrites it with official prices.
 4.5. **Price from official online prices** (cost layer; see "Online official pricing" below):
    - Read `/tmp/ai-usage.json`, collect every model name from each `platforms.<plat>.models[]` (skip `<synthetic>` / zero-token entries).
    - For each model, **web-search its official API price** (Anthropic / OpenAI / the third-party provider that serves it). Record per-million-token USD: `{input, cached_input, output, cache_creation?}` (include `cache_creation` only for Claude-family models). Normalize units (per-1K → ×1000).
@@ -93,9 +111,9 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
    - The whole report skeleton is localized from `references/report-copy.json` (default English; ADR 0025). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
    - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
 
-### Single-platform fallback
+### Dual-platform comparison (opt-in)
 
-The dual report already tolerates one platform having no data in the window — that panel just renders a localized empty note. If you deliberately want a **single-platform** enriched report (e.g. Codex-only), skip the merge and render straight from one ccoach report:
+Run this ONLY when the user explicitly asks to compare platforms. Generate BOTH reports (step 2 for `--platform claude-code` and `--platform codex`), pass both `--cc-report` and `--codex-report` to `merge_dual_platform.mjs`, then price/scorecard/render as usual — the renderer shows both panels plus the head-to-head comparison. The Codex-only enriched fallback (`render_enriched_codex_report.mjs`) remains available for a Codex-only deep report.
 
 - Run `ccoach report --platform codex --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --lang en --output codex-report.enriched.html` (skeleton localized from `references/report-copy.json`, default English; pass `--lang zh` for Chinese).
 - If Node itself is missing, ccoach can't run and there is no report — install Node, then `npx @loredunk/ccoach@latest`.
