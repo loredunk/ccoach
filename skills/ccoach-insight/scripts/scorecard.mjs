@@ -149,7 +149,8 @@ export function build(data, copy, lang) {
   lang = lang || 'en' // 默认英文（ADR 0025/0026）；任意 locale 透传，缺失键逐键回退（pick / ui 各自 fallback）
   const ui = copy.ui[lang] ?? copy.ui.en ?? copy.ui.zh
   const platforms = data.platforms ?? {}
-  const cc = platforms.claude_code ?? {}
+  // 宿主平台：dual 时取 Claude（行为不变）；单平台时取在场平台（ADR 0042）。
+  const cc = data.platforms.claude_code ?? data.platforms.codex ?? {}
   const combined = data.combined ?? {}
   const ps = truthy(cc.prompt_signals)
     ? cc.prompt_signals

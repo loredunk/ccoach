@@ -6,7 +6,7 @@
 //   - 渲染 HTML 含成绩卡，且不泄配额% / 密钥
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -64,5 +64,32 @@ describe('scorecard 回归（.mjs，去 Python）', () => {
     } finally {
       rmSync(d, { recursive: true, force: true })
     }
+  })
+
+  it('Codex-only merged JSON → 成绩卡评宿主(Codex)数据，不塌（ADR 0042）', () => {
+    const d = mkdtempSync(path.join(tmpdir(), 'ccoach-sc-cx-'))
+    try {
+      const codexOnly = {
+        platforms: {
+          codex: {
+            cost_usd: 12, active_days: 6, tokens: { total: 500000 },
+            models: [{ model: 'gpt-5.4', cost: 12 }],
+            behavior: { tool_categories: { shell: 10, file: 30 }, repos: [{ repo: 'a' }], hours: [{ hour: 14, count: 20 }], sessions: 8 },
+            prompt_signals: { prompts: 5, avg_len: 300, structured_ratio: 0.6, constraint_ratio: 0.5, file_ref_ratio: 0.4, correction_rate: 0.1 },
+          },
+        },
+        combined: { total_cost_usd: 12, total_tokens: 500000, total_sessions: 8, prompt_signals: {} },
+      }
+      const dataPath = path.join(d, 'codex-only.json')
+      writeFileSync(dataPath, JSON.stringify(codexOnly))
+      const out = path.join(d, 'card.json')
+      execFileSync('node', [path.join(SKILL, 'scorecard.mjs'), '--data', dataPath, '--lang', 'en', '--output', out], { encoding: 'utf8' })
+      const card = JSON.parse(readFileSync(out, 'utf8'))
+      expect(new Set(card.axes.map((a: { key: string }) => a.key))).toEqual(AXES)
+      for (const a of card.axes) expect(a.tier, `${a.key} tier`).toBeTruthy()
+      const dil = card.axes.find((a: { key: string }) => a.key === 'diligence')
+      // 宿主=Codex 时 active_days=6 → Workhorse(0)；旧逻辑(host={}) active_days=0 → 会落到 index 2
+      expect(dil.tier_index).toBe(0)
+    } finally { rmSync(d, { recursive: true, force: true }) }
   })
 })
