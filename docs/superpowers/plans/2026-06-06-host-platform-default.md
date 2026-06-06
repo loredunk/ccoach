@@ -850,9 +850,9 @@ Create `docs/adr/0042-skill-host-platform-default.md`:
 # ADR 0042 — ccoach-insight 默认出宿主平台报告，双平台对比转 opt-in
 
 > 状态：已接受 · 日期：2026-06-06
-> · 收敛 [`adr/0011-multi-platform-usage-sources.md`](0011-multi-platform-usage-sources.md) 的「Codex 与 Claude Code 对称、一等数据源」——对称不等于每次都并排
-> · 沿用 [`adr/0025-report-skeleton-i18n-default-english.md`](0025-report-skeleton-i18n-default-english.md) 的报告骨架 i18n（默认英文、逐键回退）
-> · 不放宽 [`adr/0016-tool-result-derived-signals.md`](0016-tool-result-derived-signals.md) / [`adr/0017-derived-non-content-signals.md`](0017-derived-non-content-signals.md) 的隐私红线
+> · 收敛 [`adr/0011-multi-platform-usage-sources.md`](../../adr/0011-multi-platform-usage-sources.md) 的「Codex 与 Claude Code 对称、一等数据源」——对称不等于每次都并排
+> · 沿用 [`adr/0025-report-skeleton-i18n-default-english.md`](../../adr/0025-report-skeleton-i18n-default-english.md) 的报告骨架 i18n（默认英文、逐键回退）
+> · 不放宽 [`adr/0016-error-signals-derived-tool-result-reading.md`](../../adr/0016-error-signals-derived-tool-result-reading.md) / [`adr/0017-derived-non-content-signals.md`](../../adr/0017-derived-non-content-signals.md) 的隐私红线
 
 ## 背景
 
