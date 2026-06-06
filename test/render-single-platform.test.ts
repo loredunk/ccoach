@@ -33,6 +33,12 @@ describe('render: single-platform (ADR 0042)', () => {
     expect(html).not.toContain('Platform Comparison')
     expect(html).not.toContain('<h2>Codex</h2>')
     expect(html).toContain('Platform: Claude Code')
+    // REQ1: single-platform report must NOT show a dual-platform behavior heading
+    expect(html).not.toContain('symmetric across platforms')
+    expect(html).toContain('Usage Behavior Profile')
+    const zhHtml = renderMerged({ generated_at: '2026-06-06', window: { desc: 'today' }, platforms: { claude_code: cc }, combined: { total_cost_usd: 1.5, total_tokens: 200, total_sessions: 2 } }, 'zh')
+    expect(zhHtml).not.toContain('两平台对称')
+    expect(zhHtml).toContain('使用行为画像')
   })
   it('Codex-only → Codex panel, no comparison, no Claude panel', () => {
     const cx = buildCodex(cxRaw)

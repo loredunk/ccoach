@@ -621,7 +621,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   }
   p.push('</section>')
 
-  // symmetric behavior panels (tools / git / languages / repos / hours) — 按在场平台渲染（ADR 0042）
+  // behavior panels (tools / git / languages / repos / hours) — 按在场平台渲染（单平台只画在场平台，ADR 0042）
   p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + `<div${gridAttr}>`)
   if (hasCc) p.push(behaviorPanel(cc.behavior, '#0f766e', 'Claude Code'))
   if (hasCx) p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
