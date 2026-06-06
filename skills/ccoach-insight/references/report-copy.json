@@ -4,7 +4,8 @@
   "dual": {
     "en": {
       "html_lang": "en",
-      "report_title": "Dual-Platform AI Usage Report",
+      "report_title": "ccoach Insight Report",
+      "report_subtitle_scope": "Platform: {scope}",
       "src_claude": "ccoach (local parse: tokens/models) · official online pricing",
       "src_codex": "ccoach (local parse: tokens/models) · official online pricing",
       "header_meta": "Statistics window: {window} · Generated at {gen}",
@@ -17,6 +18,7 @@
       "m_cc_cost": "Claude Code Cost",
       "m_cx_cost": "Codex Cost",
       "active_days_sub": "{n} active days",
+      "m_active_days": "Active Days",
       "h_exec_summary": "Executive Summary",
       "h_ai_recs": "AI Recommendations",
       "rec_evidence": "Evidence: ",
@@ -139,7 +141,8 @@
     },
     "zh": {
       "html_lang": "zh-CN",
-      "report_title": "双平台 AI 使用报告",
+      "report_title": "ccoach 洞察报告",
+      "report_subtitle_scope": "平台：{scope}",
       "src_claude": "ccoach（本地解析，token/模型）· 官方在线定价",
       "src_codex": "ccoach（本地解析，token/模型）· 官方在线定价",
       "header_meta": "统计窗口：{window} · 生成于 {gen}",
@@ -152,6 +155,7 @@
       "m_cc_cost": "Claude Code 成本",
       "m_cx_cost": "Codex 成本",
       "active_days_sub": "{n} 活跃天",
+      "m_active_days": "活跃天数",
       "h_exec_summary": "执行摘要",
       "h_ai_recs": "AI 建议",
       "rec_evidence": "证据：",

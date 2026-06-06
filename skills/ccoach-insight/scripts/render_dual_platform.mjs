@@ -432,6 +432,10 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   setI18n(copy ?? { dual: { en: {} }, default: 'en' }, lang)
   const cc = data.platforms.claude_code
   const cx = data.platforms.codex
+  const hasCc = !!cc
+  const hasCx = !!cx
+  const both = hasCc && hasCx // dual=完整对比；单平台=隐藏对比区 + 缺席面板（宿主平台默认，ADR 0042）
+  const scope = both ? 'Claude Code + Codex' : hasCc ? 'Claude Code' : 'Codex'
   const comb = data.combined
   const title = tr('report_title') // 报告标题属骨架文案，按 --lang 取；忽略 merge 写入的固定 data.title
   const htmllang = tr('html_lang')
@@ -444,6 +448,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
     CSS,
     '</style></head><body><main>',
     `<header><h1>${esc(title)}</h1>` +
+      `<p class='muted'>${esc(tr('report_subtitle_scope', { scope }))}</p>` +
       `<p><b>${tr('header_meta', { window: esc(data.window?.desc ?? data.generated_at), gen: esc(data.generated_at) })}</b></p>` +
       `<p class='muted'>${tr('header_source')}${costMeta}</p></header>`,
   ]
@@ -455,8 +460,13 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   p.push("<section class='metrics'>")
   p.push(metric(tr('m_total_cost'), money(comb.total_cost_usd), tr('m_total_cost_sub')))
   p.push(metric(tr('m_total_tokens'), comma(comb.total_tokens)))
-  p.push(metric(tr('m_cc_cost'), money(cc.cost_usd), tr('active_days_sub', { n: cc.active_days })))
-  p.push(metric(tr('m_cx_cost'), money(cx.cost_usd), tr('active_days_sub', { n: cx.active_days })))
+  if (both) {
+    p.push(metric(tr('m_cc_cost'), money(cc.cost_usd), tr('active_days_sub', { n: cc.active_days })))
+    p.push(metric(tr('m_cx_cost'), money(cx.cost_usd), tr('active_days_sub', { n: cx.active_days })))
+  } else {
+    const only = hasCc ? cc : cx
+    p.push(metric(tr('m_active_days'), comma(only.active_days)))
+  }
   p.push('</section>')
 
   // 端点 / 计费模式（账户级当前快照：官方 vs 中转）
@@ -517,98 +527,109 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   }
   p.push('</section>')
 
-  // head-to-head comparison bars
-  p.push(
-    `<section class='panel'><h2>${esc(tr('h_comparison'))}</h2><div class='legend'>` +
-      "<span class='ldot a'></span>Claude Code" +
-      "<span class='ldot b'></span>Codex</div>",
-  )
-  p.push(compareMetric(tr('cmp_total_cost'), cc.cost_usd, cx.cost_usd, money))
-  p.push(compareMetric(tr('cmp_total_tokens'), cc.tokens.total, cx.tokens.total))
-  // 输入 Token = 输入侧总量（含缓存读）——两平台口径统一，避免 Claude 因排除 cache 而虚小（ADR 0024）。
-  p.push(compareMetric(tr('cmp_input'), inputSideTotal(cc.tokens, 'claude'), inputSideTotal(cx.tokens, 'codex')))
-  p.push(compareMetric(tr('cmp_output'), cc.tokens.output, cx.tokens.output))
-  p.push(compareMetric(tr('cmp_cache_read'), cc.tokens.cache_read, cx.tokens.cache_read))
-  p.push(compareMetric(tr('cmp_cache_hit'), cc.cache_hit_rate, cx.cache_hit_rate, pct))
-  p.push(compareMetric(tr('cmp_active_days'), cc.active_days, cx.active_days))
-  p.push('</section>')
+  // head-to-head comparison bars — 仅双平台渲染（单平台无对比对象，ADR 0042）
+  if (both) {
+    p.push(
+      `<section class='panel'><h2>${esc(tr('h_comparison'))}</h2><div class='legend'>` +
+        "<span class='ldot a'></span>Claude Code" +
+        "<span class='ldot b'></span>Codex</div>",
+    )
+    p.push(compareMetric(tr('cmp_total_cost'), cc.cost_usd, cx.cost_usd, money))
+    p.push(compareMetric(tr('cmp_total_tokens'), cc.tokens.total, cx.tokens.total))
+    // 输入 Token = 输入侧总量（含缓存读）——两平台口径统一，避免 Claude 因排除 cache 而虚小（ADR 0024）。
+    p.push(compareMetric(tr('cmp_input'), inputSideTotal(cc.tokens, 'claude'), inputSideTotal(cx.tokens, 'codex')))
+    p.push(compareMetric(tr('cmp_output'), cc.tokens.output, cx.tokens.output))
+    p.push(compareMetric(tr('cmp_cache_read'), cc.tokens.cache_read, cx.tokens.cache_read))
+    p.push(compareMetric(tr('cmp_cache_hit'), cc.cache_hit_rate, cx.cache_hit_rate, pct))
+    p.push(compareMetric(tr('cmp_active_days'), cc.active_days, cx.active_days))
+    p.push('</section>')
+  }
 
-  // two platform panels side by side
-  p.push("<section class='grid2'>")
+  // platform panels — 按在场平台渲染（单平台不并排、不留空壳，ADR 0042）
+  p.push(`<section class='${both ? 'grid2' : ''}'>`)
 
   // Claude Code panel
-  p.push("<div class='panel'><h2>Claude Code</h2>")
-  p.push(
-    `<p class='muted'>${tr('panel_sessions_meta', { source: esc(tr('src_claude')), range: rangeLabel(cc.date_range), sessions: cc.sessions, cost: costNote(cc) })}</p>`,
-  )
-  p.push(sparkline(cc.daily_series, '#0f766e'))
-  p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
-  p.push(modelTable(cc.models, 'claude'))
-  p.push(`<h3>${esc(tr('h_top_sessions'))}</h3><table><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_model'))}</th></tr>`)
-  for (const s of cc.top_sessions) {
+  if (hasCc) {
+    p.push("<div class='panel'><h2>Claude Code</h2>")
     p.push(
-      `<tr><td>${esc(s.project)}<br><span class='muted'>${esc(s.last)}</span></td>` +
-        `<td>${comma(s.tokens)}</td>` +
-        `<td>${esc((s.models ?? []).join(', '))}</td></tr>`,
+      `<p class='muted'>${tr('panel_sessions_meta', { source: esc(tr('src_claude')), range: rangeLabel(cc.date_range), sessions: cc.sessions, cost: costNote(cc) })}</p>`,
     )
+    p.push(sparkline(cc.daily_series, '#0f766e'))
+    p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
+    p.push(modelTable(cc.models, 'claude'))
+    p.push(`<h3>${esc(tr('h_top_sessions'))}</h3><table><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_model'))}</th></tr>`)
+    for (const s of cc.top_sessions) {
+      p.push(
+        `<tr><td>${esc(s.project)}<br><span class='muted'>${esc(s.last)}</span></td>` +
+          `<td>${comma(s.tokens)}</td>` +
+          `<td>${esc((s.models ?? []).join(', '))}</td></tr>`,
+      )
+    }
+    p.push('</table>')
+    p.push(claudeServerTools(cc))
+    p.push('</div>')
   }
-  p.push('</table>')
-  p.push(claudeServerTools(cc))
-  p.push('</div>')
 
   // Codex panel
-  p.push("<div class='panel'><h2>Codex</h2>")
-  const cxEmpty = (cx.tokens?.total ?? 0) === 0
-  p.push(
-    `<p class='muted'>${tr('panel_cx_meta', { source: esc(tr('src_codex')), range: rangeLabel(cx.date_range), cost: costNote(cx) })}</p>`,
-  )
-  if (cxEmpty) {
-    p.push(`<p class='muted'>${esc(tr('cx_empty'))}</p>`)
-  } else {
-    p.push(sparkline(cx.daily_series, '#b45309'))
-    p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
-    p.push(modelTable(cx.models, 'codex'))
+  if (hasCx) {
+    p.push("<div class='panel'><h2>Codex</h2>")
+    const cxEmpty = (cx.tokens?.total ?? 0) === 0
     p.push(
-      `<p class='muted'>${tr('cx_tokline', { tokens: comma((cx.tokens ?? {}).total ?? 0), cost: money(cx.cost_usd), hit: pct(cx.cache_hit_rate) })}</p>`,
+      `<p class='muted'>${tr('panel_cx_meta', { source: esc(tr('src_codex')), range: rangeLabel(cx.date_range), cost: costNote(cx) })}</p>`,
     )
-    p.push(codexBillingBreakdown(cx))
-    p.push(codexExecProfile(cx))
+    if (cxEmpty) {
+      p.push(`<p class='muted'>${esc(tr('cx_empty'))}</p>`)
+    } else {
+      p.push(sparkline(cx.daily_series, '#b45309'))
+      p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
+      p.push(modelTable(cx.models, 'codex'))
+      p.push(
+        `<p class='muted'>${tr('cx_tokline', { tokens: comma((cx.tokens ?? {}).total ?? 0), cost: money(cx.cost_usd), hit: pct(cx.cache_hit_rate) })}</p>`,
+      )
+      p.push(codexBillingBreakdown(cx))
+      p.push(codexExecProfile(cx))
+    }
+    p.push('</div>')
   }
-  p.push('</div>')
   p.push('</section>')
 
-  // token composition per platform
-  p.push("<section class='grid2'>")
+  // token composition per platform — 按在场平台渲染（ADR 0042）
+  p.push(`<section class='${both ? 'grid2' : ''}'>`)
   // Both panels use disjoint buckets that sum to total (ADR 0024). For Codex this fixes the old
   // double-count where input (incl cached) + cached + reasoning (⊆ output) overshot 100%.
-  p.push(`<div class='panel'><h2>${esc(tr('h_cc_tokens'))}</h2>`)
-  const cccomp = tokenComposition(cc.tokens, 'claude')
-  p.push(barRow(tr('bar_cache_read'), cccomp.cacheRead, cccomp.total))
-  p.push(barRow(tr('bar_output'), cccomp.output, cccomp.total))
-  p.push(barRow(tr('bar_cache_create'), cccomp.cacheCreate, cccomp.total))
-  p.push(barRow(tr('bar_fresh_input'), cccomp.fresh, cccomp.total))
-  p.push('</div>')
-  p.push(`<div class='panel'><h2>${esc(tr('h_cx_tokens'))}</h2>`)
-  const cxcomp = tokenComposition(cx.tokens, 'codex')
-  p.push(barRow(tr('bar_cached_input'), cxcomp.cacheRead, cxcomp.total))
-  p.push(barRow(tr('bar_fresh_input'), cxcomp.fresh, cxcomp.total))
-  p.push(barRow(tr('bar_output'), cxcomp.output, cxcomp.total))
-  if (cxcomp.reasoning) {
-    const rpct = cxcomp.output ? ((cxcomp.reasoning / cxcomp.output) * 100).toFixed(0) : '0'
-    p.push(`<p class='muted'>${esc(tr('cx_reasoning_note', { n: comma(cxcomp.reasoning), pct: rpct }))}</p>`)
+  if (hasCc) {
+    p.push(`<div class='panel'><h2>${esc(tr('h_cc_tokens'))}</h2>`)
+    const cccomp = tokenComposition(cc.tokens, 'claude')
+    p.push(barRow(tr('bar_cache_read'), cccomp.cacheRead, cccomp.total))
+    p.push(barRow(tr('bar_output'), cccomp.output, cccomp.total))
+    p.push(barRow(tr('bar_cache_create'), cccomp.cacheCreate, cccomp.total))
+    p.push(barRow(tr('bar_fresh_input'), cccomp.fresh, cccomp.total))
+    p.push('</div>')
   }
+  if (hasCx) {
+    p.push(`<div class='panel'><h2>${esc(tr('h_cx_tokens'))}</h2>`)
+    const cxcomp = tokenComposition(cx.tokens, 'codex')
+    p.push(barRow(tr('bar_cached_input'), cxcomp.cacheRead, cxcomp.total))
+    p.push(barRow(tr('bar_fresh_input'), cxcomp.fresh, cxcomp.total))
+    p.push(barRow(tr('bar_output'), cxcomp.output, cxcomp.total))
+    if (cxcomp.reasoning) {
+      const rpct = cxcomp.output ? ((cxcomp.reasoning / cxcomp.output) * 100).toFixed(0) : '0'
+      p.push(`<p class='muted'>${esc(tr('cx_reasoning_note', { n: comma(cxcomp.reasoning), pct: rpct }))}</p>`)
+    }
+    p.push('</div>')
+  }
+  p.push('</section>')
+
+  // symmetric behavior panels (tools / git / languages / repos / hours) — 按在场平台渲染（ADR 0042）
+  p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + `<div class='${both ? 'grid2' : ''}'>`)
+  if (hasCc) p.push(behaviorPanel(cc.behavior, '#0f766e', 'Claude Code'))
+  if (hasCx) p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
   p.push('</div></section>')
 
-  // symmetric behavior panels (tools / git / languages / repos / hours)
-  p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + "<div class='grid2'>")
-  p.push(behaviorPanel(cc.behavior, '#0f766e', 'Claude Code'))
-  p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
-  p.push('</div></section>')
-
-  // per-turn episode analysis (ADR 0032/0034): autonomy / spirals / task mix / deepest pit
-  p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + "<div class='grid2'>")
-  p.push(episodePanel(cc.episode_summary, 'Claude Code'))
-  p.push(episodePanel(cx.episode_summary, 'Codex'))
+  // per-turn episode analysis (ADR 0032/0034) — 按在场平台渲染（ADR 0042）
+  p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + `<div class='${both ? 'grid2' : ''}'>`)
+  if (hasCc) p.push(episodePanel(cc.episode_summary, 'Claude Code'))
+  if (hasCx) p.push(episodePanel(cx.episode_summary, 'Codex'))
   p.push('</div></section>')
 
   // data provenance / privacy
