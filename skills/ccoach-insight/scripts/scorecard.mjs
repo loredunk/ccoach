@@ -184,7 +184,9 @@ export function build(data, copy, lang) {
     scorecard_label: ui.scorecard,
     title_label: ui.title_label,
     axes,
-    // placeholder composite title; the model may rewrite into a sentence
+    // FALLBACK ONLY: deterministic `A × B × C × D` join for non-LLM / JSON consumers.
+    // The shareable persona title is MODEL-WRITTEN at report time from axes[] (ADR 0008 D3);
+    // see SKILL.md "compose the persona title". Do not present this raw join as the final title.
     title: names.join(' × '),
     rank_pct: rankPct,
     rank_label: ui.beats_pct.replace('{pct}', String(rankPct)),

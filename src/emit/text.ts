@@ -167,6 +167,8 @@ export function emitText(r: Report, byRepo: boolean): string {
     lines.push('  ' + tf('tx_episodes_line', {
       n: ep.episodes, a: (ep.autonomy_rate * 100).toFixed(0), s: styleLabel(ep.intervention_style), sp: ep.spiral_episodes,
     }))
+    lines.push('  ' + t('tx_episodes_note'))
+    if (ep.spiral_episodes > 0) lines.push('  ' + t('tx_spiral_note'))
     const mix = Object.entries(ep.task_mix).sort((a, b) => b[1] - a[1]).slice(0, 3)
     if (mix.length) lines.push('  ' + t('tx_episode_taskmix') + mix.map(([k, v]) => `${k}(${Math.round(v * 100)}%)`).join(' '))
     if (ep.deepest_pit) lines.push('  ' + tf('tx_episode_deepest', { type: ep.deepest_pit.task_type, sev: ep.deepest_pit.severity, tok: comma(ep.deepest_pit.tokens) }))
