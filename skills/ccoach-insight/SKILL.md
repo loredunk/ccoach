@@ -11,7 +11,7 @@ allowed-tools: Read Write WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(nod
 
 ## Purpose
 
-Build a dual-platform local AI usage report. Use authoritative on-disk facts as the data source, then write AI interpretation into an insights file and render a polished standalone HTML report covering both Claude Code and Codex.
+Build a local AI usage report for the **host platform** by default (Claude Code or Codex — see Step 0), or a dual-platform comparison when the user explicitly asks. Use authoritative on-disk facts as the data source, then write AI interpretation into an insights file and render a polished standalone HTML report covering the reported platform(s).
 
 Keep responsibilities separate:
 
@@ -67,7 +67,7 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - `ccoach report --platform <P> <W> <L> --json > /tmp/<P>-report.json`
    - (Only the **Dual-platform comparison (opt-in)** path runs BOTH `--platform codex` and `--platform claude-code`.)
    - Each report carries `tokens` + `model_tokens[]` (per-model token buckets for pricing) + `models_timeline` (the daily sparkline series) + `behavior` + `prompt_signals` — numeric prompt-quality aggregates (length, structured/constraint/file-ref ratios, correction rate); **never prompt text, never assistant replies** — which power the scorecard's Prompt Skill axis. Per-project / per-session breakdowns: see "Analysis scopes" below.
-3. (Optional) Top Claude sessions for the sessions table — numeric only, **NO prompt text**, same `<W>`:
+3. (Only when `<P>` = claude-code; optional) Top Claude sessions for the sessions table — numeric only, **NO prompt text**, same `<W>`:
    - `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
    - Skip it and the Claude top-sessions table just renders empty (it has no `--include-user-prompts`, so it's repo/tokens/models counts only).
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
@@ -82,11 +82,11 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - `node ${CLAUDE_SKILL_DIR}/scripts/apply_pricing.mjs --data /tmp/ai-usage.json --pricing /tmp/pricing.json` — rewrites authoritative cost; models with no online price keep the offline fallback and are flagged `unpriced_models`.
 5. Read `/tmp/ai-usage.json`, then write `/tmp/ai-usage-insights.json` following `references/dual-insights-schema.md`.
    - Write the rich AI-interpretation layer the dual renderer expects:
-     - `executive_summary` — a prominent paragraph (or short list) covering both platforms.
+     - `executive_summary` — a prominent paragraph (or short list) covering the reported platform(s) (both only in the opt-in dual report).
      - `recommendations` — a list; each item is a string or `{title, text, evidence}` (include `evidence` grounded in the merged numbers).
      - `insights` — a list; each item is a string or `{title, detail}`.
    - All fields are optional and backward-compatible: a flat `{"insights": ["string", ...]}` still renders. **Write insights in the user's language; default to English** when their language is unclear — match the `--lang` you pass to the renderer/scorecard (default English, ADR 0025).
-   - Behavior data is in `platforms.<plat>.behavior` (tools / top_commands / git_habits / languages / repos / hours / sources / extras) for both platforms — ground at least one insight per platform in these behavior numbers.
+   - Behavior data is in `platforms.<plat>.behavior` (tools / top_commands / git_habits / languages / repos / hours / sources / extras) for the reported platform(s) — ground at least one insight for each reported platform in these behavior numbers.
    - **Billing / endpoint / exec-profile** (ADR 0022/0023) also surface in the merged JSON & rendered HTML: `platforms.codex.billing` (token split by subscription plan tier plus/pro + `unclassified`), `platforms.<plat>.endpoint` (`endpoint` official/custom + `billing_mode` subscription/api_or_relay/unknown + `relay_suspected` + `subscription_type`), `platforms.codex.codex_specific` (effort/approval/sandbox/collaboration_mode/originators/compactions/aborted_turns/context_window), `platforms.claude_code.claude_specific` (server web search/fetch counts). All are derived whitelist labels — never key/token/full URL. `plan_type` is spoofable by relays (`confidence: spoofable-by-relay`); if `endpoint=custom`/`relay_suspected`, treat plan tiers and subscription claims as untrusted. Don't print quota percentages.
    - For richer interpretation patterns (evidence → meaning → impact → drilldown → intervention), read `references/insight-patterns.md`; distill those ladders into the `recommendations`/`insights` fields described in `references/dual-insights-schema.md`.
    - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization (ADR 0015); skip it only if the user opts out.
@@ -209,7 +209,7 @@ Before recommending any platform configuration or feature (CLAUDE.md/AGENTS.md, 
 
 Prioritize:
 
-- Cross-platform comparison: how Claude Code vs Codex split cost, tokens, cache reuse, and active days.
+- Cross-platform comparison (dual/opt-in report only): how Claude Code vs Codex split cost, tokens, cache reuse, and active days.
 - Usage patterns across time, source, language, and project.
 - Git habits: review cadence, status/diff checks, commit/push behavior, branch spread.
 - Project management habits: build systems, tests, CI, docs/planning/config changes.
@@ -231,7 +231,7 @@ Avoid:
 
 The final HTML should be useful as a daily dual-platform review artifact:
 
-- Start with an executive summary that covers both Claude Code and Codex.
+- Start with an executive summary covering the reported platform(s) (both only in the opt-in dual report).
 - Include evidence-backed recommendations.
 - Include at least 2-4 deeper insights when the data supports them, especially around long sessions, cache reuse, high-token projects, and repeated tool loops.
 - Highlight risks and next actions.

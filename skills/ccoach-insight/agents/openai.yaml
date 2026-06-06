@@ -1,4 +1,4 @@
 interface:
   display_name: "ccoach Insight"
-  short_description: "Generate enriched dual-platform (Claude Code + Codex) HTML usage reports, deeper insights, and session drilldowns from local AI coding data."
+  short_description: "Generate enriched HTML usage reports of local AI coding usage — the host platform by default (Claude Code or Codex), or a dual-platform comparison on request — plus deeper insights and session drilldowns."
   default_prompt: "Generate an enriched AI usage HTML report for my current platform (today) with deep insights and high-token project drilldowns."
