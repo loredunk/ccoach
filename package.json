@@ -42,7 +42,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsx src/cli.ts",
-    "dev:fixture": "TZ=UTC CLAUDE_CONFIG_DIR=test/fixtures/home/claude CODEX_HOME=test/fixtures/home/codex tsx src/cli.ts",
+    "dev:fixture": "TZ=UTC tsx src/cli.ts --claude-dir test/fixtures/claude --codex-home test/fixtures/codex",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
