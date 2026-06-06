@@ -18,6 +18,21 @@ ccoach 让用户**更清晰地驾驭自己的 harness（Claude Code / Codex）**
 
 ---
 
+## 0.1 产品原则 · 官方特性优先（不可妥协）
+
+> **建议只锚定 Claude Code / Codex 官方验证过的原生特性与 Tool —— 绝不根据用户习惯推荐 skills。**
+
+ccoach 所有「怎么用得更好」的建议，**一律映射到平台官方的原生特性 / Tool**（CLAUDE.md · AGENTS.md、hooks、
+plan mode、subagents、permission / approval 设置、reasoning effort 档位……）。这些是**官方验证过、从真实
+用户视角出发**的能力，长期可依赖。
+
+**明确的永久非目标**：不做任何「根据用户习惯向其推荐第三方 / 社区 skills」的功能。基于习惯推 skills 是
+**未经验证的猜测**，会把不稳定的外部依赖塞进用户工作流，与「让用户更看得清、更少浪费」的愿景相悖。
+（这条锐化了 §3.10「特性优先建议」与 [ADR 0006](adr/0006-feature-first-recommendations.md)：所谓「特性」=
+官方原生能力，**不含**习惯推 skills。）
+
+---
+
 ## 1. 产品定位
 
 ccoach 是一个跨平台（macOS / Linux）的 **本机 AI 用量教练**：只读分析你在 **Claude Code / Codex**
@@ -193,6 +208,10 @@ report --json / --digest   ──喂──►   agent(Claude Code / Codex) 按 s
 > 决策见 [`adr/0006-feature-first-recommendations.md`](adr/0006-feature-first-recommendations.md)。
 
 产品目的是帮用户**用好 Claude Code / Codex 的特性**，因此建议先映射到原生特性，再补习惯 / 提示类做法。
+
+> **锚定官方原生特性 / Tool，不做基于习惯的 skill 推荐**（见 §0.1 产品原则）：这里的「特性」专指平台
+> **官方验证过**的原生能力（下表），ccoach **明确不**根据用户习惯向其推荐第三方 / 社区 skills。
+
 代表性映射（非穷举，详见 ADR 0006）：
 
 - 重复加载 / 低缓存、长上下文 → CLAUDE.md / AGENTS.md、`@文件`引用、`/compact`、memory。
