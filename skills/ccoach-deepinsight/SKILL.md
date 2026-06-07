@@ -37,7 +37,7 @@ Two platforms, **symmetric**: **Claude Code** (default) and **Codex** — pass `
 Find systemic root causes that recur across sessions and are fixable once.
 
 1. `ccoach --platform claude-code --since <date> --scope project --json` and `--scope episode --json` → project + episode/spiral signals.
-2. Read the repo itself (read-only): `CLAUDE.md`/`AGENTS.md`, `package.json` (scripts), whether `.claude/settings.json` exists, and the hot files git churn points at. Use Grep/Glob/Read.
+2. Read the repo itself (read-only): the **platform's own project guide** — `CLAUDE.md` for Claude Code, **`AGENTS.md` for Codex (Codex does NOT read CLAUDE.md)** — plus the build/test manifest (`package.json` / `pyproject.toml`), whether an auto-verify gate exists (`.claude/settings.json` for Claude Code), and the hot files git churn points at. Use Grep/Glob/Read.
 3. Emit **ship-once** root causes + fixes, e.g.: a missing `.claude/settings.json` PostToolUse hook running the repo's typecheck/test; a CLAUDE.md Commands block + one-line-per-file module map. Ground each in the code you read; demote metrics to a single supporting line.
 
 This pass alone is the highest-leverage, lowest-risk output. Stop here unless the user wants per-session depth or a session is spiral-flagged.
@@ -59,7 +59,7 @@ Drill the deepest individual pits for per-turn behavioral root causes.
 Codex works the same way; swap `--platform codex`:
 - **Signals:** `ccoach --platform codex --since <date> --scope project|episode --json` + `ccoach sessions --platform codex --repo <repo> --top 20`. Episode edit/error/spiral signals are now populated from Codex rollouts (`patch_apply_end` diffs + `exec_command_end` exit codes, ADR 0050) — before this they were blind.
 - **Content gate:** `ccoach digest --platform codex --id <session-id> --budget tight` (assistant text + tool args + tool results; **NO reasoning**).
-- **Grounding:** Codex sessions carry their `cwd`; the same `grounding.mjs "<first>" "<last>" <cwd>` works (platform-agnostic). Read the repo code at that cwd; for project context read `AGENTS.md` / `config.toml` (Codex's CLAUDE.md equivalent).
+- **Grounding:** Codex sessions carry their `cwd`; the same `grounding.mjs "<first>" "<last>" <cwd>` works (platform-agnostic). Read the repo code at that cwd. For the **project guide read `AGENTS.md`** — Codex does NOT read CLAUDE.md, so if a repo has only CLAUDE.md, faithfully report that Codex ran with **no** project guide and recommend adding an `AGENTS.md` (do not point the user at CLAUDE.md in a Codex report).
 - **Codex-only treasures (optional):** per-turn effort / approval / sandbox, collab/subagent events, compaction — available for richer dimensions later.
 - **Limitation:** Codex user prompts are still thin (env-context injected; ADR 0041 / T26 pending) — lean on the digest narrative + grounding + episode signals rather than prompt text. Red lines unchanged: never read reasoning / developer / system content.
 
