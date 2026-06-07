@@ -1,4 +1,4 @@
-// grounding.mjs — deep-insight 的 grounding gate（ADR 0048 D2）。
+// grounding.mjs — deep-insight 的 grounding gate。
 // 只读 git：给定会话 [since, until] 窗口，取窗内提交，供 skill 把会话意图锚定到真实落地。
 // 绝不臆造、绝不取窗外提交（窗口由 git --since/--until 强制）。
 import { execFileSync } from 'node:child_process'
