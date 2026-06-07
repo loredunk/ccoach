@@ -150,6 +150,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
     let rolloutPlanType: string | null = null // 该会话首个非空 plan_type（计费维度，ADR 0022 D1）
     let billingTokens = 0                       // 该 rollout 窗口内 token 总数（计费归类用）
     const callNames = new Map<string, string>() // call_id -> 工具名（把 *_output 错误归因到工具）
+    const callExit = new Map<string, number>()  // call_id -> exit_code（来自 exec_command_end，可靠数字；ADR 0050 D2）
     for (const line of lines) {
       const trimmed = line.trim(); if (!trimmed) continue
       let rec: any
@@ -207,6 +208,32 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           // Codex 执行画像（ADR 0023 D1）：上下文压缩 / 主动放弃回合（窗口内、非子代理）。
           if (payload.type === 'context_compacted') { if (!sidechain && inWin(ts)) agg.markCodexCompaction(); break }
           if (payload.type === 'turn_aborted') { if (!sidechain && inWin(ts)) agg.markCodexAbortedTurn(); break }
+          // 文件编辑信号（ADR 0050 D1）：patch_apply_end.changes 派生 applyEdit + 文件 fileKey（喂 episode edit_ring / rework）。
+          if (payload.type === 'patch_apply_end') {
+            const changes = payload.changes
+            if (!sidechain && inWin(ts) && changes && typeof changes === 'object') {
+              agg.beginRecord(repo, sessionId, ts)
+              for (const [path, ch] of Object.entries(changes as Record<string, any>)) {
+                const diff = typeof ch?.unified_diff === 'string' ? ch.unified_diff : ''
+                let added = 0, removed = 0
+                for (const dl of diff.split('\n')) {
+                  if (dl.startsWith('+') && !dl.startsWith('+++')) added++
+                  else if (dl.startsWith('-') && !dl.startsWith('---')) removed++
+                }
+                const base = String(path).split('/').pop() || String(path)
+                const dot = base.lastIndexOf('.')
+                const ext = dot > 0 ? base.slice(dot) : ''
+                agg.applyEdit(added, removed, false) // Codex 无 userModified 概念，恒 false
+                agg.applyTool('file', undefined, { isEdit: true, fileKey: base, ext })
+              }
+            }
+            break
+          }
+          // 错误信号（ADR 0050 D2）：exec_command_end 的可靠数字 exit_code 存入 call_id→exit 映射，供 function_call_output 判错。
+          if (payload.type === 'exec_command_end') {
+            if (typeof payload.call_id === 'string' && typeof payload.exit_code === 'number') callExit.set(payload.call_id, payload.exit_code)
+            break
+          }
           if (payload.type !== 'token_count') break
           // 计费维度（ADR 0022 D1）：从 rate_limits 取首个非空 plan_type（会话级属性，不限窗口）。
           // 只取标签值，绝不读 used_percent/credits/resets（rate_limits 顶层在报告里仍恒 null）。
@@ -266,11 +293,13 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
             } else {
               agg.applyTool('other')
             }
-          } else if (t === 'function_call_output' || t === 'local_shell_call_output') {
-            // 错误/卡顿信号（输出形状推断）：解析 exit code，非 0 即错误，瞬时分类成白名单类别。
+          } else if (t === 'function_call_output' || t === 'local_shell_call_output' || t === 'custom_tool_call_output') {
+            // 错误/卡顿信号：优先用 exec_command_end 的可靠 exit_code（ADR 0050 D2），回退到 output 文本/JSON 推断。
             const { exitCode, text, interrupted } = codexOutcome(payload.output)
-            const name = (typeof payload.call_id === 'string' ? callNames.get(payload.call_id) : undefined) ?? 'shell'
-            const isError = exitCode !== null && exitCode !== 0
+            const cid = typeof payload.call_id === 'string' ? payload.call_id : ''
+            const ec = callExit.has(cid) ? (callExit.get(cid) as number) : exitCode
+            const name = (cid ? callNames.get(cid) : undefined) ?? 'shell'
+            const isError = ec !== null && ec !== undefined && ec !== 0
             agg.applyToolResult(name, isError, isError ? classifyError(text) : null)
             if (interrupted) agg.markInterrupted()
           } else if (t === 'local_shell_call') {
