@@ -66,7 +66,7 @@ const EN: Dict = {
   tx_git_identity: 'git repo identity ✓',
   tx_claude_server: 'Claude server-side tools: web search {s} · web fetch {f}',
   // emit/text.ts — main body
-  tx_report_title: 'AI usage report',
+  tx_report_title: 'ccoach Report',
   tx_local_meta: 'Local-only data (source: {source}) · {sessions} sessions · duration {dur}',
   tx_no_records: '(no usage records in this time window)',
   tx_cache_reasoning: 'cache hit rate {chr}% · reasoning/output {rr}%',
@@ -155,7 +155,7 @@ const ZH: Dict = {
   tx_personality: '人格 {names}',
   tx_git_identity: 'git 仓库身份 ✓',
   tx_claude_server: 'Claude 服务端工具: web 搜索 {s} · web 抓取 {f}',
-  tx_report_title: 'AI 用量报告',
+  tx_report_title: 'ccoach 报告',
   tx_local_meta: '仅本机数据 (来源: {source}) · {sessions} 个会话 · 时长 {dur}',
   tx_no_records: '（该时间窗口内没有使用记录）',
   tx_cache_reasoning: '缓存命中率 {chr}% · reasoning 占 output {rr}%',

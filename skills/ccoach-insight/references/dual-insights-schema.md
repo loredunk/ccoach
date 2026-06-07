@@ -11,7 +11,7 @@ Write `/tmp/ai-usage-insights.json` with this shape:
 
 ```json
 {
-  "title": "双平台 AI 使用报告",
+  "title": "ccoach 洞察报告",
   "executive_summary": "一到两段话总结两平台的整体使用情况、成本/token 分布、最值得注意的发现。可用换行分段。",
   "recommendations": [
     "一条纯文本建议",
@@ -33,7 +33,7 @@ Write `/tmp/ai-usage-insights.json` with this shape:
 
 ## 字段说明
 
-- `title`（可选，字符串）：报告标题。缺省时渲染为「双平台 AI 使用报告」。
+- `title`（可选，字符串）：报告标题。缺省时渲染为「ccoach 洞察报告」。
 - `executive_summary`（可选）：渲染在报告靠前的醒目「执行摘要」区。
   - 可以是**字符串**（用 `\n` 分段，每段一个 `<p>`），或**字符串列表**（渲染成无序列表）。
 - `recommendations`（可选，列表）：渲染成「AI 建议」卡片。每项可以是：

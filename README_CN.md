@@ -2,7 +2,7 @@
 
 <p align="center"><a href="README.md">English README</a></p>
 
-> 本机 AI 用量教练（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
+> 本机 ccoach（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
 > 告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。
 > 两个平台是对称的一等公民（不是只给 Codex 用的工具），未来还会扩展到 OpenClaw、Harness 等其它 Agent CLI。设计与决策见 [`docs/`](docs/)。
 

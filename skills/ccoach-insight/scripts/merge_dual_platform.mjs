@@ -374,7 +374,7 @@ function main() {
   if (codex) platforms.codex = codex
 
   const merged = {
-    title: 'AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题）；保留字段兼容
+    title: 'ccoach Insight Report', // 不再用于显示（renderer 按 --lang 取标题）；保留字段兼容
     generated_at: todayIso(),
     window: buildWindow([codexReport, ccReport].filter(Boolean)),
     platforms,

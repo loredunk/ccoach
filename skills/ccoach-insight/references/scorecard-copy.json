@@ -2,7 +2,7 @@
   "_about": "Copy for the scorecard. Tiers are high->low. The tier NAMES ({LANG}_name) + ui labels are the fixed, deterministic identity (don't run-to-run vary them). The {LANG}_roast lines are the SAFE DEFAULT/FALLBACK + a tone EXEMPLAR: at runtime the model rewrites axes[].roast in the user's language, idiomatic and aggregate-grounded. GROUNDING RULE: every roast must describe a phenomenon backed by a concrete number in the merged JSON — describing the phenomenon is enough; a light wry note is optional, NOT a savage punchline tacked onto every axis. NEVER assert an activity ccoach does not measure (e.g. whether tests were executed, whether code was reviewed, whether plan mode 'should' have been used) — it tracks tool/command CATEGORIES and counts, not intent; inventing such a claim (e.g. 'never ran a test') is a correctness bug, not a joke. Roasts tease changeable HABITS, never the person/ability, and never quote prompt text. The 'title'/personality summary is model-written. To add a tier-name locale: add {LANG}_name (and optionally {LANG}_roast) to every tier and a ui.{LANG} block; scorecard.mjs reads them generically and falls back to the default language.",
   "ui": {
     "zh": {
-      "report_title": "AI 用量教练报告",
+      "report_title": "ccoach Insight 成绩卡",
       "scorecard": "成绩卡",
       "tier": "段位",
       "title_label": "称号",
@@ -15,7 +15,7 @@
       "estimate_note": "排名为本地估算，仅供娱乐"
     },
     "en": {
-      "report_title": "AI Usage Coach Report",
+      "report_title": "ccoach Insight Report",
       "scorecard": "Scorecard",
       "tier": "Tier",
       "title_label": "Title",

@@ -1,6 +1,6 @@
 # ccoach 文档
 
-> **ccoach** = 本机 AI 用量教练（macOS / Linux）：只读分析你在 Claude Code / Codex 上的用量与习惯。
+> **ccoach** = 本机用量与习惯分析工具（macOS / Linux）：只读分析你在 Claude Code / Codex 上的用量与习惯。
 
 本目录收录 ccoach 的产品与工程文档。约定如下：
 
@@ -19,7 +19,7 @@
 
 ## 当前主线
 
-ccoach = 本机 AI 用量教练，产品分两块交付，在同一仓库内明确分开：
+ccoach = 本机用量与习惯分析工具，产品分两块交付，在同一仓库内明确分开：
 
 1. **CLI** — 产出只读、语义化的用量数据（默认命令 `ccoach`，即原 `report`；`--json` 为 agent 友好输出）。
 2. **skills** — 教 Claude Code / Codex 如何解读 CLI 产物，给出**对人有用的建议**，并渲染

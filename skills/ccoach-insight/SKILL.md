@@ -124,19 +124,19 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
      emits a stderr warning, and leaves a `<!-- ccoach:scorecard_title_is_fallback -->` marker in the
      HTML. Write-back happens BEFORE render — never render first and patch later.
 7. Render HTML (run step 4.5 `apply_pricing.mjs` first so cost is the official-online figure, not the offline fallback):
-   - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ai-usage-report.html`
+   - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ccoach-insight.html`
    - The whole report skeleton is localized from `references/report-copy.json` (default English). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
-   - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
+   - Use the user-specified output path if given; otherwise `ccoach-insight.html`.
    - **Self-check:** after rendering, look at the command's stderr. If you see a
      `⚠ scorecard:` warning, the persona title / roasts were NOT written back before render — fix
      `/tmp/scorecard.json` (step 6 write-back) and **re-run this render command**. Do not ship the
-     `ai-usage-report.html` while that warning is present.
+     `ccoach-insight.html` while that warning is present.
 
 ### Dual-platform comparison (opt-in)
 
 Run this ONLY when the user explicitly asks to compare platforms. Generate BOTH reports (step 2 for `--platform claude-code` and `--platform codex`), pass both `--cc-report` and `--codex-report` to `merge_dual_platform.mjs`, then price/scorecard/render as usual — the renderer shows both panels plus the head-to-head comparison. The Codex-only enriched fallback (`render_enriched_codex_report.mjs`) remains available for a Codex-only deep report.
 
-- Run `ccoach report --platform codex --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --lang en --output codex-report.enriched.html` (skeleton localized from `references/report-copy.json`, default English; pass `--lang zh` for Chinese).
+- Run `ccoach report --platform codex --json > /tmp/codex-usage-report.json`, write `/tmp/codex-usage-insights.json` per `references/insights-schema.md`, and render with `node ${CLAUDE_SKILL_DIR}/scripts/render_enriched_codex_report.mjs --report /tmp/codex-usage-report.json --insights /tmp/codex-usage-insights.json --lang en --output ccoach-insight.html` (skeleton localized from `references/report-copy.json`, default English; pass `--lang zh` for Chinese).
 - If Node itself is missing, ccoach can't run and there is no report — install Node, then `npx @loredunk/ccoach@latest`.
 - **Never** substitute `~/.claude/stats-cache.json` for missing Claude Code data — it is wrong and stale (see data-layer rules).
 

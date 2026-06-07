@@ -75,7 +75,7 @@ Markdown by default. For each root cause: a plain-language semantic statement, t
 
 For a shareable dossier, write the findings to a report JSON (schema: `references/deepinsight-insights-schema.md`) and render:
 
-`node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output deepinsight-report.html`
+`node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`
 
 The renderer is a standalone "diagnostic dossier" (dark editorial; root-cause categories color-coded; metrics demoted to a faint "signal" margin; grounding commits shown as a ledger). It HTML-escapes every field. Same privacy discipline: desensitize identifiers to `<…>` in the JSON before rendering anything you'll share, and keep `root_cause`/`headline` as paraphrase — never paste redacted prompt/digest text verbatim.
 

@@ -1,7 +1,7 @@
 {
   "name": "@loredunk/ccoach",
   "version": "0.1.4",
-  "description": "本机 AI 用量教练：只读分析 Claude Code / Codex 用量与习惯（A local AI usage coach for Claude Code / Codex）",
+  "description": "本机 ccoach：只读分析 Claude Code / Codex 用量与习惯（A local AI usage coach for Claude Code / Codex）",
   "type": "module",
   "bin": {
     "ccoach": "dist/cli.js"

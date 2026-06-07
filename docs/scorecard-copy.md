@@ -62,7 +62,7 @@
 
 | key | zh | en |
 | --- | --- | --- |
-| `report_title` | AI 用量教练报告 | AI Usage Coach Report |
+| `report_title` | ccoach Insight 成绩卡 | ccoach Insight Report |
 | `scorecard` | 成绩卡 | Scorecard |
 | `tier` | 段位 | Tier |
 | `title_label` | 称号 | Title |

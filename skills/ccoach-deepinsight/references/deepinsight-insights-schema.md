@@ -41,4 +41,4 @@ Notes:
 - `category` drives the color code; unknown values fall back to `other`.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
-- Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output deepinsight-report.html`.
+- Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`.
