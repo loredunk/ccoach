@@ -161,7 +161,7 @@ export function listClaudeSessions(dir: string, window: Window, opts: SessionsOp
         if (fl.file_ref) s.flags.file_ref += 1
         if (fl.constraint) s.flags.constraint += 1
         if (fl.correction) s.flags.correction += 1
-        if (wantId && (wantId === '*' || sid === wantId)) s.texts.push({ ts: tsv, text, fl })
+        if (wantId && (wantId === '*' || sid.includes(wantId))) s.texts.push({ ts: tsv, text, fl })
       } else if (rec.type === 'assistant') {
         const u = rec.message?.usage ?? {}
         s.tokens += num(u.input_tokens) + num(u.output_tokens) + num(u.cache_read_input_tokens) + num(u.cache_creation_input_tokens)

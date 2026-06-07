@@ -78,4 +78,11 @@ describe('ccoach sessions', () => {
     expect(o.sessions[0].user_prompts).toBeUndefined()
     expect(JSON.stringify(o)).not.toContain('"user_prompts"') // 列表无 prompt 内容字段（区别于 includes_user_prompts 标志）
   })
+
+  // bug: 文本收集用 sid===wantId（精确），与 --help/列表过滤承诺的子串匹配不一致 → --id 短前缀返回空 prompts。
+  it('claude 预览：--id 子串也收集 prompt 文本（修 sid===wantId）', () => {
+    const o = listClaudeSessions('test/fixtures/claude', window, { sessionId: 's', includePrompts: true }) as Record<string, any>
+    expect(o.selected_session.session_id).toBe('s1')
+    expect(o.selected_session.prompts).toHaveLength(1)
+  })
 })
