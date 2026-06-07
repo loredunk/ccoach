@@ -5,6 +5,7 @@ import { setLang } from './i18n.js'
 import { VERSION, claudeProjectsDir, codexHome } from './index.js'
 import { runReport, type ReportCliOptions } from './run-report.js'
 import { listClaudeSessions, listCodexSessions, type SessionsOpts } from './sessions.js'
+import { buildDigest, BUDGETS, type DigestBudget } from './digest.js'
 
 const cli = cac('ccoach')
 
@@ -76,6 +77,46 @@ cli
         platform === 'codex'
           ? listCodexSessions(codexHome(), window, opts)
           : listClaudeSessions(claudeProjectsDir(), window, opts)
+      process.stdout.write(JSON.stringify(out, null, 2) + '\n')
+    } catch (e) {
+      process.stderr.write((e instanceof Error ? e.message : String(e)) + '\n')
+      process.exit(1)
+    }
+  })
+
+// 正文摘要钻取（ADR 0049）：opt-in、token 受控、redacted（assistant 回复 + tool_result，不含 thinking）。
+cli
+  .command('digest', 'opt-in token-bounded redacted content digest of ONE session (assistant replies + tool_result; no thinking)')
+  .option('--platform <platform>', 'Data source: claude-code (codex not supported yet)', { default: 'claude-code' })
+  .option('--id <sessionId>', 'Session id to digest (substring match) — REQUIRED')
+  .option('--date <date>', 'Single-day window (YYYY-MM-DD)')
+  .option('--since <date>', 'From a date until today (YYYY-MM-DD)')
+  .option('--days <n>', 'Last N days (including today)')
+  .option('--claude-dir <dir>', 'Override Claude data dir (path to projects dir)')
+  .option('--budget <budget>', 'Token budget: tight (~7.5K) | rich (~30K)', { default: 'tight' })
+  .option('--per-item <n>', 'Override per-item code-point cap')
+  .option('--max-total <n>', 'Override total code-point cap')
+  .option('--lang <lang>', 'Output language: en | zh', { default: 'en' })
+  .action((options: Record<string, unknown>) => {
+    try {
+      setLang(options.lang as string | undefined)
+      const platform = String(options.platform ?? 'claude-code')
+      if (platform !== 'claude-code') throw new Error(`digest supports only --platform claude-code (got ${platform})`)
+      if (!options.id) throw new Error('digest requires --id <sessionId> (opt-in, single session only)')
+      const daysRaw = options.days
+      const days = daysRaw != null ? Number(daysRaw) : undefined
+      if (days !== undefined && !Number.isFinite(days)) throw new Error(`invalid --days ${String(daysRaw)}`)
+      const window = resolveWindow(
+        { date: options.date as string | undefined, since: options.since as string | undefined, days },
+        new Date(),
+      )
+      const budget = String(options.budget ?? 'tight') as DigestBudget
+      if (budget !== 'tight' && budget !== 'rich') throw new Error(`invalid --budget ${budget} (want tight|rich)`)
+      const base = BUDGETS[budget]
+      const perItem = options.perItem != null ? Number(options.perItem) : base.perItem
+      const maxTotal = options.maxTotal != null ? Number(options.maxTotal) : base.maxTotal
+      const dir = (options.claudeDir as string | undefined) || claudeProjectsDir()
+      const out = buildDigest(dir, window, { sessionId: String(options.id), perItem, maxTotal })
       process.stdout.write(JSON.stringify(out, null, 2) + '\n')
     } catch (e) {
       process.stderr.write((e instanceof Error ? e.message : String(e)) + '\n')
