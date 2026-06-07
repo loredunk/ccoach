@@ -1,0 +1,6 @@
+{"type":"user","sessionId":"d1","timestamp":"2026-06-02T10:00:00Z","message":{"role":"user","content":[{"type":"text","text":"please fix the failing build"}]}}
+{"type":"assistant","sessionId":"d1","timestamp":"2026-06-02T10:00:01Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"PRIVATE_THOUGHT_DO_NOT_LEAK"},{"type":"text","text":"I'll run the tests then patch. note key sk-ABCDEFGHIJKLMN"}]}}
+{"type":"assistant","sessionId":"d1","timestamp":"2026-06-02T10:00:02Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"npm test"}}]}}
+{"type":"user","sessionId":"d1","timestamp":"2026-06-02T10:00:03Z","message":{"role":"user","content":[{"type":"tool_result","content":"FAIL one test failed","is_error":true}]}}
+{"type":"assistant","sessionId":"d1","timestamp":"2026-06-02T10:00:04Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/Users/x/proj/src/a.ts","old_string":"foo","new_string":"bar"}}]}}
+{"type":"user","sessionId":"d1","timestamp":"2026-06-02T10:00:05Z","toolUseResult":{"stdout":"PASS all green"},"message":{"role":"user","content":[]}}
