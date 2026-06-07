@@ -1,0 +1,15 @@
+# 强制所有文本文件用 LF 行尾，覆盖 Windows 的 git autocrlf。
+# 否则 Windows 把 .mjs / .ts checkout 成 CRLF，带 `#!/usr/bin/env node` shebang 的 skill 脚本
+# 被 import 时报 `SyntaxError: Invalid or unexpected token`（已本地复现：把 .mjs 转 CRLF 即在
+# mac 复现该错、还原 LF 即恢复）。eol=lf 优先于 core.autocrlf，保证三平台 checkout 统一 LF。
+* text=auto eol=lf
+
+# 明确二进制（避免 text=auto 误判而改动字节）。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
