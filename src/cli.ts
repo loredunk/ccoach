@@ -5,7 +5,7 @@ import { setLang } from './i18n.js'
 import { VERSION, claudeProjectsDir, codexHome } from './index.js'
 import { runReport, type ReportCliOptions } from './run-report.js'
 import { listClaudeSessions, listCodexSessions, type SessionsOpts } from './sessions.js'
-import { buildDigest, BUDGETS, type DigestBudget } from './digest.js'
+import { buildDigest, buildCodexDigest, BUDGETS, type DigestBudget } from './digest.js'
 
 const cli = cac('ccoach')
 
@@ -86,10 +86,11 @@ cli
 
 // 正文摘要钻取（ADR 0049）：opt-in、token 受控、redacted（assistant 回复 + tool_result，不含 thinking）。
 cli
-  .command('digest', 'opt-in token-bounded redacted content digest of ONE session (assistant replies + tool_result; no thinking)')
-  .option('--platform <platform>', 'Data source: claude-code (codex not supported yet)', { default: 'claude-code' })
+  .command('digest', 'opt-in token-bounded redacted content digest of ONE session (assistant replies + tool_result; no thinking/reasoning)')
+  .option('--platform <platform>', 'Data source: claude-code | codex', { default: 'claude-code' })
   .option('--id <sessionId>', 'Session id to digest (substring match) — REQUIRED; names ONE session (no time window)')
   .option('--claude-dir <dir>', 'Override Claude data dir (path to projects dir)')
+  .option('--codex-home <dir>', 'Override Codex home (reads <dir>/sessions)')
   .option('--budget <budget>', 'Token budget: tight (~7.5K) | rich (~30K)', { default: 'tight' })
   .option('--per-item <n>', 'Override per-item code-point cap')
   .option('--max-total <n>', 'Override total code-point cap')
@@ -98,15 +99,17 @@ cli
     try {
       setLang(options.lang as string | undefined)
       const platform = String(options.platform ?? 'claude-code')
-      if (platform !== 'claude-code') throw new Error(`digest supports only --platform claude-code (got ${platform})`)
+      if (platform !== 'claude-code' && platform !== 'codex') throw new Error(`digest supports --platform claude-code|codex (got ${platform})`)
       if (!options.id) throw new Error('digest requires --id <sessionId> (opt-in, single session only)')
       const budget = String(options.budget ?? 'tight') as DigestBudget
       if (budget !== 'tight' && budget !== 'rich') throw new Error(`invalid --budget ${budget} (want tight|rich)`)
       const base = BUDGETS[budget]
       const perItem = options.perItem != null ? Number(options.perItem) : base.perItem
       const maxTotal = options.maxTotal != null ? Number(options.maxTotal) : base.maxTotal
-      const dir = (options.claudeDir as string | undefined) || claudeProjectsDir()
-      const out = buildDigest(dir, { sessionId: String(options.id), perItem, maxTotal })
+      const sessionId = String(options.id)
+      const out = platform === 'codex'
+        ? buildCodexDigest((options.codexHome as string | undefined) || codexHome(), { sessionId, perItem, maxTotal })
+        : buildDigest((options.claudeDir as string | undefined) || claudeProjectsDir(), { sessionId, perItem, maxTotal })
       process.stdout.write(JSON.stringify(out, null, 2) + '\n')
     } catch (e) {
       process.stderr.write((e instanceof Error ? e.message : String(e)) + '\n')

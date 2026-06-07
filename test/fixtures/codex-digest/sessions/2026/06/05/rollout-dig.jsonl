@@ -1,0 +1,8 @@
+{"timestamp":"2026-06-05T10:00:00.000Z","type":"session_meta","payload":{"id":"cxdig1","cwd":"/Users/x/proj","source":"cli"}}
+{"timestamp":"2026-06-05T10:00:01.000Z","type":"turn_context","payload":{"model":"gpt-5.1-codex"}}
+{"timestamp":"2026-06-05T10:00:02.000Z","type":"response_item","payload":{"type":"reasoning","summary":[],"content":"SECRET_REASONING_DO_NOT_LEAK"}}
+{"timestamp":"2026-06-05T10:00:03.000Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"text","text":"DEV_PROMPT_SECRET"}]}}
+{"timestamp":"2026-06-05T10:00:04.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I will check the queue then patch the worker."}]}}
+{"timestamp":"2026-06-05T10:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"c1","arguments":"{\"cmd\":\"rg queue\"}"}}
+{"timestamp":"2026-06-05T10:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"queue empty. leaked key sk-ABCDEFGHIJKLMN here"}}
+{"timestamp":"2026-06-05T10:00:07.000Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c2","output":"{\"output\":\"Updated files: a.ts\",\"metadata\":{\"exit_code\":0}}"}}

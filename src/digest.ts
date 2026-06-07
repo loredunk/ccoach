@@ -67,6 +67,28 @@ function resultText(rec: any): { text: string; isError: boolean } {
 const cps = (s: string): number => [...s].length
 function trunc(s: string, n: number): string { const a = [...s]; return a.length > n ? a.slice(0, n).join('') + '…' : s }
 
+// 共享打包：脱敏 + 逐项截断 + 总量封顶 + stats（两平台同一输出形状）。
+function packDigest(platform: string, sessionId: string, items: DigestItem[], perItem: number, maxTotal: number): Record<string, unknown> {
+  const emitted: DigestItem[] = []
+  let total = 0, rawChars = 0, dropped = 0
+  for (const it of items) {
+    rawChars += cps(it.text)
+    if (total >= maxTotal) { dropped++; continue }
+    const red = redact(it.text.replace(/\s+/g, ' '), perItem)
+    emitted.push({ kind: it.kind, text: red })
+    total += cps(red)
+  }
+  return {
+    platform,
+    session_id: sessionId,
+    budget: { per_item: perItem, max_total: maxTotal },
+    includes_content: true,
+    excludes: ['thinking', 'system_prompt', 'file_contents_as_content'],
+    stats: { items: items.length, emitted: emitted.length, dropped, raw_chars: rawChars, emitted_chars: total, est_tokens: Math.round(total / 4) },
+    items: emitted,
+  }
+}
+
 // 不接受时间窗：--id 点名单会话即范围（窗口会把旧会话过滤空，是 papercut）。
 export function buildDigest(dir: string, opts: DigestOpts): Record<string, unknown> {
   const perItem = opts.perItem ?? BUDGETS.tight.perItem
@@ -108,24 +130,53 @@ export function buildDigest(dir: string, opts: DigestOpts): Record<string, unkno
     }
   }
 
-  const emitted: DigestItem[] = []
-  let total = 0, rawChars = 0, dropped = 0
-  for (const it of items) {
-    rawChars += cps(it.text)
-    if (total >= maxTotal) { dropped++; continue }
-    const red = redact(it.text.replace(/\s+/g, ' '), perItem)
-    emitted.push({ kind: it.kind, text: red })
-    total += cps(red)
+  const sid = recs.length ? String(recs[0].sessionId) : want
+  return packDigest('claude-code', sid, items, perItem, maxTotal)
+}
+
+// Codex 正文 digest（ADR 0050 D3）：从单 rollout 提取 assistant 文本 + function_call args + 工具结果正文。
+// **绝不含 reasoning（思维链）/ developer / system / instructions**。--id 子串定位单会话（每 rollout = 一会话）。
+export function buildCodexDigest(home: string, opts: DigestOpts): Record<string, unknown> {
+  const perItem = opts.perItem ?? BUDGETS.tight.perItem
+  const maxTotal = opts.maxTotal ?? BUDGETS.tight.maxTotal
+  const want = opts.sessionId
+
+  let chosen: any[] | null = null
+  let chosenSid = want
+  for (const file of walkJsonl(join(home, 'sessions'))) {
+    let content: string
+    try { content = readFileSync(file, 'utf8') } catch { continue }
+    const recs: any[] = []
+    let sid = ''
+    for (const line of content.split('\n')) {
+      const t = line.trim(); if (!t) continue
+      let rec: any
+      try { rec = JSON.parse(t) } catch { continue }
+      if (rec?.type === 'session_meta' && typeof rec.payload?.id === 'string') sid = rec.payload.id
+      recs.push(rec)
+    }
+    if (sid && sid.includes(want)) { chosen = recs; chosenSid = sid; break }
   }
 
-  const sid = recs.length ? String(recs[0].sessionId) : want
-  return {
-    platform: 'claude-code',
-    session_id: sid,
-    budget: { per_item: perItem, max_total: maxTotal },
-    includes_content: true,
-    excludes: ['thinking', 'system_prompt', 'file_contents_as_content'],
-    stats: { items: items.length, emitted: emitted.length, dropped, raw_chars: rawChars, emitted_chars: total, est_tokens: Math.round(total / 4) },
-    items: emitted,
+  const items: DigestItem[] = []
+  for (const rec of chosen ?? []) {
+    if (rec?.type !== 'response_item') continue // event_msg/turn_context/reasoning-at-other-levels 跳过
+    const p = rec.payload ?? {}
+    const t = p.type
+    if (t === 'message') {
+      if (p.role !== 'assistant') continue // 绝不取 developer/system；user prompt 走 sessions --include-user-prompts
+      const txt = Array.isArray(p.content) ? p.content.map((c: any) => c?.text ?? c?.input_text ?? '').join(' ') : ''
+      if (txt.trim()) items.push({ kind: 'ASSISTANT', text: txt })
+    } else if (t === 'function_call') {
+      const args = typeof p.arguments === 'string' ? p.arguments : JSON.stringify(p.arguments ?? {})
+      items.push({ kind: 'TOOL', text: String(p.name ?? '') + ' ' + args })
+    } else if (t === 'function_call_output' || t === 'local_shell_call_output' || t === 'custom_tool_call_output') {
+      const o = p.output
+      let text = typeof o === 'string' ? o : JSON.stringify(o ?? '')
+      try { const j = JSON.parse(text); if (j && typeof j.output === 'string') text = j.output } catch { /* 纯文本输出 */ }
+      if (text.trim()) items.push({ kind: 'RESULT', text })
+    }
+    // reasoning 及其它：故意排除（思维链红线）
   }
+  return packDigest('codex', chosenSid, items, perItem, maxTotal)
 }
