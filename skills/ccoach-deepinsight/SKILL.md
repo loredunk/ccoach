@@ -1,13 +1,13 @@
 ---
 name: ccoach-deepinsight
-description: Deep, semantic root-cause coaching for how you work with Claude Code in a specific project. Goes beyond aggregate metrics — reads your own real code (read-only) and, on spiral-flagged sessions, an opt-in token-bounded content digest — to tell you in plain language WHY work churned and the concrete fix, anchored to official Claude Code features. Distinct from the entertainment-flavored ccoach-insight report. Claude Code only (for now); read-only, local, desensitized.
+description: Deep, semantic root-cause coaching for how you work with Claude Code or Codex in a specific project. Goes beyond aggregate metrics — reads your own real code (read-only) and, on spiral-flagged sessions, an opt-in token-bounded content digest — to tell you in plain language WHY work churned and the concrete fix, anchored to official native features. Distinct from the entertainment-flavored ccoach-insight report. Claude Code + Codex (symmetric); read-only, local, desensitized.
 when_to_use: 'Trigger when the user wants a SERIOUS productivity / behavioral deep-dive on how they use Claude Code in a project — "why do I keep reworking this", "where am I wasting effort", "deep insight", "what should I change to use Claude Code better", "/ccoach-deepinsight". NOT for the fun usage scorecard (that is ccoach-insight).'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
 allowed-tools: Read Grep Glob WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
 ---
 
-# ccoach-deepinsight — semantic root-cause deep coach (Claude Code)
+# ccoach-deepinsight — semantic root-cause deep coach (Claude Code + Codex)
 
 ## Purpose
 
@@ -30,7 +30,7 @@ Read-only; local; never exfiltrate. Read the user's own current-project code (ne
 
 ## Workflow — two passes (ADR 0048)
 
-Single platform: **Claude Code**. Locate `ccoach` (prefer PATH; else `node dist/cli.js` in this repo, or `npx @loredunk/ccoach@latest`).
+Two platforms, **symmetric**: **Claude Code** (default) and **Codex** — pass `--platform claude-code|codex`. The two passes below are written for Claude Code; the Codex equivalents are identical (just swap the flag) — see **Codex notes** at the end. Locate `ccoach` (prefer PATH; else `node dist/cli.js` in this repo, or `npx @loredunk/ccoach@latest`).
 
 ### Pass 1 — PROJECT (always; cheap; NO content)
 
@@ -53,6 +53,15 @@ Drill the deepest individual pits for per-turn behavioral root causes.
 3. **Content verification gate (ADR 0049):** before emitting any session-intent finding at confidence≥high, spend a TIGHT digest:
    `ccoach digest --platform claude-code --id <FULL-session-id> --budget tight` (≈7.5K tok; redacted; no thinking). Use it to FALSIFY a tentative root cause before asserting it — this is what prevents confidently-wrong diagnoses. Use `--budget rich` only on explicit single-session drill-down.
 4. Read the specific code the session worked on (read-only) for the semantic reason it churned.
+
+### Codex notes (symmetric — ADR 0050)
+
+Codex works the same way; swap `--platform codex`:
+- **Signals:** `ccoach --platform codex --since <date> --scope project|episode --json` + `ccoach sessions --platform codex --repo <repo> --top 20`. Episode edit/error/spiral signals are now populated from Codex rollouts (`patch_apply_end` diffs + `exec_command_end` exit codes, ADR 0050) — before this they were blind.
+- **Content gate:** `ccoach digest --platform codex --id <session-id> --budget tight` (assistant text + tool args + tool results; **NO reasoning**).
+- **Grounding:** Codex sessions carry their `cwd`; the same `grounding.mjs "<first>" "<last>" <cwd>` works (platform-agnostic). Read the repo code at that cwd; for project context read `AGENTS.md` / `config.toml` (Codex's CLAUDE.md equivalent).
+- **Codex-only treasures (optional):** per-turn effort / approval / sandbox, collab/subagent events, compaction — available for richer dimensions later.
+- **Limitation:** Codex user prompts are still thin (env-context injected; ADR 0041 / T26 pending) — lean on the digest narrative + grounding + episode signals rather than prompt text. Red lines unchanged: never read reasoning / developer / system content.
 
 ### Dedup (ADR 0048 D5)
 
