@@ -60,7 +60,15 @@ When both passes reach the same conclusion (e.g. plan mode, @file refs), state i
 
 ## Output
 
-Markdown (v1). For each root cause: a plain-language semantic statement, the concrete fix (official feature named), confidence, and at most one supporting metric line. **False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change. **Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior. Desensitize all paths/identifiers to `<…>` before writing/sharing.
+Markdown by default. For each root cause: a plain-language semantic statement, the concrete fix (official feature named), confidence, and at most one supporting metric line. **False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change. **Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior. Desensitize all paths/identifiers to `<…>` before writing/sharing.
+
+### HTML report (optional)
+
+For a shareable dossier, write the findings to a report JSON (schema: `references/deepinsight-insights-schema.md`) and render:
+
+`node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output deepinsight-report.html`
+
+The renderer is a standalone "diagnostic dossier" (dark editorial; root-cause categories color-coded; metrics demoted to a faint "signal" margin; grounding commits shown as a ledger). It HTML-escapes every field. Same privacy discipline: desensitize identifiers to `<…>` in the JSON before rendering anything you'll share, and keep `root_cause`/`headline` as paraphrase — never paste redacted prompt/digest text verbatim.
 
 ## Honesty rules (ADR 0048 D4 / repo CLAUDE.md)
 
