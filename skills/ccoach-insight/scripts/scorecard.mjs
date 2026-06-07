@@ -5,7 +5,7 @@
 // (references/scorecard-copy.json) and grades four independent axes — Prompt Skill,
 // Spending Style, Engineering Sense, Diligence — into tier labels + roast lines in
 // the chosen language. The personality-summary paragraph is NOT produced here; the
-// model writes that in the user's language (ADR 0008 D3 / 0009).
+// model writes that in the user's language.
 //
 // Pure Node ≥18 (ESM, no external deps, offline). Tier scoring is heuristic and
 // deterministic. Relative rank is a LOCAL ESTIMATE (labelled as such), never a real
@@ -146,10 +146,10 @@ function pick(copy, axisKey, idx, lang) {
 }
 
 export function build(data, copy, lang) {
-  lang = lang || 'en' // 默认英文（ADR 0025/0026）；任意 locale 透传，缺失键逐键回退（pick / ui 各自 fallback）
+  lang = lang || 'en' // 默认英文；任意 locale 透传，缺失键逐键回退（pick / ui 各自 fallback）
   const ui = copy.ui[lang] ?? copy.ui.en ?? copy.ui.zh
   const platforms = data.platforms ?? {}
-  // 宿主平台：dual 时取 Claude（行为不变）；单平台时取在场平台（ADR 0042）。
+  // 宿主平台：dual 时取 Claude（行为不变）；单平台时取在场平台。
   const cc = platforms.claude_code ?? platforms.codex ?? {}
   const combined = data.combined ?? {}
   const ps = truthy(cc.prompt_signals)
@@ -171,7 +171,7 @@ export function build(data, copy, lang) {
   for (const [key, uiLabel, idx] of axesSpec) {
     const { name, roast, i, count } = pick(copy, key, idx, lang)
     // roast_is_fixture: this roast came verbatim from scorecard-copy.json (the fixture/兜底);
-    // the model rewrites axes[].roast before render and clears this flag (ADR 0029/0044).
+    // the model rewrites axes[].roast before render and clears this flag.
     axes.push({ key, label: ui[uiLabel], tier: name, roast, roast_is_fixture: true, tier_index: i, tier_count: count })
     goodness.push(count > 1 ? (count - 1 - i) / (count - 1) : 1.0)
     names.push(name)
@@ -187,11 +187,11 @@ export function build(data, copy, lang) {
     title_label: ui.title_label,
     axes,
     // FALLBACK ONLY: deterministic `A × B × C × D` join for non-LLM / JSON consumers.
-    // The shareable persona title is MODEL-WRITTEN at report time from axes[] (ADR 0008 D3);
+    // The shareable persona title is MODEL-WRITTEN at report time from axes[];
     // see SKILL.md "compose the persona title". Do not present this raw join as the final title.
     title: names.join(' × '),
     // title_is_fallback: the renderer warns + marks the HTML if this is still true at render time,
-    // i.e. the model did not write the persona title back before rendering (ADR 0044).
+    // i.e. the model did not write the persona title back before rendering.
     title_is_fallback: true,
     rank_pct: rankPct,
     rank_label: ui.beats_pct.replace('{pct}', String(rankPct)),
@@ -207,7 +207,7 @@ function main() {
     process.stderr.write('missing --data (merged dual-platform JSON)\n')
     process.exit(2)
   }
-  const lang = a.lang || 'en' // 默认英文（ADR 0025/0026）；任意 locale 透传，build/pick 内逐键回退
+  const lang = a.lang || 'en' // 默认英文；任意 locale 透传，build/pick 内逐键回退
   const data = load(a.data)
   const copy = load(a.copy ?? DEFAULT_COPY)
   const card = build(data, copy, lang)

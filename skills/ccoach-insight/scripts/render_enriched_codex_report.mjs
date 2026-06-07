@@ -4,8 +4,8 @@
 //
 //   --report <ccoach-report.json> --insights <insights.json> --output <out.html> [--lang en|zh]
 //
-// Skeleton copy is localized via references/report-copy.json (`enriched` section), default English
-// (ADR 0025). Self-contained: pure Node ≥18 (ESM, no external libs, no network).
+// Skeleton copy is localized via references/report-copy.json (`enriched` section), default English.
+// Self-contained: pure Node ≥18 (ESM, no external libs, no network).
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -15,7 +15,7 @@ const DEFAULT_COPY = path.join(HERE, '..', 'references', 'report-copy.json')
 
 const load = (p) => JSON.parse(readFileSync(p, 'utf8'))
 
-// i18n (ADR 0025): skeleton copy from references/report-copy.json `enriched` section, default English.
+// i18n: skeleton copy from references/report-copy.json `enriched` section, default English.
 let I18N = {}
 let I18N_DEF = {}
 function setI18n(copy, lang) {
@@ -280,7 +280,7 @@ function main() {
   const report = load(a.report)
   const insights = load(a.insights)
   const copy = load(a.copy ?? DEFAULT_COPY)
-  const lang = a.lang ?? copy.default ?? 'en' // 默认英文（ADR 0025）；agent 按用户语言传 --lang
+  const lang = a.lang ?? copy.default ?? 'en' // 默认英文；agent 按用户语言传 --lang
   writeFileSync(a.output, render(report, insights, copy, lang))
   console.log(`wrote ${a.output}`)
 }

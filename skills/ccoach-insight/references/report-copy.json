@@ -1,5 +1,5 @@
 {
-  "_about": "Hand-localized fixed copy for the HTML report SKELETON (section titles, table headers, labels, notes), separate from scorecard-copy.json (the scorecard card). Default language is English (ADR 0024/0025). Structure supports any locale: add a key under dual/enriched with the same key set; missing keys fall back per-key to the default language. Follow ADR 0009 — hand-localize, do not machine-translate. Placeholders look like {name}; keep them and any embedded HTML/<code> tags intact when translating.",
+  "_about": "Hand-localized fixed copy for the HTML report SKELETON (section titles, table headers, labels, notes), separate from scorecard-copy.json (the scorecard card). Default language is English. Structure supports any locale: add a key under dual/enriched with the same key set; missing keys fall back per-key to the default language. Hand-localize, do not machine-translate. Placeholders look like {name}; keep them and any embedded HTML/<code> tags intact when translating.",
   "default": "en",
   "dual": {
     "en": {

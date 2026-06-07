@@ -17,7 +17,7 @@ const DEFAULT_COPY = path.join(HERE, '..', 'references', 'report-copy.json')
 
 const load = (p) => JSON.parse(readFileSync(p, 'utf8'))
 
-// i18n (ADR 0025): report-skeleton copy comes from references/report-copy.json, default English.
+// i18n: report-skeleton copy comes from references/report-copy.json, default English.
 // Single-threaded per process — setI18n() picks the active locale map + the default locale for
 // per-key fallback (so a partial new locale degrades gracefully instead of showing the raw key).
 let I18N = {}
@@ -72,7 +72,7 @@ function pct(v) {
   return (n * 100).toFixed(1) + '%'
 }
 
-// --- Cross-platform token口径 helpers (ADR 0024) ---
+// --- Cross-platform token口径 helpers ---
 // The two platforms store the per-platform `tokens.input` with DIFFERENT semantics:
 //   Claude: tokens.input is FRESH non-cached input; cache_read / cache_create are separate
 //           DISJOINT buckets (input + cache_read + cache_create + output = total).
@@ -209,7 +209,7 @@ function hoursChart(hours, color) {
   return `<div class='hours'>${cols.join('')}</div>`
 }
 
-// Per-turn (episode) summary panel for one platform (ADR 0032/0034): autonomy / intervention
+// Per-turn (episode) summary panel for one platform: autonomy / intervention
 // style / task mix / spiral count / deepest pit. All derived aggregates — no prompt text/paths.
 function episodePanel(ep, platform) {
   if (!ep || !ep.episodes) {
@@ -320,7 +320,7 @@ function behaviorPanel(beh, color, platform) {
 function sparkline(series, color) {
   if (!series || !series.length) return ''
   // Plot per-day tokens — the series carries tokens (cost is per-model official-online,
-  // applied later, never per-day), so a token-over-time curve is what's meaningful (ADR 0030).
+  // applied later, never per-day), so a token-over-time curve is what's meaningful.
   const vals = series.map((s) => s.tokens ?? s.cost ?? 0)
   const mx = Math.max(...vals) || 1
   const w = 280
@@ -342,7 +342,7 @@ function sparkline(series, color) {
 const billingModeLabel = (m) => tr('bill_' + m) !== 'bill_' + m ? tr('bill_' + m) : m
 const confidenceLabel = (c) => tr('conf_' + c) !== 'conf_' + c ? tr('conf_' + c) : c
 
-// 端点 / 计费模式卡片（账户级当前快照，ADR 0022 D2-D4）：两平台是否走官方/中转 + 计费模式。
+// 端点 / 计费模式卡片（账户级当前快照）：两平台是否走官方/中转 + 计费模式。
 function endpointBillingCard(cc, cx) {
   const row = (e, name) => {
     if (!e) return ''
@@ -364,7 +364,7 @@ function endpointBillingCard(cc, cx) {
   )
 }
 
-// Codex 计费拆分（订阅 plan tier，ADR 0022 D1）。
+// Codex 计费拆分（订阅 plan tier）。
 function codexBillingBreakdown(cx) {
   const b = cx?.billing
   if (!b) return ''
@@ -380,7 +380,7 @@ function codexBillingBreakdown(cx) {
   )
 }
 
-// Codex 执行画像（ADR 0023 D1）：effort / 审批 / 沙箱 / 协作模式 / 客户端 + 压缩 / 放弃 / 窗口 / git 身份。
+// Codex 执行画像：effort / 审批 / 沙箱 / 协作模式 / 客户端 + 压缩 / 放弃 / 窗口 / git 身份。
 function codexExecProfile(cx) {
   const cs = cx?.codex_specific
   if (!cs) return ''
@@ -409,7 +409,7 @@ function codexExecProfile(cx) {
   return `<h3>${esc(tr('exec_title'))}</h3>` + blocks.join('')
 }
 
-// Claude 服务端工具（ADR 0023 D2）：web 搜索 / 抓取计数（常为 0，非零才显示）。
+// Claude 服务端工具：web 搜索 / 抓取计数（常为 0，非零才显示）。
 function claudeServerTools(cc) {
   const c = cc?.claude_specific
   if (!c || (!c.web_search_requests && !c.web_fetch_requests)) return ''
@@ -420,10 +420,10 @@ function claudeServerTools(cc) {
 // `sc` is the JSON from scripts/scorecard.mjs; fully bilingual via its own copy.
 function scorecardHtml(sc) {
   if (!sc) return ''
-  // Render-order guard (ADR 0044): the persona title + roasts are MODEL-WRITTEN before render
+  // Render-order guard: the persona title + roasts are MODEL-WRITTEN before render
   // (SKILL.md step 6). If they are still the deterministic fallback at render time, leave a
   // visible HTML marker + warn on stderr so the omission is caught — but still render (offline/
-  // test 兜底 stays valid, ADR 0029).
+  // test 兜底 stays valid).
   const titleFallback = sc.title_is_fallback === true || /\s×\s/.test(sc.title ?? '')
   const fixtureRoasts = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
   if (titleFallback || fixtureRoasts) {
@@ -432,7 +432,7 @@ function scorecardHtml(sc) {
     if (fixtureRoasts) bits.push(`${fixtureRoasts} roast line(s) are still the fixture 兜底`)
     process.stderr.write(
       `⚠ scorecard: ${bits.join('; ')} — not written back to /tmp/scorecard.json before render. ` +
-        `Compose the persona title / rewrite roasts, then re-render (ADR 0044).\n`,
+        `Compose the persona title / rewrite roasts, then re-render.\n`,
     )
   }
   const parts = ["<section class='scorecard'>"]
@@ -465,9 +465,9 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   const cx = data.platforms.codex
   const hasCc = !!cc
   const hasCx = !!cx
-  const both = hasCc && hasCx // dual=完整对比；单平台=隐藏对比区 + 缺席面板（宿主平台默认，ADR 0042）
+  const both = hasCc && hasCx // dual=完整对比；单平台=隐藏对比区 + 缺席面板（宿主平台默认）
   const scope = both ? 'Claude Code + Codex' : hasCc ? 'Claude Code' : 'Codex' // 产品名不本地化，仅副标题模板按 --lang 取
-  const gridAttr = both ? " class='grid2'" : '' // dual=并排两栏；单平台=无 class，单面板整宽（ADR 0042）
+  const gridAttr = both ? " class='grid2'" : '' // dual=并排两栏；单平台=无 class，单面板整宽
   const comb = data.combined
   const title = tr('report_title') // 报告标题属骨架文案，按 --lang 取；忽略 merge 写入的固定 data.title
   const htmllang = tr('html_lang')
@@ -559,7 +559,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   }
   p.push('</section>')
 
-  // head-to-head comparison bars — 仅双平台渲染（单平台无对比对象，ADR 0042）
+  // head-to-head comparison bars — 仅双平台渲染（单平台无对比对象）
   if (both) {
     p.push(
       `<section class='panel'><h2>${esc(tr('h_comparison'))}</h2><div class='legend'>` +
@@ -568,7 +568,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
     )
     p.push(compareMetric(tr('cmp_total_cost'), cc.cost_usd, cx.cost_usd, money))
     p.push(compareMetric(tr('cmp_total_tokens'), cc.tokens.total, cx.tokens.total))
-    // 输入 Token = 输入侧总量（含缓存读）——两平台口径统一，避免 Claude 因排除 cache 而虚小（ADR 0024）。
+    // 输入 Token = 输入侧总量（含缓存读）——两平台口径统一，避免 Claude 因排除 cache 而虚小。
     p.push(compareMetric(tr('cmp_input'), inputSideTotal(cc.tokens, 'claude'), inputSideTotal(cx.tokens, 'codex')))
     p.push(compareMetric(tr('cmp_output'), cc.tokens.output, cx.tokens.output))
     p.push(compareMetric(tr('cmp_cache_read'), cc.tokens.cache_read, cx.tokens.cache_read))
@@ -577,7 +577,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
     p.push('</section>')
   }
 
-  // platform panels — 按在场平台渲染（单平台不并排、不留空壳，ADR 0042）
+  // platform panels — 按在场平台渲染（单平台不并排、不留空壳）
   p.push(`<section${gridAttr}>`)
 
   // Claude Code panel
@@ -615,7 +615,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
       p.push(sparkline(cx.daily_series, '#b45309'))
       p.push(`<h3>${esc(tr('h_model_dist'))}</h3>`)
       p.push(modelTable(cx.models, 'codex'))
-      // Top Sessions(按项目)表，与 Claude 面板对称（ADR 0011/0041）；仅在有 --codex-sessions 数据时渲染。
+      // Top Sessions(按项目)表，与 Claude 面板对称；仅在有 --codex-sessions 数据时渲染。
       if ((cx.top_sessions ?? []).length) {
         p.push(`<h3>${esc(tr('h_top_sessions'))}</h3><table><tr><th>${esc(tr('th_project'))}</th><th>${esc(tr('th_tokens'))}</th><th>${esc(tr('th_model'))}</th></tr>`)
         for (const s of cx.top_sessions) {
@@ -637,9 +637,9 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   }
   p.push('</section>')
 
-  // token composition per platform — 按在场平台渲染（ADR 0042）
+  // token composition per platform — 按在场平台渲染
   p.push(`<section${gridAttr}>`)
-  // Both panels use disjoint buckets that sum to total (ADR 0024). For Codex this fixes the old
+  // Both panels use disjoint buckets that sum to total. For Codex this fixes the old
   // double-count where input (incl cached) + cached + reasoning (⊆ output) overshot 100%.
   if (hasCc) {
     p.push(`<div class='panel'><h2>${esc(tr('h_cc_tokens'))}</h2>`)
@@ -664,13 +664,13 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   }
   p.push('</section>')
 
-  // behavior panels (tools / git / languages / repos / hours) — 按在场平台渲染（单平台只画在场平台，ADR 0042）
+  // behavior panels (tools / git / languages / repos / hours) — 按在场平台渲染（单平台只画在场平台）
   p.push(`<section><h2 class='section-h'>${esc(tr('h_behavior_section'))}</h2>` + `<div${gridAttr}>`)
   if (hasCc) p.push(behaviorPanel(cc.behavior, '#0f766e', 'Claude Code'))
   if (hasCx) p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
   p.push('</div></section>')
 
-  // per-turn episode analysis (ADR 0032/0034) — 按在场平台渲染（ADR 0042）
+  // per-turn episode analysis — 按在场平台渲染
   p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + `<div${gridAttr}>`)
   if (hasCc) p.push(episodePanel(cc.episode_summary, 'Claude Code'))
   if (hasCx) p.push(episodePanel(cx.episode_summary, 'Codex'))
@@ -749,7 +749,7 @@ function main() {
   const insights = load(a.insights)
   const scorecard = a.scorecard ? load(a.scorecard) : null
   const copy = load(a.copy ?? DEFAULT_COPY)
-  const lang = a.lang ?? copy.default ?? 'en' // 默认英文（ADR 0025）；agent 按用户语言传 --lang
+  const lang = a.lang ?? copy.default ?? 'en' // 默认英文；agent 按用户语言传 --lang
   writeFileSync(a.output, render(data, insights, scorecard, copy, lang))
   console.log(`wrote ${a.output}`)
 }

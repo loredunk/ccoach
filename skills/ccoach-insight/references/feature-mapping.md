@@ -2,7 +2,7 @@
 
 Use this when writing `recommendations`. **Feature-first**: whenever a finding can be
 solved with a native Claude Code / Codex feature, recommend that feature (by name)
-before any generic habit advice. Decision: ADR 0006.
+before any generic habit advice.
 
 Before recommending any configuration/feature, **verify it against current official
 docs** (these tools change fast). Only suggest — never auto-change the user's config.

@@ -22,7 +22,7 @@ Keep responsibilities separate:
 
 Separate **tokens/models** (authoritative local facts, offline) from **cost** (computed in this skill from official online prices):
 
-- **Tokens & model list = authoritative, offline, from ccoach — for BOTH platforms.** `ccoach report --platform claude-code|codex --json` parses the local JSONL into the unified Report — tokens + per-model token buckets (`model_tokens[]`) + `models_timeline` (per-day series) + behavior. ccoach never leaves the machine. **ccusage is NOT used at skill runtime**: ccoach's own per-model attribution now matches ccusage within ~0.04% (ADR 0030; the older ~20% gap predated ccoach's streaming "final/max usage" dedup fix). ccusage stays purely a dev/CI cross-check of the CLI (`npm run verify:ccusage`) — this skill never invokes it.
+- **Tokens & model list = authoritative, offline, from ccoach — for BOTH platforms.** `ccoach report --platform claude-code|codex --json` parses the local JSONL into the unified Report — tokens + per-model token buckets (`model_tokens[]`) + `models_timeline` (per-day series) + behavior. ccoach never leaves the machine. **ccusage is NOT used at skill runtime**: ccoach's own per-model attribution now matches ccusage within ~0.04% (the older ~20% gap predated ccoach's streaming "final/max usage" dedup fix). ccusage stays purely a dev/CI cross-check of the CLI (`npm run verify:ccusage`) — this skill never invokes it.
 - **Both platforms are symmetric.** Tokens / models / daily sparkline (`models_timeline`) / behavior all come from each platform's `ccoach report --json`. The **top-sessions** table (either platform) is sourced from `ccoach sessions --platform <P> --top N` (numeric only — repo/tokens/models, NO prompt text, NO per-session cost); skip it and that table just renders empty.
 - **Cost is NOT a bundled/snapshot price.** This skill looks up the **official API price of each actually-observed model name online** (including third-party cc-switch models like kimi/deepseek), then `apply_pricing.mjs` computes cost deterministically from each model's token buckets. See "Online official pricing" below.
 - **NEVER use `~/.claude/stats-cache.json`.** It is polluted by cc-switch swapping in third-party providers (kimi, etc.), so its model/cost attribution is wrong, and it stopped updating after 2026-04-09 — stale and inaccurate. Do not read or fall back to it under any circumstances.
@@ -58,7 +58,7 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
 
    Let `<W>` be the window flag derived from `$period` (default: **no flag = today**; `--date <d>` / `--days <n>` / `--since <d>` otherwise). Use the **same `<W>`** for every command below.
 
-   Let `<L>` be the language flag `--lang en|zh` (**default English**; pass `--lang zh` etc. to match the user's language). **Use the same `<L>` on every `ccoach report` call AND on `merge_dual_platform.mjs` / `scorecard.mjs` / `render_*.mjs`** — the CLI localizes its habit/behavior signals and window description by `--lang` (ADR 0026), so a Chinese report needs `--lang zh` everywhere, or some signals stay English. Omit `<L>` for the English default.
+   Let `<L>` be the language flag `--lang en|zh` (**default English**; pass `--lang zh` etc. to match the user's language). **Use the same `<L>` on every `ccoach report` call AND on `merge_dual_platform.mjs` / `scorecard.mjs` / `render_*.mjs`** — the CLI localizes its habit/behavior signals and window description by `--lang`, so a Chinese report needs `--lang zh` everywhere, or some signals stay English. Omit `<L>` for the English default.
 
 1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
    - Prefer `ccoach` from `PATH`; otherwise `npx @loredunk/ccoach@latest`.
@@ -70,7 +70,7 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
 3. (Optional) Top sessions for the **host platform's** Top Sessions table — numeric only, **NO prompt text** (no `--include-user-prompts`, so it's repo/tokens/models counts only), same `<W>`:
    - `<P>`=claude-code: `ccoach sessions --platform claude-code <W> --top 5 > /tmp/cc-sessions.json`
    - `<P>`=codex: `ccoach sessions --platform codex <W> --top 5 > /tmp/codex-sessions.json`
-   - Skip it and that platform's top-sessions table just renders empty (both platforms support it symmetrically, ADR 0041).
+   - Skip it and that platform's top-sessions table just renders empty (both platforms support it symmetrically).
 4. Merge into one dual-platform JSON (both platforms get a unified `behavior` block + a `window` header):
    - Single platform (default), `<P>=claude-code`:
      `node ${CLAUDE_SKILL_DIR}/scripts/merge_dual_platform.mjs --cc-report /tmp/claude-code-report.json [--cc-sessions /tmp/cc-sessions.json] <L> --output /tmp/ai-usage.json`
@@ -88,32 +88,32 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
      - `executive_summary` — a prominent paragraph (or short list) covering the reported platform(s) (both only in the opt-in dual report).
      - `recommendations` — a list; each item is a string or `{title, text, evidence}` (include `evidence` grounded in the merged numbers).
      - `insights` — a list; each item is a string or `{title, detail}`.
-     - **Honest counting (ADR 0043):** the prompt count is "instructions you gave", NOT "rounds of asking". NEVER write "asked N rounds / 追问 N 轮 / 一口气问了 N 轮" — it implies repeatedly re-asking the same thing, which ccoach does not measure. For a heavy session say "this session ran N instructions and used X% of tokens" and pair it with the episode/spiral lens.
-   - All fields are optional and backward-compatible: a flat `{"insights": ["string", ...]}` still renders. **Write insights in the user's language; default to English** when their language is unclear — match the `--lang` you pass to the renderer/scorecard (default English, ADR 0025).
+     - **Honest counting:** the prompt count is "instructions you gave", NOT "rounds of asking". NEVER write "asked N rounds / 追问 N 轮 / 一口气问了 N 轮" — it implies repeatedly re-asking the same thing, which ccoach does not measure. For a heavy session say "this session ran N instructions and used X% of tokens" and pair it with the episode/spiral lens.
+   - All fields are optional and backward-compatible: a flat `{"insights": ["string", ...]}` still renders. **Write insights in the user's language; default to English** when their language is unclear — match the `--lang` you pass to the renderer/scorecard (default English).
    - Behavior data is in `platforms.<plat>.behavior` (tools / top_commands / git_habits / languages / repos / hours / sources / extras) for the reported platform(s) — ground at least one insight for each reported platform in these behavior numbers.
-   - **Billing / endpoint / exec-profile** (ADR 0022/0023) also surface in the merged JSON & rendered HTML: `platforms.codex.billing` (token split by subscription plan tier plus/pro + `unclassified`), `platforms.<plat>.endpoint` (`endpoint` official/custom + `billing_mode` subscription/api_or_relay/unknown + `relay_suspected` + `subscription_type`), `platforms.codex.codex_specific` (effort/approval/sandbox/collaboration_mode/originators/compactions/aborted_turns/context_window), `platforms.claude_code.claude_specific` (server web search/fetch counts). All are derived whitelist labels — never key/token/full URL. `plan_type` is spoofable by relays (`confidence: spoofable-by-relay`); if `endpoint=custom`/`relay_suspected`, treat plan tiers and subscription claims as untrusted. Don't print quota percentages.
+   - **Billing / endpoint / exec-profile** also surface in the merged JSON & rendered HTML: `platforms.codex.billing` (token split by subscription plan tier plus/pro + `unclassified`), `platforms.<plat>.endpoint` (`endpoint` official/custom + `billing_mode` subscription/api_or_relay/unknown + `relay_suspected` + `subscription_type`), `platforms.codex.codex_specific` (effort/approval/sandbox/collaboration_mode/originators/compactions/aborted_turns/context_window), `platforms.claude_code.claude_specific` (server web search/fetch counts). All are derived whitelist labels — never key/token/full URL. `plan_type` is spoofable by relays (`confidence: spoofable-by-relay`); if `endpoint=custom`/`relay_suspected`, treat plan tiers and subscription claims as untrusted. Don't print quota percentages.
    - For richer interpretation patterns (evidence → meaning → impact → drilldown → intervention), read `references/insight-patterns.md`; distill those ladders into the `recommendations`/`insights` fields described in `references/dual-insights-schema.md`.
-   - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization (ADR 0015); skip it only if the user opts out.
+   - **By default, also run the Claude Code session prompt review** ("Session prompt review (Claude Code)" below) on the top-token session and fold its content-layer diagnoses (token drivers, prompt failure modes, better first/follow-up prompts — paraphrased) into `recommendations`/`insights`. This is default-on under standing local authorization; skip it only if the user opts out.
    - **Explain the "why", in plain language.** When recommending file references, say *why* it helps: naming `file_path:line_number` lets the agent jump straight to the right place instead of grepping the whole repo (saves tokens) and cuts "you edited the wrong file" reworks (Anthropic's context guidance: the fuller the context window, the worse quality gets). When the report mentions "episodes" or "spirals", define them in human terms: an episode = one instruction → the agent's work for it; a spiral = an episode where the agent got stuck (same file re-edited / repeated errors / no progress) — flag it as wasteful and suggest splitting the task, giving sharper context, or giving it a way to self-verify.
 6. (Optional) Build the shareable **scorecard** (see "Shareable scorecard" below):
    - `node ${CLAUDE_SKILL_DIR}/scripts/scorecard.mjs --data /tmp/ai-usage.json --lang en --output /tmp/scorecard.json`
-   - **Default language is English** (ADR 0025); pass `--lang zh` (or another supported locale) to match the user.
+   - **Default language is English**; pass `--lang zh` (or another supported locale) to match the user.
    - The **tier scores and tier names** come from `scorecard.mjs` + the copy table — **do not change the names**
      (stable, recognizable, shareable identity; unsupported locales fall back to English).
-   - **Roast lines are yours to write (ADR 0029/0031).** `scorecard.json` ships a safe fixture roast per axis as the
+   - **Roast lines are yours to write.** `scorecard.json` ships a safe fixture roast per axis as the
      default/fallback. Rewriting each `axes[].roast` is **mandatory** (see the **REQUIRED before step 7** step below) — write it into the
-     **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules (ADR 0031):
+     **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules:
      **describe a phenomenon backed by a concrete number** in the merged JSON (cost / tokens / cache-replay / late-night
      share / plan-mode count / active days…) — *describing it is enough*; a light wry note is **optional, NOT a savage
      punchline tacked onto every axis**. **NEVER assert something ccoach doesn't measure**: it tracks tool/command
      CATEGORIES and counts, not intent — so do not claim "never ran a test", "didn't review the code", or "should've
      used plan mode" (there is no test-execution / review / plan-necessity signal; inventing one is a correctness bug,
-     not a joke). Tease **changeable habits, never the person/ability** (ADR 0008); **aggregate-only — never quote or
+     not a joke). Tease **changeable habits, never the person/ability**; **aggregate-only — never quote or
      imply prompt text** (the shareable card stays zero-raw-text).
    - **REQUIRED before step 7 (render).** The scorecard you just generated ships fallback markers
      (`title_is_fallback: true`, each `axes[].roast_is_fixture: true`). Before rendering you MUST
      overwrite `/tmp/scorecard.json` in place (Read it, edit the fields, then write it back):
-     1. **Compose the persona title yourself (ADR 0008 D3)** — a short, witty handle from the four
+     1. **Compose the persona title yourself** — a short, witty handle from the four
        `axes[].tier` names (e.g. 渡劫飞升 + 富哥随意 + 架构师 + 劳模 → "随手烧钱的渡劫劳模"); stay
        faithful to the computed tiers, never invent an axis, never quote prompt text. Set
        `title` to it **and set `title_is_fallback` to `false`**.
@@ -122,12 +122,12 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
      3. Also write the personality-summary sentence into the insights `executive_summary` — note this field lives in `/tmp/ai-usage-insights.json` (a separate file, not scorecard.json).
      If you skip this, the renderer keeps the fallback `A × B × C × D` title and fixture roasts,
      emits a stderr warning, and leaves a `<!-- ccoach:scorecard_title_is_fallback -->` marker in the
-     HTML (ADR 0044). Write-back happens BEFORE render — never render first and patch later.
+     HTML. Write-back happens BEFORE render — never render first and patch later.
 7. Render HTML (run step 4.5 `apply_pricing.mjs` first so cost is the official-online figure, not the offline fallback):
    - `node ${CLAUDE_SKILL_DIR}/scripts/render_dual_platform.mjs --data /tmp/ai-usage.json --insights /tmp/ai-usage-insights.json --scorecard /tmp/scorecard.json --lang en --output ai-usage-report.html`
-   - The whole report skeleton is localized from `references/report-copy.json` (default English; ADR 0025). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
+   - The whole report skeleton is localized from `references/report-copy.json` (default English). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
    - Use the user-specified output path if given; otherwise `ai-usage-report.html`.
-   - **Self-check (ADR 0044):** after rendering, look at the command's stderr. If you see a
+   - **Self-check:** after rendering, look at the command's stderr. If you see a
      `⚠ scorecard:` warning, the persona title / roasts were NOT written back before render — fix
      `/tmp/scorecard.json` (step 6 write-back) and **re-run this render command**. Do not ship the
      `ai-usage-report.html` while that warning is present.
@@ -158,9 +158,9 @@ Use this when the user wants to find expensive or unclear Codex sessions.
 8. Read `references/session-prompt-review.md`, then summarize the session review findings. Fold the key diagnoses into the `insights` strings of `/tmp/ai-usage-insights.json` (or, in the Codex-only fallback, into `session_reviews` of `/tmp/codex-usage-insights.json` per the schema).
 9. Render the HTML again.
 
-### Session prompt review (Claude Code) — default-on (ADR 0015)
+### Session prompt review (Claude Code) — default-on
 
-The symmetric counterpart for Claude Code. The data owner has granted **standing local authorization** to read their own prompts by default (ADR 0015), so the daily report runs this step automatically — no per-run approval gate. It is still **single-session** (the top-token session, or one the user names), redacted, local-only, and you must still **paraphrase rather than quote**.
+The symmetric counterpart for Claude Code. The data owner has granted **standing local authorization** to read their own prompts by default, so the daily report runs this step automatically — no per-run approval gate. It is still **single-session** (the top-token session, or one the user names), redacted, local-only, and you must still **paraphrase rather than quote**.
 
 1. By default, surface the highest-token session's redacted prompts + per-prompt signals in one call (no `--id` needed — it auto-selects the top-token session):
    - `ccoach sessions --platform claude-code <W> --include-user-prompts > /tmp/cc-session-review-source.json` (same `<W>` as the report; default today)
@@ -173,7 +173,7 @@ The symmetric counterpart for Claude Code. The data owner has granted **standing
 
 ## Analysis scopes (session / project / global)
 
-Pick the scope from what the user asks (ADR 0005):
+Pick the scope from what the user asks:
 
 - **Global** (default): cross-project overview. `ccoach report --json` (per platform via `--platform`).
 - **Project**: one project across its sessions. `ccoach report --scope project --json` emits `projects[]` (keyed by cwd basename), either platform.
@@ -205,11 +205,11 @@ price table (models change; a stale snapshot drifts). The CLI stays offline and 
 
 ## Shareable scorecard
 
-`scripts/scorecard.mjs` deterministically grades four axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier indices + tier names + a fixture roast from `references/scorecard-copy.json` (ADR 0008/0009). The report skeleton is localized from `references/report-copy.json` (ADR 0025). The renderer shows the scorecard as a screenshot-friendly cover card.
+`scripts/scorecard.mjs` deterministically grades four axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier indices + tier names + a fixture roast from `references/scorecard-copy.json`. The report skeleton is localized from `references/report-copy.json`. The renderer shows the scorecard as a screenshot-friendly cover card.
 
 - **Deterministic, fixed**: the tier *score* and the tier *name* (UI labels too) come from `scorecard.mjs` + the copy tables — **don't change names yourself**; **default English**, pass `--lang zh` (or another locale) to match the user. To add a tier-name locale, add its keys to the copy tables (missing keys fall back to the default language).
-- **Model-authored (ADR 0029)**: the **axis roast lines** AND the personality-summary sentence are **yours to write in the user's language**. The fixture roast in `scorecard.json` is a safe default/fallback + your tone exemplar — rewrite `axes[].roast` (idiomatic, fresh, one line) before rendering; leave it for the fixture default. This is where the LLM's per-language idiom shines, so you don't have to hand-localize roasts into every language.
-- **Grounded, not savage (ADR 0031)**: every roast must **describe a real phenomenon backed by a concrete number** in the merged JSON — *describing it is enough*; a light wry note is optional, **not a mocking punchline on every axis**. **Never assert what ccoach doesn't measure** (e.g. "never ran a test", "didn't review", "should've used plan mode" — there is no such signal; making it up is a correctness bug). Tease changeable **habits**, never ability or the person (ADR 0008).
+- **Model-authored**: the **axis roast lines** AND the personality-summary sentence are **yours to write in the user's language**. The fixture roast in `scorecard.json` is a safe default/fallback + your tone exemplar — rewrite `axes[].roast` (idiomatic, fresh, one line) before rendering; leave it for the fixture default. This is where the LLM's per-language idiom shines, so you don't have to hand-localize roasts into every language.
+- **Grounded, not savage**: every roast must **describe a real phenomenon backed by a concrete number** in the merged JSON — *describing it is enough*; a light wry note is optional, **not a mocking punchline on every axis**. **Never assert what ccoach doesn't measure** (e.g. "never ran a test", "didn't review", "should've used plan mode" — there is no such signal; making it up is a correctness bug). Tease changeable **habits**, never ability or the person.
 - **Aggregate-only**: roasts may use aggregate numbers (cost/tokens/hours/tier) but **never prompt text** — the shareable card stays zero-raw-text. The relative rank ("beats X%") is a local **estimate** — keep it labelled.
 - Privacy is a selling point: state that all analysis is local and prompt content never leaves the machine.
 
@@ -217,7 +217,7 @@ price table (models change; a stale snapshot drifts). The CLI stays offline and 
 
 Base all claims on the merged JSON / report data. If a claim is an inference, phrase it as an inference.
 
-**Feature-first recommendations**: whenever a finding can be solved with a native Claude Code / Codex feature, recommend that feature by name before any generic habit advice. Use `references/feature-mapping.md` for the finding → feature table (ADR 0006).
+**Feature-first recommendations**: whenever a finding can be solved with a native Claude Code / Codex feature, recommend that feature by name before any generic habit advice. Use `references/feature-mapping.md` for the finding → feature table.
 
 Before recommending any platform configuration or feature (CLAUDE.md/AGENTS.md, skills, subagents, hooks, sandbox/model/effort settings, permission/settings), search the web for the latest official Claude Code and Codex documentation and verify the suggestion against it. These tools change quickly, so confirm every configuration recommendation against current docs rather than relying on prior knowledge. Only suggest — never auto-change the user's config.
 

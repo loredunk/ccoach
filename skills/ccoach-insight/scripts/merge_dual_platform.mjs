@@ -2,7 +2,7 @@
 // Merge Claude Code + Codex usage into one dual-platform JSON. Both platforms' tokens & model
 // list are authoritative local facts from ccoach's offline parse — ccusage is NOT used at skill
 // runtime (it stays a dev/CI cross-check only; ccoach's own per-model attribution now matches
-// ccusage within ~0.04%, see ADR 0030). COST is NOT computed here — it's left as an offline
+// ccusage within ~0.04%). COST is NOT computed here — it's left as an offline
 // fallback and recomputed by apply_pricing.mjs from official online prices the agent looks up
 // (per actual model name).
 //
@@ -76,7 +76,7 @@ function topClaudeSessions(sessionsJson, n = 5) {
 // Top Codex sessions by token — symmetric with topClaudeSessions but for the Codex session shape
 // (`ccoach sessions --platform codex --top N`: tokens is an object {total}, model is a single string,
 // date is last_seen). Maps to the same {project,last,tokens,models} the renderer's table expects.
-// Numeric only — repo basename + token count + model name, NO prompt text (ADR 0011/0041 parity).
+// Numeric only — repo basename + token count + model name, NO prompt text (parity).
 function topCodexSessions(sessionsJson, n = 5) {
   const list = sessionsJson?.sessions ?? (Array.isArray(sessionsJson) ? sessionsJson : [])
   return [...list]
@@ -92,7 +92,7 @@ function topCodexSessions(sessionsJson, n = 5) {
 // Derive a daily {date,tokens} series from a CLI report's models_timeline (used for both
 // platforms' sparklines). Sums per-day tokens across models. Note: models_timeline caps
 // days[] to the last ~31 days and models to the top 10 by token, so very wide windows show a
-// recent/top-model sparkline — first_day/last_day/totals stay exact (ADR 0030).
+// recent/top-model sparkline — first_day/last_day/totals stay exact.
 function dailyFromTimeline(report) {
   const byDay = new Map()
   for (const mt of report?.models_timeline ?? []) {
@@ -103,7 +103,7 @@ function dailyFromTimeline(report) {
 
 // True activity date range from models_timeline's per-model first_day/last_day — these are the
 // real full-window endpoints (uncapped; only days[] is capped to ~31). Used for date_range so wide
-// windows aren't truncated to the sparkline's last-31-day view (ADR 0030 fix from review).
+// windows aren't truncated to the sparkline's last-31-day view.
 function rangeFromTimeline(report) {
   let lo = null
   let hi = null
@@ -156,7 +156,7 @@ function normHours(hours, countKey = null) {
   return out
 }
 
-// i18n for the few behavior `extras` prefixes composed here (default English, ADR 0026).
+// i18n for the few behavior `extras` prefixes composed here (default English).
 // (git/pm signals come already-localized from `ccoach report --lang`; these are merge-added labels.)
 const MERGE_I18N = {
   en: { perm: 'Permission modes: ', sep: ', ', subagent: (n) => `${n} subagent messages`, reasoning: (p) => `reasoning ${p}% of output` },
@@ -204,7 +204,7 @@ export function claudeBehavior(r, lang = 'en') {
     tool_categories: cats,
     git_habits: cleanGit(git.top_subcommands ?? []),
     languages: (r.file_languages ?? []).slice(0, 10).map((l) => ({ name: l.name, count: l.files ?? 0 })),
-    languages_unit: 'files', // 中性键；renderer 按 --lang 本地化（ADR 0025）
+    languages_unit: 'files', // 中性键；renderer 按 --lang 本地化
     repos: (r.repos ?? []).slice(0, 10).map((x) => ({
       repo: x.repo, sessions: x.sessions ?? 0, tokens: x.tokens ?? 0, tool_calls: 0,
     })),
@@ -239,7 +239,7 @@ export function codexBehavior(r, lang = 'en') {
     tool_categories: cats,
     git_habits: cleanGit(git.top_subcommands ?? []),
     languages: (r.languages ?? []).slice(0, 10).map((l) => ({ name: l.name, count: l.sessions ?? 0 })),
-    languages_unit: 'sessions', // 中性键；renderer 按 --lang 本地化（ADR 0025）
+    languages_unit: 'sessions', // 中性键；renderer 按 --lang 本地化
     repos,
     hours: normHours(r.hours ?? []),
     sources: (r.sources ?? []).map((s) => ({ name: s.name, count: s.sessions ?? 0 })),
@@ -249,7 +249,7 @@ export function codexBehavior(r, lang = 'en') {
 
 // Claude Code from the ccoach CLI (authoritative tokens + per-model breakdown, offline local
 // parse). ccusage is no longer used at skill runtime: ccoach's own model_tokens[] matches
-// ccusage's per-line attribution within ~0.04% (ADR 0030; the ~20% gap in ADR 0019 D4 predated
+// ccusage's per-line attribution within ~0.04% (the ~20% gap predated
 // the streaming "final/max usage" dedup fix). Cost here is the CLI offline fallback; apply_pricing
 // overwrites it with official online prices. Daily sparkline derives from models_timeline (same as
 // Codex); top sessions come from `ccoach sessions --top N` (numeric only — no prompt text, no cost).
@@ -282,8 +282,8 @@ export function buildClaude(report, sessions = null, lang = 'en') {
     top_sessions: topClaudeSessions(sessions),
     behavior: claudeBehavior(r, lang),
     prompt_signals: r.prompt_signals ?? {},
-    episode_summary: r.episode_summary ?? null, // 回合概览（ADR 0032/0034）：自主度/干预风格/任务构成/最深的坑
-    // 平台特色 + 端点/计费（ADR 0023 D2 / 0022 D2-D4）：均为派生白名单标签，不含 key/token/完整 URL。
+    episode_summary: r.episode_summary ?? null, // 回合概览：自主度/干预风格/任务构成/最深的坑
+    // 平台特色 + 端点/计费：均为派生白名单标签，不含 key/token/完整 URL。
     claude_specific: r.claude_specific ?? null,
     endpoint: (r.endpoints ?? []).find((e) => e.platform === 'claude-code') ?? null,
   }
@@ -308,7 +308,7 @@ export function buildCodex(codexReport, codexSessions = null, lang = 'en') {
     // tokens/模型来自 ccoach 本地解析；成本由 skill 层联网官方价计算（apply_pricing）。
     source: 'ccoach（本地解析，token/模型）· 官方在线定价',
     active_days: r.active_days ?? series.length,
-    sessions: r.sessions ?? 0, // 顶层会话数（与 buildClaude 对称）：单平台宿主=Codex 时成绩卡 Engineering 轴用（ADR 0042 review）
+    sessions: r.sessions ?? 0, // 顶层会话数（与 buildClaude 对称）：单平台宿主=Codex 时成绩卡 Engineering 轴用
     date_range: dateRange,
     tokens: {
       input: tok.input ?? 0,
@@ -322,11 +322,11 @@ export function buildCodex(codexReport, codexSessions = null, lang = 'en') {
     cache_hit_rate: round(r.cache_hit_rate ?? 0, 4),
     models,
     daily_series: series,
-    top_sessions: topCodexSessions(codexSessions), // Top Sessions(按项目)表，与 Claude 对称（ADR 0011/0041）
+    top_sessions: topCodexSessions(codexSessions), // Top Sessions(按项目)表，与 Claude 对称
     behavior: codexBehavior(r, lang),
-    prompt_signals: r.prompt_signals ?? {}, // 单平台(宿主=Codex)时供成绩卡 Prompt Skill 轴（ADR 0008/0042）
-    episode_summary: r.episode_summary ?? null, // 回合概览（ADR 0032/0034）
-    // 计费维度 + 执行画像 + 端点（ADR 0022 D1-D4 / 0023 D1）：均为派生计数/白名单标签，不含敏感内容。
+    prompt_signals: r.prompt_signals ?? {}, // 单平台(宿主=Codex)时供成绩卡 Prompt Skill 轴
+    episode_summary: r.episode_summary ?? null, // 回合概览
+    // 计费维度 + 执行画像 + 端点：均为派生计数/白名单标签，不含敏感内容。
     billing: r.billing ?? null,
     codex_specific: r.codex_specific ?? null,
     endpoint: (r.endpoints ?? []).find((e) => e.platform === 'codex') ?? null,
@@ -351,7 +351,7 @@ function buildWindow(reports) {
 
 function main() {
   const a = parseArgs(process.argv.slice(2))
-  // 至少一个平台 report + --output（单平台默认；两个都给 = 双平台 opt-in，ADR 0042）。
+  // 至少一个平台 report + --output（单平台默认；两个都给 = 双平台 opt-in）。
   // --cc-sessions 仍可选（Claude top-sessions 表；缺省即空表）。
   if (!a.output) {
     process.stderr.write('missing --output\n')
@@ -361,7 +361,7 @@ function main() {
     process.stderr.write('need at least one of --cc-report / --codex-report\n')
     process.exit(2)
   }
-  const lang = a.lang || 'en' // 默认英文（ADR 0026）；与 ccoach report / scorecard / render 同传
+  const lang = a.lang || 'en' // 默认英文；与 ccoach report / scorecard / render 同传
   const ccReport = a['cc-report'] ? load(a['cc-report']) : null
   const codexReport = a['codex-report'] ? load(a['codex-report']) : null
   const ccSessions = a['cc-sessions'] ? load(a['cc-sessions']) : null
@@ -374,7 +374,7 @@ function main() {
   if (codex) platforms.codex = codex
 
   const merged = {
-    title: 'AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题，ADR 0025）；保留字段兼容
+    title: 'AI Usage Report', // 不再用于显示（renderer 按 --lang 取标题）；保留字段兼容
     generated_at: todayIso(),
     window: buildWindow([codexReport, ccReport].filter(Boolean)),
     platforms,

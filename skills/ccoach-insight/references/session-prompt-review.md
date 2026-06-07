@@ -27,7 +27,7 @@ Review the session as a context-management problem:
 For each reviewed session, write:
 
 - What likely consumed tokens: ambiguity, repeated context loading, broad search, failed commands, rework, tool loops, or over-scoped asks.
-- Describe prompt volume as "instructions given", never "rounds of asking" (ADR 0043). Do not imply the user re-asked the same thing — ccoach measures structure/constraint/file-ref/correction, not repetition.
+- Describe prompt volume as "instructions given", never "rounds of asking". Do not imply the user re-asked the same thing — ccoach measures structure/constraint/file-ref/correction, not repetition.
 - Prompt failure modes: missing acceptance criteria, missing files, unclear ownership, premature solution, conflicting constraints, vague bug report, too many goals, or no verification target.
 - Better first prompt: a concise rewrite the user could have started with.
 - Better follow-up prompt: a rewrite for steering the agent after the first result.
