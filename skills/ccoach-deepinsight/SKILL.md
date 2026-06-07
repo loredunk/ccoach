@@ -1,0 +1,65 @@
+---
+name: ccoach-deepinsight
+description: Deep, semantic root-cause coaching for how you work with Claude Code in a specific project. Goes beyond aggregate metrics — reads your own real code (read-only) and, on spiral-flagged sessions, an opt-in token-bounded content digest — to tell you in plain language WHY work churned and the concrete fix, anchored to official Claude Code features. Distinct from the entertainment-flavored ccoach-insight report. Claude Code only (for now); read-only, local, desensitized.
+when_to_use: 'Trigger when the user wants a SERIOUS productivity / behavioral deep-dive on how they use Claude Code in a project — "why do I keep reworking this", "where am I wasting effort", "deep insight", "what should I change to use Claude Code better", "/ccoach-deepinsight". NOT for the fun usage scorecard (that is ccoach-insight).'
+allowed-tools: Read Grep Glob Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
+---
+
+# ccoach-deepinsight — semantic root-cause deep coach (Claude Code)
+
+## Purpose
+
+Tell the user, in plain human language, WHY their work in a project churns/wastes effort and the concrete fix — so they wield the AI harness more consciously. The deliverable is **solutions and results**, not metrics.
+
+**First principle (non-negotiable):** CLI aggregate metrics (spiral, edit_ring, structured_ratio, any "pass rate") mislead and are machine-speak. They are **minor supporting evidence only — never the headline.** The real product is the **semantic root cause**, found by reading the user's own real code (read-only) and, when needed, an opt-in content digest.
+
+Every root cause is classified and stated as a human fix:
+- **cognitive_gap** — didn't know something about the domain/code/tool.
+- **prompt_issue** — communication; say it as "next time do X", never a scold.
+- **code_structure** — the code made it hard.
+- **workflow** — process.
+- **unknown_feature** — an official Claude Code feature already solves it.
+
+**Feature-first:** name the official native feature (plan mode, @file references, PostToolUse hooks, /clear, subagents, CLAUDE.md anchors). Official only — never recommend third-party habit skills.
+
+## Privacy (red lines, ADR 0048/0049)
+
+Read-only; local; never exfiltrate. Read the user's own current-project code (never modify it) and CLI-derived signals. Reading assistant/tool_result content is **opt-in and only via `ccoach digest`** (token-bounded, redacted, NO thinking). **Never** read thinking / system·developer prompts / file contents as content. All surfaced/written output is **desensitized** (paths/identifiers → `<…>`); no raw prompt text, no assistant/thinking content.
+
+## Workflow — two passes (ADR 0048)
+
+Single platform: **Claude Code**. Locate `ccoach` (prefer PATH; else `node dist/cli.js` in this repo, or `npx @loredunk/ccoach@latest`).
+
+### Pass 1 — PROJECT (always; cheap; NO content)
+
+Find systemic root causes that recur across sessions and are fixable once.
+
+1. `ccoach --platform claude-code --since <date> --scope project --json` and `--scope episode --json` → project + episode/spiral signals.
+2. Read the repo itself (read-only): `CLAUDE.md`/`AGENTS.md`, `package.json` (scripts), whether `.claude/settings.json` exists, and the hot files git churn points at. Use Grep/Glob/Read.
+3. Emit **ship-once** root causes + fixes, e.g.: a missing `.claude/settings.json` PostToolUse hook running the repo's typecheck/test; a CLAUDE.md Commands block + one-line-per-file module map. Ground each in the code you read; demote metrics to a single supporting line.
+
+This pass alone is the highest-leverage, lowest-risk output. Stop here unless the user wants per-session depth or a session is spiral-flagged.
+
+### Pass 2 — SESSION (on spiral-flagged sessions or user drill-down)
+
+Drill the deepest individual pits for per-turn behavioral root causes.
+
+1. List candidates (numeric, zero content): `ccoach sessions --platform claude-code --repo <repo> --since <date> --top 20`. Pick spiral/high-churn sessions.
+2. **Grounding gate (ADR 0048 D2 — never violate):** read that session's own redacted prompts (`ccoach sessions --platform claude-code --id <FULL-session-id> --include-user-prompts`) and its `[first,last]` window. For any claim about what the turn was doing / whether work shipped, get in-window commits ONLY:
+   `node ${CLAUDE_SKILL_DIR}/scripts/grounding.mjs "<first-ISO>" "<last-ISO>" <repo-path>`
+   **Never** time-correlate the session to commits outside that window.
+3. **Content verification gate (ADR 0049):** before emitting any session-intent finding at confidence≥high, spend a TIGHT digest:
+   `ccoach digest --platform claude-code --id <FULL-session-id> --budget tight` (≈7.5K tok; redacted; no thinking). Use it to FALSIFY a tentative root cause before asserting it — this is what prevents confidently-wrong diagnoses. Use `--budget rich` only on explicit single-session drill-down.
+4. Read the specific code the session worked on (read-only) for the semantic reason it churned.
+
+### Dedup (ADR 0048 D5)
+
+When both passes reach the same conclusion (e.g. plan mode, @file refs), state it ONCE at project scope as a durable habit; the session pass cites instances. Reserve the session pass for findings the project pass cannot produce.
+
+## Output
+
+Markdown (v1). For each root cause: a plain-language semantic statement, the concrete fix (official feature named), confidence, and at most one supporting metric line. **False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change. **Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior. Desensitize all paths/identifiers to `<…>` before writing/sharing.
+
+## Honesty rules (ADR 0048 D4 / repo CLAUDE.md)
+
+Never assert what ccoach doesn't measure (no "you never ran tests", "didn't review", "should've used plan mode" unless a real signal supports it). Verify any feature/config recommendation against current official Claude Code docs (WebSearch) before suggesting; only suggest, never auto-change config.
