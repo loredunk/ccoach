@@ -3,7 +3,7 @@
 > 状态：已接受 · 日期：2026-06-07
 > · 沿用 [`adr/0005-tiered-analysis-and-signals.md`](0005-tiered-analysis-and-signals.md) / [`adr/0006-feature-first-recommendations.md`](0006-feature-first-recommendations.md)
 > · 复用 [`adr/0032-episode-abstraction-layer.md`](0032-episode-abstraction-layer.md) / [`adr/0034-spiral-detection-deepest-pit-story.md`](0034-spiral-detection-deepest-pit-story.md)
-> · 配套 [`adr/0049-ccoach-digest-optin-content.md`](0049-ccoach-digest-optin-content.md)
+> · 配套 `adr/0049-ccoach-digest-optin-content.md`
 
 ## 背景
 

@@ -44,9 +44,14 @@ function checkAdrs(errors) {
   if (seen.size === 0) errors.push('no ADR files found')
 }
 
+/** Strip fenced code blocks so example links inside ``` aren't checked. */
+function stripFencedBlocks(text) {
+  return text.replace(/^```[^\n]*\n[\s\S]*?^```/gm, '')
+}
+
 function checkLinks(errors) {
   for (const fp of walkMd(DOCS).sort()) {
-    const text = readFileSync(fp, 'utf8')
+    const text = stripFencedBlocks(readFileSync(fp, 'utf8'))
     for (const match of text.matchAll(LINK_RE)) {
       const target = match[1].trim()
       if (/^(https?:\/\/|#|mailto:)/.test(target)) continue
