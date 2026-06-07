@@ -3,7 +3,6 @@
 // 文件内容做内容用途**。原始正文瞬时派生即弃，落地只有截断+脱敏后的摘要。复用 sessions.redact()。
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { inLocalRange, type Window } from './window.js'
 import { redact } from './sessions.js'
 
 export interface DigestOpts {
@@ -68,7 +67,8 @@ function resultText(rec: any): { text: string; isError: boolean } {
 const cps = (s: string): number => [...s].length
 function trunc(s: string, n: number): string { const a = [...s]; return a.length > n ? a.slice(0, n).join('') + '…' : s }
 
-export function buildDigest(dir: string, window: Window, opts: DigestOpts): Record<string, unknown> {
+// 不接受时间窗：--id 点名单会话即范围（窗口会把旧会话过滤空，是 papercut）。
+export function buildDigest(dir: string, opts: DigestOpts): Record<string, unknown> {
   const perItem = opts.perItem ?? BUDGETS.tight.perItem
   const maxTotal = opts.maxTotal ?? BUDGETS.tight.maxTotal
   const want = opts.sessionId
@@ -87,7 +87,6 @@ export function buildDigest(dir: string, window: Window, opts: DigestOpts): Reco
       const tsRaw = rec?.timestamp
       const ts = typeof tsRaw === 'string' ? new Date(tsRaw) : null
       const tsv = ts && !Number.isNaN(ts.getTime()) ? ts : null
-      if (tsv && !inLocalRange(tsv, window)) continue
       rec.__ts = tsv ? tsv.getTime() : 0
       recs.push(rec)
     }
