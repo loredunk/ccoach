@@ -2,7 +2,9 @@
 name: ccoach-deepinsight
 description: Deep, semantic root-cause coaching for how you work with Claude Code in a specific project. Goes beyond aggregate metrics — reads your own real code (read-only) and, on spiral-flagged sessions, an opt-in token-bounded content digest — to tell you in plain language WHY work churned and the concrete fix, anchored to official Claude Code features. Distinct from the entertainment-flavored ccoach-insight report. Claude Code only (for now); read-only, local, desensitized.
 when_to_use: 'Trigger when the user wants a SERIOUS productivity / behavioral deep-dive on how they use Claude Code in a project — "why do I keep reworking this", "where am I wasting effort", "deep insight", "what should I change to use Claude Code better", "/ccoach-deepinsight". NOT for the fun usage scorecard (that is ccoach-insight).'
-allowed-tools: Read Grep Glob Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
+argument-hint: "[YYYY-MM-DD | N (days back)]"
+arguments: period
+allowed-tools: Read Grep Glob WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
 ---
 
 # ccoach-deepinsight — semantic root-cause deep coach (Claude Code)
