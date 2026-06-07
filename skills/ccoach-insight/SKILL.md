@@ -38,6 +38,8 @@ If the user gives no time argument, analyze **today** (ccoach's default). Only w
 
 ## Workflow
 
+> **Windows:** these steps are Bash command sequences (they use `/tmp` paths and POSIX shell syntax), so run them under **Git Bash or WSL** on Windows. The `ccoach` CLI and the `.mjs` scripts are themselves cross-platform Node.
+
 ### Step 0 — pick the platform (host-aware default)
 
 Decide which platform(s) to report, in this priority order:

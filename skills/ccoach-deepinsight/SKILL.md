@@ -30,6 +30,8 @@ Read-only; local; never exfiltrate. Read the user's own current-project code (ne
 
 ## Workflow — two passes
 
+> **Windows:** these steps are Bash command sequences (`/tmp`, `${CLAUDE_SKILL_DIR}`, POSIX shell syntax), so run them under **Git Bash or WSL** on Windows. The `ccoach` CLI and the `.mjs` scripts are themselves cross-platform Node.
+
 Two platforms, **symmetric**: **Claude Code** (default) and **Codex** — pass `--platform claude-code|codex`. The two passes below are written for Claude Code; the Codex equivalents are identical (just swap the flag) — see **Codex notes** at the end. Locate `ccoach` (prefer PATH; else `node dist/cli.js` in this repo, or `npx @loredunk/ccoach@latest`).
 
 ### Pass 1 — PROJECT (always; cheap; NO content)

@@ -263,7 +263,7 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
               const fp = typeof inp.file_path === 'string' ? inp.file_path : ''
               const ext = extOf(fp)
               // fileKey=basename 仅瞬时传给 episode 层映射成局部 id（ADR 0032 D5），不存全路径。
-              agg.applyTool('file', undefined, { isEdit: name !== 'Read', fileKey: fp ? fp.split('/').pop() : undefined, ext })
+              agg.applyTool('file', undefined, { isEdit: name !== 'Read', fileKey: fp ? fp.split(/[\\/]/).pop() : undefined, ext })
               agg.applyFileChangeExt(repo, ext)
               agg.applyLanguageFile(ext)
             } else if (name === 'Glob' || name === 'Grep' || name === 'ToolSearch') {

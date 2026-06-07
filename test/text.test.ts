@@ -28,6 +28,17 @@ describe('text utils（隐私安全）', () => {
     expect(repoName('/Users/x/workspace/ccoach')).toBe('ccoach')
     expect(repoName('')).toBe('(unknown)')
   })
+  it('Windows 反斜杠路径：只取 basename，绝不把完整 home 路径泄露进输出', () => {
+    // Windows 上 JSONL 里记录的 cwd / file_path 是反斜杠路径；派生函数必须只留 basename，
+    // 否则按仓库聚合错乱，且完整 home 路径（含用户名）会泄露进报告 / 可分享成绩卡。
+    expect(repoName('C:\\Users\\alice\\workspace\\ccoach')).toBe('ccoach')
+    expect(repoName('C:\\Users\\alice\\workspace\\ccoach\\')).toBe('ccoach')
+    expect(repoName('C:\\Users\\alice/projects/myrepo')).toBe('myrepo') // 混合分隔符
+    expect(extOf('C:\\proj\\src\\main.ts')).toBe('ts')
+    expect(extOf('C:\\proj\\Makefile')).toBe('')
+    expect(firstToken('C:\\tools\\rg.exe -n secret')).toBe('rg.exe')
+    expect(gitSubcommand('C:\\tools\\git status')).toBe('status')
+  })
   it('comma 千分位', () => {
     expect(comma(1234567)).toBe('1,234,567')
   })

@@ -5,6 +5,8 @@
 // by root-cause category; metrics are deliberately DEMOTED to a faint "signal" margin line.
 // Pure: renderDeepinsight(data) -> html string. CLI wrapper at the bottom. No network at render time.
 import { readFileSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 function parseArgs(argv) {
   const o = {}
@@ -250,7 +252,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 }
 
 // CLI
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = parseArgs(process.argv.slice(2))
   if (!a.data || !a.output) {
     process.stderr.write('usage: node render_deepinsight.mjs --data <report.json> --output <out.html>\n')

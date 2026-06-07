@@ -2,7 +2,7 @@
 
 <p align="center"><a href="README.md">English README</a></p>
 
-> 本机 ccoach（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
+> 本机 ccoach（macOS / Linux / Windows）。只读分析你在 **Claude Code / Codex** 上的用量，
 > 告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。
 > 两个平台是对称的一等公民（不是只给 Codex 用的工具），未来还会扩展到 OpenClaw、Harness 等其它 Agent CLI。设计与决策见 [`docs/`](docs/)。
 
@@ -35,6 +35,8 @@ npx skills add loredunk/ccoach
 ```
 
 它会让你**自行选择 agent（Claude Code / Codex）与范围（全局 / 项目）**。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。
+
+> **平台**：`ccoach` CLI 原生支持 macOS / Linux / Windows（纯 Node、零 shell 调用）。skill 的步骤是 Bash 命令序列（用到 `/tmp` 与 POSIX shell 语法），所以 **Windows 上请在 Git Bash 或 WSL 里运行你的 agent**；`.mjs` 渲染脚本本身是跨平台的。
 
 ### 怎么用
 

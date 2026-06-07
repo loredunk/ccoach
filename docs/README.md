@@ -1,6 +1,6 @@
 # ccoach 文档
 
-> **ccoach** = 本机用量与习惯分析工具（macOS / Linux）：只读分析你在 Claude Code / Codex 上的用量与习惯。
+> **ccoach** = 本机用量与习惯分析工具（macOS / Linux / Windows）：只读分析你在 Claude Code / Codex 上的用量与习惯。
 
 本目录收录 ccoach 的产品与工程文档。约定如下：
 

@@ -2,7 +2,7 @@
 
 <p align="center"><a href="README_CN.md">中文 README</a></p>
 
-> A local AI usage coach (macOS / Linux). Read-only analysis of how you use **Claude Code / Codex** —
+> A local AI usage coach (macOS / Linux / Windows). Read-only analysis of how you use **Claude Code / Codex** —
 > where your tokens go, what's wasted, and how to use the tools better — turned into a **shareable scorecard**.
 > Both platforms are first-class and symmetric (not a Codex-only tool); more agent CLIs (OpenClaw, Harness, …) are planned. Design & decisions live in [`docs/`](docs/).
 
@@ -38,6 +38,8 @@ npx skills add loredunk/ccoach
 ```
 
 It prompts you to pick the agents (Claude Code / Codex) and scope (global / project) — choose what you want. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`.
+
+> **Platforms**: the `ccoach` CLI runs natively on macOS / Linux / Windows (pure Node, no shell-out). The skills are Bash command sequences (they use `/tmp` and POSIX shell syntax), so on **Windows run your agent under Git Bash or WSL**; the `.mjs` render scripts themselves are cross-platform.
 
 ### Use it
 

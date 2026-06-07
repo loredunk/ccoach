@@ -23,7 +23,7 @@ export function firstToken(cmd: string): string {
         continue
       }
     }
-    return part.split('/').pop() as string
+    return part.split(/[\\/]/).pop() as string
   }
   return ''
 }
@@ -34,7 +34,7 @@ export function gitSubcommand(cmd: string): string | null {
   const toks = cmd.trim().split(/\s+/).filter(Boolean)
   let seenGit = false
   for (const t of toks) {
-    const base = t.split('/').pop() as string
+    const base = t.split(/[\\/]/).pop() as string
     if (!seenGit) {
       if (base === 'git') seenGit = true
       continue
@@ -50,15 +50,17 @@ export function gitSubcommand(cmd: string): string | null {
 // 文件扩展名：只取 basename 的最后一段扩展名，无扩展名返回 ''。
 export function extOf(filePath: string): string {
   if (typeof filePath !== 'string' || !filePath) return ''
-  const base = filePath.split('/').pop() as string
+  const base = filePath.split(/[\\/]/).pop() as string
   if (!base.includes('.')) return ''
   return (base.split('.').pop() as string).toLowerCase()
 }
 
-// 仓库名：只取 cwd 的 basename，剥尾部斜杠；空/无名返回 '(unknown)'。
+// 仓库名：只取 cwd 的 basename（跨平台：POSIX `/` 与 Windows `\` 都剥；防止 Windows 反斜杠
+// 路径整条当成 repo 名，既错乱按仓库聚合、又会把完整 home 路径泄露进报告 / 成绩卡）。
+// 剥尾部斜杠；空/无名返回 '(unknown)'。
 export function repoName(cwd: string): string {
   if (typeof cwd !== 'string' || !cwd) return '(unknown)'
-  const name = cwd.replace(/\/+$/, '').split('/').pop() as string
+  const name = cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() as string
   return name || '(unknown)'
 }
 

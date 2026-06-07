@@ -2,6 +2,8 @@
 // 只读 git：给定会话 [since, until] 窗口，取窗内提交，供 skill 把会话意图锚定到真实落地。
 // 绝不臆造、绝不取窗外提交（窗口由 git --since/--until 强制）。
 import { execFileSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // 解析 `git log --pretty=%H%x09%cI%x09%s`（TAB 分隔）为 [{hash, ts, subject}]。纯函数，可测。
 export function parseGitLog(raw) {
@@ -32,7 +34,7 @@ export function commitsInWindow({ since, until, cwd = '.' }) {
 }
 
 // CLI 用法：node grounding.mjs <since-ISO> <until-ISO> [cwd]
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [, , since, until, cwd] = process.argv
   if (!since || !until) {
     process.stderr.write('usage: node grounding.mjs <since-ISO> <until-ISO> [cwd]\n')

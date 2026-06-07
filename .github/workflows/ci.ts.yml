@@ -4,9 +4,13 @@ on: [push, pull_request]
 
 jobs:
   ts:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # 一个 OS 失败不连累另一个，便于定位平台差异
+      matrix:
+        os: [ubuntu-latest, windows-latest] # 跨平台锁定：Windows 反斜杠路径回归
+    runs-on: ${{ matrix.os }}
     env:
-      TZ: UTC # 窗口/本地日期判定确定化
+      TZ: UTC # 窗口/本地日期判定确定化（Node 跨平台尊重 TZ）
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,7 +18,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test # vitest（含 scorecard 回归：四轴/本地化/估算/不泄配额%·密钥）
+      - run: npm test # vitest（含 scorecard 回归 + Windows 反斜杠路径 basename 回归）
       - run: npm run build
       - run: node tools/check_adrs.mjs # docs lint：ADR 编号/状态 + 相对链接（原 tools/check_adrs.py）
       - run: npm run verify:ccusage # 在线时强校验（token 严等 / 成本 1% 容差）；无数据/离线则 SKIP

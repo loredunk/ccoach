@@ -18,7 +18,7 @@ ccoach 存在的意义，是让用户**更清晰地驾驭自己的 harness（Cla
 
 ## 项目是什么
 
-**ccoach** = 本机用量与习惯分析工具（macOS / Linux）。只读分析你在 **Claude Code / Codex** 上的用量，
+**ccoach** = 本机用量与习惯分析工具（macOS / Linux / Windows）。只读分析你在 **Claude Code / Codex** 上的用量，
 告诉你**花在哪、哪里浪费、怎么用得更好**，并把结果做成**可分享的成绩卡**。**主打英文市场**：CLI 与
 报告**默认英文输出**，`--lang zh` 切中文（i18n 见 [ADR 0026](docs/adr/0026-cli-output-i18n-default-english.md) / [0025](docs/adr/0025-report-skeleton-i18n-default-english.md)）。
 

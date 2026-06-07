@@ -220,7 +220,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
                   if (dl.startsWith('+') && !dl.startsWith('+++')) added++
                   else if (dl.startsWith('-') && !dl.startsWith('---')) removed++
                 }
-                const base = String(path).split('/').pop() || String(path)
+                const base = String(path).split(/[\\/]/).pop() || String(path)
                 const dot = base.lastIndexOf('.')
                 const ext = dot > 0 ? base.slice(dot) : ''
                 agg.applyEdit(added, removed, false) // Codex 无 userModified 概念，恒 false
