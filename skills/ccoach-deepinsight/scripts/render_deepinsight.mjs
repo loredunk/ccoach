@@ -24,6 +24,34 @@ function esc(v) {
     .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
 }
 
+// ---- On-page glossary (回合 / 严重程度 / 卡壳) ----
+// Plain-language defs for the jargon the report uses, so a general reader can follow it.
+// Bilingual, keyed by locale; product language only — NO internal markers.
+const GLOSSARY = {
+  zh: {
+    head: '术语',
+    terms: [
+      ['回合 episode', '你下的一条指令 → agent 为它做的整段工作；下一条指令开启下一个回合。'],
+      ['严重程度 severity', '0–6，衡量一个回合「卡壳」的程度：反复改同一文件、连环报错、原地没进展、耗时异常四类信号加权相加，0=完全顺畅，越高越像深坑。'],
+      ['卡壳 spiral', 'agent 卡住、原地空转的回合——反复改同几个文件、命令一直报错、却没往前推，很烧 token。'],
+    ],
+  },
+  en: {
+    head: 'Terms',
+    terms: [
+      ['episode', 'One instruction you gave → the work the agent did for it; the next instruction starts the next episode.'],
+      ['severity', '0-6 — how stuck an episode got, weighted from re-editing the same file, repeated errors, no progress, and time-outliers. 0 = smooth.'],
+      ['spiral', 'An episode where the agent got stuck going in circles — same files re-edited, repeated errors, no progress; costly in tokens.'],
+    ],
+  },
+}
+
+function glossarySection(loc) {
+  const g = GLOSSARY[loc] ?? GLOSSARY.en
+  const items = g.terms.map(([t, dfn]) => `<div><dt>${esc(t)}</dt><dd>${esc(dfn)}</dd></div>`).join('')
+  return `<section class="terms"><div class="terms-k">${esc(g.head)}</div><dl>${items}</dl></section>`
+}
+
 const CAT = {
   cognitive_gap: { label: 'Cognitive Gap', v: '--c-cog' },
   prompt_issue: { label: 'Prompt', v: '--c-prompt' },
@@ -111,6 +139,7 @@ const GRAIN =
 
 export function renderDeepinsight(data) {
   const d = data || {}
+  const loc = String(d.lang ?? '').startsWith('zh') ? 'zh' : 'en'
   const passes = (d.passes || []).map((p, i) => passSection(p, i)).join('')
   const honesty =
     Array.isArray(d.honesty) && d.honesty.length
@@ -129,7 +158,7 @@ export function renderDeepinsight(data) {
     .join('')
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${esc(loc === 'zh' ? 'zh-CN' : 'en')}">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -168,9 +197,17 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .seal{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule);border-radius:100px;padding:5px 12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:18px}
 .seal::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c-flow);box-shadow:0 0 9px var(--c-flow)}
 
-/* tldr */
-.tldr{font-family:var(--disp);font-style:italic;font-size:clamp(24px,4.2vw,38px);line-height:1.28;margin:0 0 64px;color:var(--paper);max-width:30ch}
+/* tldr — readable lead paragraph (not a display-size column) */
+.tldr{font-family:var(--serif);font-size:clamp(18px,2.1vw,22px);line-height:1.62;margin:0 0 30px;color:var(--paper);max-width:62ch;border-left:2px solid var(--accent);padding-left:20px}
 .tldr::first-letter{color:var(--accent)}
+
+/* glossary / 术语 strip */
+.terms{border:1px dashed var(--rule);border-radius:4px;padding:16px 22px;margin:0 0 44px;background:rgba(255,255,255,.012)}
+.terms-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-prompt);margin-bottom:11px}
+.terms dl{margin:0}
+.terms dl>div{margin:9px 0}
+.terms dt{font-family:var(--mono);font-size:13px;color:var(--accent2);font-weight:500;letter-spacing:.02em}
+.terms dd{margin:4px 0 0;font-size:14.5px;line-height:1.55;color:var(--muted)}
 
 /* pass */
 .pass{margin:0 0 70px;opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards;animation-delay:calc(var(--d,0)*.12s + .1s)}
@@ -243,6 +280,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
     <span class="seal">read-only · local · desensitizable</span>
   </header>
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
+  ${glossarySection(loc)}
   ${passes}
   ${honesty}
   <footer class="foot">${esc(d.privacy || 'Local, read-only analysis. Metrics are supporting evidence only — the root cause and the fix are the product. Never reads thinking / system prompts / file contents as content; assistant/tool_result content is opt-in, redacted, token-bounded.')}</footer>

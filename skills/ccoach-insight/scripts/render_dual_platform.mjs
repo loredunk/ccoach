@@ -72,6 +72,51 @@ function pct(v) {
   return (n * 100).toFixed(1) + '%'
 }
 
+// Compact token count for the share-card stat band (空间有限，要一眼可读).
+// zh → 亿/万; en → B/M/K. Trims a trailing ".0".
+function compactTokens(n, loc) {
+  const v = Number(n) || 0
+  const trim = (s) => s.replace(/\.0$/, '')
+  if (loc === 'zh') {
+    if (v >= 1e8) return trim((v / 1e8).toFixed(1)) + '亿'
+    if (v >= 1e4) return trim((v / 1e4).toFixed(0)) + '万'
+    return String(Math.trunc(v))
+  }
+  if (v >= 1e9) return trim((v / 1e9).toFixed(1)) + 'B'
+  if (v >= 1e6) return trim((v / 1e6).toFixed(0)) + 'M'
+  if (v >= 1e3) return trim((v / 1e3).toFixed(0)) + 'K'
+  return String(Math.trunc(v))
+}
+
+// ---- On-page glossary (回合 / 严重程度 / 卡壳) ----
+// Single source of truth for the HTML term definitions, bilingual, keyed by locale.
+// (.mjs can't import src/i18n.ts; the CLI/text path keeps its own copy in i18n.ts.)
+// Product language only — NO internal markers (ADR numbers etc.).
+const GLOSSARY = {
+  zh: {
+    head: '术语',
+    terms: [
+      ['回合 episode', '你下的一条指令 → agent 为它做的整段工作；下一条指令开启下一个回合。'],
+      ['严重程度 severity', '0–6，衡量一个回合「卡壳」的程度：反复改同一文件、连环报错、原地没进展、耗时异常四类信号加权相加，0=完全顺畅，越高越像深坑。'],
+      ['卡壳 spiral', 'agent 卡住、原地空转的回合——反复改同几个文件、命令一直报错、却没往前推，很烧 token。'],
+    ],
+  },
+  en: {
+    head: 'Terms',
+    terms: [
+      ['episode', 'One instruction you gave → the work the agent did for it; the next instruction starts the next episode.'],
+      ['severity', '0-6 — how stuck an episode got, weighted from re-editing the same file, repeated errors, no progress, and time-outliers. 0 = smooth.'],
+      ['spiral', 'An episode where the agent got stuck going in circles — same files re-edited, repeated errors, no progress; costly in tokens.'],
+    ],
+  },
+}
+
+function glossarySection(loc) {
+  const g = GLOSSARY[loc] ?? GLOSSARY.en
+  const items = g.terms.map(([t, d]) => `<div><dt>${esc(t)}</dt><dd>${esc(d)}</dd></div>`).join('')
+  return `<section class='terms'><div class='terms-k'>${esc(g.head)}</div><dl>${items}</dl></section>`
+}
+
 // --- Cross-platform token口径 helpers ---
 // The two platforms store the per-platform `tokens.input` with DIFFERENT semantics:
 //   Claude: tokens.input is FRESH non-cached input; cache_read / cache_create are separate
@@ -416,23 +461,26 @@ function claudeServerTools(cc) {
   return `<p class='muted'>${esc(tr('cc_server_tools', { s: comma(c.web_search_requests), f: comma(c.web_fetch_requests) }))}</p>`
 }
 
-// Render the shareable cover scorecard (vertical, screenshot-friendly).
-// `sc` is the JSON from scripts/scorecard.mjs; fully bilingual via its own copy.
-function scorecardHtml(sc) {
+// Render the shareable cover scorecard — a BOUNDED, single-screen "share unit"
+// (dark+gold hero card, screenshot-ready). `sc` is the JSON from scripts/scorecard.mjs
+// (fully bilingual via its own copy); `stats` is the headline stat band built in render().
+// The card shows the SHORT roast (one punchy hook); the LONG roast lives in scorecardBreakdown().
+function scorecardHtml(sc, stats) {
   if (!sc) return ''
-  // Render-order guard: the persona title + roasts are MODEL-WRITTEN before render
-  // (SKILL.md step 6). If they are still the deterministic fallback at render time, leave a
-  // visible HTML marker + warn on stderr so the omission is caught — but still render (offline/
-  // test 兜底 stays valid).
+  // Render-order guard: persona title + roasts are MODEL-WRITTEN before render (SKILL.md step 6).
+  // If still the deterministic fallback, leave a visible HTML marker + warn on stderr (but still
+  // render — offline/test 兜底 stays valid). Short (card) and long (breakdown) are flagged separately.
   const titleFallback = sc.title_is_fallback === true || /\s×\s/.test(sc.title ?? '')
-  const fixtureRoasts = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
-  if (titleFallback || fixtureRoasts) {
+  const fixtureShort = (sc.axes ?? []).filter((ax) => ax.roast_short_is_fixture === true).length
+  const fixtureLong = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
+  if (titleFallback || fixtureShort || fixtureLong) {
     const bits = []
     if (titleFallback) bits.push("persona title is still the fallback 'A × B × C × D'")
-    if (fixtureRoasts) bits.push(`${fixtureRoasts} roast line(s) are still the fixture 兜底`)
+    if (fixtureShort) bits.push(`${fixtureShort} short roast(s) still fixture 兜底 (card)`)
+    if (fixtureLong) bits.push(`${fixtureLong} long roast(s) still fixture 兜底 (breakdown)`)
     process.stderr.write(
       `⚠ scorecard: ${bits.join('; ')} — not written back to /tmp/scorecard.json before render. ` +
-        `Compose the persona title / rewrite roasts, then re-render.\n`,
+        `Compose the persona title / rewrite roasts (short + long), then re-render.\n`,
     )
   }
   const parts = ["<section class='scorecard'>"]
@@ -441,22 +489,48 @@ function scorecardHtml(sc) {
     `<span class='sc-kicker'>${esc(sc.scorecard_label ?? '')} · ` + `${esc(sc.title_label ?? '')}</span>`,
   )
   parts.push(`<h2 class='sc-title'>${esc(sc.title ?? '')}</h2>`)
-  if (sc.rank_label) parts.push(`<p class='sc-rank'>${esc(sc.rank_label)}</p>`)
+  // stat band bound directly under the title — the headline numbers enter the title's field of view
+  if (stats) {
+    const items = (stats.items ?? []).map((s) => `<span class='sc-stat'>${esc(s)}</span>`).join('')
+    parts.push(`<div class='sc-stats'><span class='sc-hero'>${esc(stats.hero)}</span>${items}</div>`)
+  }
   for (const ax of sc.axes ?? []) {
-    const roastMark = ax.roast_is_fixture === true ? '<!-- ccoach:roast_is_fixture -->' : ''
+    const roastMark = ax.roast_short_is_fixture === true ? '<!-- ccoach:roast_short_is_fixture -->' : ''
+    const topCls = ax.tier_index === 0 ? ' top' : ''
     parts.push(
       "<div class='sc-axis'>" +
         roastMark +
         `<span class='sc-ax-label'>${esc(ax.label)}</span>` +
-        `<span class='sc-tier'>${esc(ax.tier)}</span>` +
-        `<span class='sc-roast'>${esc(ax.roast)}</span>` +
+        `<span class='sc-tier${topCls}'>${esc(ax.tier)}</span>` +
+        `<span class='sc-roast'>${esc(ax.roast_short ?? ax.roast ?? '')}</span>` +
         '</div>',
     )
   }
-  const note = [sc.privacy_note, sc.estimate_note].filter(Boolean).join(' · ')
-  if (note) parts.push(`<p class='sc-note'>${esc(note)}</p>`)
+  if (sc.privacy_note) parts.push(`<p class='sc-note'>${esc(sc.privacy_note)}</p>`)
+  // closing boundary: this caption marks "screenshot this card, the rest is the full report"
+  if (stats?.caption) parts.push(`<p class='sc-share'>${esc(stats.caption)}</p>`)
   parts.push('</section>')
   return parts.join('')
+}
+
+// The LONG roast per axis, in the report body BELOW the bounded share card — the full,
+// grounded line the model wrote (the card carries only the short hook).
+function scorecardBreakdown(sc) {
+  if (!sc || !(Array.isArray(sc.axes) && sc.axes.length)) return ''
+  const rows = sc.axes
+    .map((ax) => {
+      const mark = ax.roast_is_fixture === true ? '<!-- ccoach:roast_is_fixture -->' : ''
+      return (
+        "<div class='sc-d-axis'>" +
+        mark +
+        `<span class='sc-d-label'>${esc(ax.label)}</span>` +
+        `<span class='sc-d-tier'>${esc(ax.tier)}</span>` +
+        `<p class='sc-d-roast'>${esc(ax.roast ?? '')}</p>` +
+        '</div>'
+      )
+    })
+    .join('')
+  return `<section class='panel sc-detail'><h2>${esc(tr('h_scorecard_detail'))}</h2>${rows}</section>`
 }
 
 function render(data, insights, scorecard = null, copy = null, lang = null) {
@@ -476,6 +550,9 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   const p = [
     `<!doctype html><html lang='${esc(htmllang)}'><head><meta charset='utf-8'>`,
     "<meta name='viewport' content='width=device-width, initial-scale=1'>",
+    // JetBrains Mono for the share-card numerals; system mono fallback keeps offline/file:// solid
+    "<link rel='preconnect' href='https://fonts.googleapis.com'><link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>",
+    "<link href='https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap' rel='stylesheet'>",
     `<title>${esc(title)}</title><style>`,
     CSS,
     '</style></head><body><main>',
@@ -485,21 +562,61 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
       `<p class='muted'>${tr('header_source')}${costMeta}</p></header>`,
   ]
 
-  // shareable cover scorecard (top of the report, screenshot-friendly)
-  if (scorecard) p.push(scorecardHtml(scorecard))
+  // locale bucket for renderer-side bilingual fragments (stat-band units, glossary)
+  const loc = String(lang ?? tr('html_lang') ?? 'en').startsWith('zh') ? 'zh' : 'en'
 
-  // combined headline metrics
-  p.push("<section class='metrics'>")
-  p.push(metric(tr('m_total_cost'), money(comb.total_cost_usd), tr('m_total_cost_sub')))
-  p.push(metric(tr('m_total_tokens'), comma(comb.total_tokens)))
-  if (both) {
+  // shareable cover card + stat band — a BOUNDED, screenshot-ready hero unit at the top.
+  if (scorecard) {
+    // stat band: bind the headline numbers to the persona title. cachePct REUSES tokenComposition()
+    // so the band's "96%靠缓存" equals the token-composition bars further down.
+    const present = [hasCc ? cc : null, hasCx ? cx : null].filter(Boolean)
+    let bandCacheRead = 0
+    let bandTotal = 0
+    for (const pf of present) {
+      const cmp = tokenComposition(pf.tokens, pf === cx ? 'codex' : 'claude-code')
+      bandCacheRead += cmp.cacheRead
+      bandTotal += cmp.total
+    }
+    const cachePct = bandTotal ? Math.round((bandCacheRead / bandTotal) * 100) : 0
+    // active days is a calendar-day UNION, not additive across platforms (days overlap)
+    const activeDays = both
+      ? comb.active_days ?? Math.max(cc.active_days || 0, cx.active_days || 0)
+      : (cc ?? cx ?? {}).active_days
+    const u =
+      loc === 'zh'
+        ? { tk: (t) => `${t} token`, dy: (d) => `${d}天`, ca: (pp) => `${pp}%靠缓存` }
+        : { tk: (t) => `${t} tokens`, dy: (d) => `${d} days`, ca: (pp) => `${pp}% cached` }
+    const scStats = {
+      hero: '$' + Math.round(Number(comb.total_cost_usd) || 0).toLocaleString('en-US'),
+      items: [u.tk(compactTokens(comb.total_tokens, loc)), u.dy(activeDays), u.ca(cachePct)],
+      caption: tr('sc_share_caption'),
+    }
+    p.push(scorecardHtml(scorecard, scStats))
+    p.push(scorecardBreakdown(scorecard))
+  }
+
+  // Headline metrics. The share card's stat band already carries cost/tokens/days/cache, so a
+  // single-platform report drops the standalone boxes. Keep them when there's NO card (else the
+  // headline numbers vanish); in dual mode keep only the per-platform cost split the combined band
+  // can't show.
+  if (!scorecard) {
+    p.push("<section class='metrics'>")
+    p.push(metric(tr('m_total_cost'), money(comb.total_cost_usd), tr('m_total_cost_sub')))
+    p.push(metric(tr('m_total_tokens'), comma(comb.total_tokens)))
+    if (both) {
+      p.push(metric(tr('m_cc_cost'), money(cc.cost_usd), tr('active_days_sub', { n: cc.active_days })))
+      p.push(metric(tr('m_cx_cost'), money(cx.cost_usd), tr('active_days_sub', { n: cx.active_days })))
+    } else {
+      const only = cc ?? cx ?? {} // 单平台在场者；空 platforms（不可达，merge 已 exit 2）也不抛
+      p.push(metric(tr('m_active_days'), comma(only.active_days)))
+    }
+    p.push('</section>')
+  } else if (both) {
+    p.push("<section class='metrics'>")
     p.push(metric(tr('m_cc_cost'), money(cc.cost_usd), tr('active_days_sub', { n: cc.active_days })))
     p.push(metric(tr('m_cx_cost'), money(cx.cost_usd), tr('active_days_sub', { n: cx.active_days })))
-  } else {
-    const only = cc ?? cx ?? {} // 单平台在场者；空 platforms（不可达，merge 已 exit 2）也不抛
-    p.push(metric(tr('m_active_days'), comma(only.active_days)))
+    p.push('</section>')
   }
-  p.push('</section>')
 
   // 端点 / 计费模式（账户级当前快照：官方 vs 中转）
   p.push(endpointBillingCard(cc, cx))
@@ -670,11 +787,16 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   if (hasCx) p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
   p.push('</div></section>')
 
-  // per-turn episode analysis — 按在场平台渲染
-  p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>` + `<div${gridAttr}>`)
-  if (hasCc) p.push(episodePanel(cc.episode_summary, 'Claude Code'))
-  if (hasCx) p.push(episodePanel(cx.episode_summary, 'Codex'))
-  p.push('</div></section>')
+  // per-turn episode analysis — 按在场平台渲染。先给术语条（回合/严重程度/卡壳），让黑话可读
+  const hasEpisodes = (hasCc && cc.episode_summary?.episodes) || (hasCx && cx.episode_summary?.episodes)
+  if (hasEpisodes) {
+    p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>`)
+    p.push(glossarySection(loc))
+    p.push(`<div${gridAttr}>`)
+    if (hasCc) p.push(episodePanel(cc.episode_summary, 'Claude Code'))
+    if (hasCx) p.push(episodePanel(cx.episode_summary, 'Codex'))
+    p.push('</div></section>')
+  }
 
   // data provenance / privacy
   p.push(`<section class='panel'><h2>${esc(tr('h_provenance'))}</h2><ul>`)
@@ -689,7 +811,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
 }
 
 const CSS = String.raw`
-:root{color-scheme:light dark;--bg:#f6f7f5;--fg:#202322;--muted:#68706c;--panel:#fff;--line:#d8ddd9;--a:#0f766e;--b:#b45309}
+:root{color-scheme:light dark;--bg:#f6f7f5;--fg:#202322;--muted:#68706c;--panel:#fff;--line:#d8ddd9;--a:#0f766e;--b:#b45309;--mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 @media(prefers-color-scheme:dark){:root{--bg:#111413;--fg:#edf1ef;--muted:#a7b0ab;--panel:#1a1f1d;--line:#313936;--a:#5eead4;--b:#fbbf24}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,sans-serif}
 main{max-width:1180px;margin:0 auto;padding:30px 18px 56px}header{margin-bottom:22px}h1{font-size:27px;margin:0 0 6px}
@@ -725,15 +847,38 @@ code{font-family:ui-monospace,Menlo,monospace;font-size:12px}ul{margin:0;padding
 .hbar{width:70%;border-radius:2px 2px 0 0;min-height:2px}
 .hlab{font-size:9px;color:var(--muted);margin-top:2px;height:11px}
 ul.sig{margin:4px 0;padding-left:18px}ul.sig li{font-size:12px;color:var(--muted);margin:2px 0}
-.scorecard{max-width:430px;margin:14px auto 22px;padding:20px 22px;border-radius:16px;background:linear-gradient(160deg,#1b2440,#0f1530);color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.25)}
-.scorecard .sc-kicker{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.65}
-.scorecard .sc-title{margin:4px 0 2px;font-size:23px;line-height:1.25;font-weight:800}
-.scorecard .sc-rank{margin:0 0 12px;font-size:13px;opacity:.85}
-.sc-axis{display:flex;flex-direction:column;padding:10px 0;border-top:1px solid rgba(255,255,255,.12)}
-.sc-axis .sc-ax-label{font-size:11px;opacity:.6}
-.sc-axis .sc-tier{font-size:17px;font-weight:700;margin:1px 0}
-.sc-axis .sc-roast{font-size:12px;opacity:.82}
-.scorecard .sc-note{margin:12px 0 0;font-size:10px;opacity:.55}
+/* ===== shareable cover card: a bounded, single-screen hero unit (always dark+gold) ===== */
+.scorecard{position:relative;max-width:440px;margin:8px auto 34px;padding:26px 26px 18px;border-radius:20px;color:#f1ece1;overflow:hidden;background:radial-gradient(120% 60% at 82% -8%,rgba(233,185,73,.16),transparent 58%),radial-gradient(120% 55% at 8% 0%,rgba(244,212,136,.10),transparent 55%),linear-gradient(180deg,#181610 0%,#0c0b08 64%);border:1px solid rgba(233,185,73,.22);box-shadow:0 30px 70px -28px rgba(0,0,0,.85)}
+.scorecard::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#e9b949,transparent);opacity:.65}
+.scorecard::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.scorecard>*{position:relative;z-index:1}
+.scorecard .sc-kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:#e8a85a}
+.scorecard .sc-title{margin:10px 0 0;font-size:32px;line-height:1.12;font-weight:800;letter-spacing:.01em;background:linear-gradient(180deg,#fff 6%,#f5b942 128%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sc-stats{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 14px;margin:16px 0 2px;font-family:var(--mono)}
+.sc-stats .sc-hero{font-size:34px;font-weight:800;letter-spacing:.01em;background:linear-gradient(90deg,#f5b942,#ff6b35);-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:2px}
+.sc-stats .sc-stat{font-size:12.5px;color:#b8b1a3;font-weight:500;position:relative;padding-left:15px}
+.sc-stats .sc-stat::before{content:"·";position:absolute;left:3px;color:rgba(233,185,73,.6)}
+.sc-axis{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:baseline;padding:11px 0;border-top:1px solid rgba(233,185,73,.12)}
+.sc-axis:first-of-type{margin-top:10px}
+.sc-axis .sc-ax-label{grid-row:1;align-self:center;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#8b857a}
+.sc-axis .sc-tier{grid-row:1;justify-self:start;font-size:14px;font-weight:700;color:#f5b942;padding:3px 11px;border:1px solid rgba(233,185,73,.28);border-radius:999px;background:rgba(233,185,73,.06);white-space:nowrap}
+.sc-axis .sc-tier.top{color:#0c0b08;background:linear-gradient(90deg,#f5b942,#e8a85a);border-color:transparent;box-shadow:0 0 16px rgba(245,185,66,.3)}
+.sc-axis .sc-roast{grid-column:1 / -1;font-size:12.5px;line-height:1.5;color:#cfc9bc}
+.scorecard .sc-note{margin:16px 0 0;padding-top:13px;border-top:1px solid rgba(255,255,255,.07);font-family:var(--mono);font-size:9.5px;line-height:1.5;color:#8b857a}
+.scorecard .sc-share{margin:9px 0 0;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:#e8a85a}
+.scorecard .sc-share::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 8px #f5b942;margin-right:7px;vertical-align:middle}
+/* scorecard breakdown — the LONG roast, in the report body below the share unit */
+.sc-detail .sc-d-axis{display:grid;grid-template-columns:auto auto;gap:4px 10px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)}
+.sc-detail .sc-d-axis:first-of-type{border-top:0;padding-top:2px}
+.sc-detail .sc-d-label{font-size:12px;color:var(--muted)}
+.sc-detail .sc-d-tier{font-size:14px;font-weight:700;color:var(--a)}
+.sc-detail .sc-d-roast{grid-column:1 / -1;margin:2px 0 0;font-size:13px;line-height:1.55}
+/* glossary / terms strip (episode / severity / spiral) */
+.terms{border:1px dashed var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
+.terms-k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.terms dl{margin:0}.terms dl>div{margin:7px 0}
+.terms dt{font-family:var(--mono);font-size:12px;color:var(--fg);font-weight:600}
+.terms dd{margin:3px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
 @media(max-width:900px){.metrics,.grid2,.cards{grid-template-columns:1fr}.mbar{grid-template-columns:90px 1fr 70px}}
 `
 

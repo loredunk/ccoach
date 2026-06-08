@@ -2,8 +2,8 @@
 // 跑 skill 的 scorecard.mjs（zh + en）与 render_dual_platform.mjs，对承诺的不变量做断言：
 //   - 四轴齐全且每轴有非空段位标签
 //   - zh 与 en 段位本地化（不相等）
-//   - rank 标注为本地估算
-//   - 渲染 HTML 含成绩卡，且不泄配额% / 密钥
+//   - 每轴有非空 roast_short + roast_short_is_fixture（fixture 兜底，模型 writeback 覆盖）
+//   - 渲染 HTML 含成绩卡 + 数字带 + 成绩卡详解，且不出现百分位、不泄配额% / 密钥
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
@@ -19,19 +19,23 @@ const INSIGHTS = path.join(FIX, 'insights_sample.json')
 
 const QUOTA_RE = /配额[^。\n]{0,8}\d+\s*%|quota[^.\n]{0,8}\d+\s*%/i
 const SECRET_RE = /sk-[A-Za-z0-9]{6,}|ghp_[A-Za-z0-9]{6,}/
+// percentile/rank was removed — the report must never claim "beats X% of users" / "超过了 X% 的用户"
+const RANK_RE = /超过了\s*\d+\s*%|beats\s+\d+\s*%/i
 const AXES = new Set(['prompt', 'spending', 'engineering', 'diligence'])
+
+type Axis = { key: string; tier: string; roast: string; roast_short: string; roast_short_is_fixture: boolean }
 
 function runNode(script: string, args: string[]): void {
   execFileSync('node', [path.join(SKILL, script), ...args], { encoding: 'utf8' })
 }
 
-function scorecard(lang: string, out: string): { axes: { key: string; tier: string }[]; rank_is_estimate: boolean } {
+function scorecard(lang: string, out: string): { axes: Axis[] } {
   runNode('scorecard.mjs', ['--data', DATA, '--lang', lang, '--output', out])
   return JSON.parse(readFileSync(out, 'utf8'))
 }
 
 describe('scorecard 回归（.mjs，去 Python）', () => {
-  it('四轴有段位、zh/en 本地化、估算标注、HTML 有成绩卡、不泄配额%/密钥', () => {
+  it('四轴有段位+短roast、zh/en 本地化、HTML 有成绩卡/数字带/详解、无百分位、不泄配额%/密钥', () => {
     const d = mkdtempSync(path.join(tmpdir(), 'ccoach-sc-'))
     try {
       const zh = scorecard('zh', path.join(d, 'zh.json'))
@@ -42,8 +46,14 @@ describe('scorecard 回归（.mjs，去 Python）', () => {
         [en, 'en'],
       ] as const) {
         expect(new Set(card.axes.map((a) => a.key)), `[${lang}] axes`).toEqual(AXES)
-        for (const a of card.axes) expect(a.tier, `[${lang}] ${a.key} tier`).toBeTruthy()
-        expect(card.rank_is_estimate, `[${lang}] rank estimate`).toBe(true)
+        for (const a of card.axes) {
+          expect(a.tier, `[${lang}] ${a.key} tier`).toBeTruthy()
+          // 短 roast：fixture 派生、非空、且标记为 fixture（writeback 前的兜底契约）
+          expect(a.roast_short, `[${lang}] ${a.key} roast_short`).toBeTruthy()
+          expect(a.roast_short_is_fixture, `[${lang}] ${a.key} short fixture flag`).toBe(true)
+        }
+        // rank 字段已彻底移除
+        expect('rank_pct' in card, `[${lang}] no rank_pct`).toBe(false)
       }
 
       const zt = zh.axes.map((a) => a.tier)
@@ -57,6 +67,9 @@ describe('scorecard 回归（.mjs，去 Python）', () => {
       ])
       const html = readFileSync(htmlPath, 'utf8')
       expect(html, 'rendered HTML has scorecard section').toContain("class='scorecard'")
+      expect(html, 'has the title-bound stat band').toContain("class='sc-stats'")
+      expect(html, 'has the scorecard breakdown (long roast)').toContain('sc-detail')
+      expect(RANK_RE.test(html), 'no percentile rank in HTML').toBe(false)
       for (const blob of [JSON.stringify(zh), JSON.stringify(en), html]) {
         expect(QUOTA_RE.test(blob), 'no quota-percentage claim').toBe(false)
         expect(SECRET_RE.test(blob), 'no secret-like token').toBe(false)

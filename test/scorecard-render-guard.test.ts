@@ -45,7 +45,12 @@ describe('scorecard render-order guard (ADR 0044)', () => {
       const card = JSON.parse(readFileSync(scPath, 'utf8'))
       card.title = '深夜烧 Opus 的劳模架构师'
       card.title_is_fallback = false
-      for (const ax of card.axes) { ax.roast = 'rewritten'; ax.roast_is_fixture = false }
+      for (const ax of card.axes) {
+        ax.roast = 'rewritten'
+        ax.roast_is_fixture = false
+        ax.roast_short = 'short'
+        ax.roast_short_is_fixture = false
+      }
       writeFileSync(scPath, JSON.stringify(card))
       const { html, stderr } = render(d, scPath)
       expect(html).toContain('深夜烧 Opus 的劳模架构师')

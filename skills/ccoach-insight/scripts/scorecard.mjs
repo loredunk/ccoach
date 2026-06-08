@@ -21,10 +21,6 @@ const DEFAULT_COPY = path.join(HERE, '..', 'references', 'scorecard-copy.json')
 
 const load = (p) => JSON.parse(readFileSync(p, 'utf8'))
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x))
-const round = (x, n = 0) => {
-  const f = 10 ** n
-  return Math.round(Number(x) * f) / f
-}
 const isObj = (x) => typeof x === 'object' && x !== null && !Array.isArray(x)
 
 // Python-style truthiness for chained `a or b or {}` (empty object/array == falsy).
@@ -134,6 +130,17 @@ export function scoreDiligence(combined, cc) {
   return 2 // Zen Coder
 }
 
+// Derive a punchy one-liner for the share card from the full roast (fixture 兜底 only;
+// the model overwrites roast_short in writeback). Take the first clause before a delimiter,
+// trim, and cap conservatively (no ellipsis); fall back to the whole roast if no delimiter.
+function shortClause(roast) {
+  const s = String(roast ?? '').trim()
+  if (!s) return ''
+  const parts = s.split(/[—·，,。.；;]/).map((x) => x.trim()).filter(Boolean)
+  const first = parts.length ? parts[0] : s
+  return first.length > 24 ? first.slice(0, 24) : first
+}
+
 // Generic per-locale lookup: `${lang}_name` / `${lang}_roast`, falling back to en then zh.
 // Adding a new locale needs no code change — just add {lang}_name/{lang}_roast to each tier.
 function pick(copy, axisKey, idx, lang) {
@@ -142,7 +149,7 @@ function pick(copy, axisKey, idx, lang) {
   const t = tiers[idx]
   const name = t[`${lang}_name`] ?? t.en_name ?? t.zh_name
   const roast = t[`${lang}_roast`] ?? t.en_roast ?? t.zh_roast
-  return { name, roast, i: idx, count: tiers.length }
+  return { name, roast, roast_short: shortClause(roast), i: idx, count: tiers.length }
 }
 
 export function build(data, copy, lang) {
@@ -166,19 +173,25 @@ export function build(data, copy, lang) {
   ]
 
   const axes = []
-  const goodness = []
   const names = []
   for (const [key, uiLabel, idx] of axesSpec) {
-    const { name, roast, i, count } = pick(copy, key, idx, lang)
-    // roast_is_fixture: this roast came verbatim from scorecard-copy.json (the fixture/兜底);
-    // the model rewrites axes[].roast before render and clears this flag.
-    axes.push({ key, label: ui[uiLabel], tier: name, roast, roast_is_fixture: true, tier_index: i, tier_count: count })
-    goodness.push(count > 1 ? (count - 1 - i) / (count - 1) : 1.0)
+    const { name, roast, roast_short, i, count } = pick(copy, key, idx, lang)
+    // roast_is_fixture / roast_short_is_fixture: both came verbatim from scorecard-copy.json (兜底);
+    // the model rewrites BOTH axes[].roast (long, → breakdown) and axes[].roast_short (the card hook)
+    // before render and clears both flags.
+    axes.push({
+      key,
+      label: ui[uiLabel],
+      tier: name,
+      roast,
+      roast_short,
+      roast_is_fixture: true,
+      roast_short_is_fixture: true,
+      tier_index: i,
+      tier_count: count,
+    })
     names.push(name)
   }
-
-  const good = goodness.length ? goodness.reduce((a, b) => a + b, 0) / goodness.length : 0
-  const rankPct = Math.trunc(clamp(round(good * 100), 3, 97))
 
   return {
     lang,
@@ -193,10 +206,6 @@ export function build(data, copy, lang) {
     // title_is_fallback: the renderer warns + marks the HTML if this is still true at render time,
     // i.e. the model did not write the persona title back before rendering.
     title_is_fallback: true,
-    rank_pct: rankPct,
-    rank_label: ui.beats_pct.replace('{pct}', String(rankPct)),
-    rank_is_estimate: true,
-    estimate_note: ui.estimate_note,
     privacy_note: ui.local_privacy_note,
   }
 }
@@ -217,7 +226,6 @@ function main() {
     writeFileSync(a.output, out)
     console.log(`wrote ${a.output}`)
     for (const ax of card.axes) console.log(`  ${ax.label}: ${ax.tier}`)
-    console.log(`  ${card.rank_label} (${card.rank_is_estimate ? 'estimate' : ''})`)
   } else {
     console.log(out)
   }

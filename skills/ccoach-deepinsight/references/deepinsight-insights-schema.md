@@ -6,6 +6,7 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
 {
   "project": "ccoach",
   "platform": "claude-code",
+  "lang": "zh",
   "window": "last 60 days (… → …)",
   "generated_at": "2026-06-07",
   "tldr": "one-paragraph verdict (solutions, not metrics)",
@@ -41,4 +42,5 @@ Notes:
 - `category` drives the color code; unknown values fall back to `other`.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
+- `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 严重程度 / 卡壳 with plain-language defs). Write your findings using these reader-friendly terms (回合 / 严重程度 / 卡壳), not raw `episode`/`severity`/`spiral`, so the glossary explains what the prose uses.
 - Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`.

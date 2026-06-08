@@ -68,7 +68,7 @@ export interface SessionScope extends ScopeBucket { session_id: string; repo: st
 export type TaskType =
   | 'explore' | 'implement' | 'debug' | 'refactor'
   | 'experiment' | 'scripting' | 'docs' | 'unknown'
-// 绕圈（spiral）结构化子信号（ADR 0034）：纯结构离线派生，不读内容。
+// 卡壳（spiral）结构化子信号（ADR 0034）：纯结构离线派生，不读内容。
 export interface SpiralSignals {
   edit_ring: boolean        // 同一文件被 edit ≥ 阈值次（尤其 edit→test→error→edit n-gram）
   error_dense: boolean      // 连续错误 / 高错误率且文件集合不再扩大
