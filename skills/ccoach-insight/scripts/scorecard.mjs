@@ -130,17 +130,6 @@ export function scoreDiligence(combined, cc) {
   return 2 // Zen Coder
 }
 
-// Derive a punchy one-liner for the share card from the full roast (fixture 兜底 only;
-// the model overwrites roast_short in writeback). Take the first clause before a delimiter,
-// trim, and cap conservatively (no ellipsis); fall back to the whole roast if no delimiter.
-function shortClause(roast) {
-  const s = String(roast ?? '').trim()
-  if (!s) return ''
-  const parts = s.split(/[—·，,。.；;]/).map((x) => x.trim()).filter(Boolean)
-  const first = parts.length ? parts[0] : s
-  return first.length > 24 ? first.slice(0, 24) : first
-}
-
 // Generic per-locale lookup: `${lang}_name` / `${lang}_roast`, falling back to en then zh.
 // Adding a new locale needs no code change — just add {lang}_name/{lang}_roast to each tier.
 function pick(copy, axisKey, idx, lang) {
@@ -149,7 +138,7 @@ function pick(copy, axisKey, idx, lang) {
   const t = tiers[idx]
   const name = t[`${lang}_name`] ?? t.en_name ?? t.zh_name
   const roast = t[`${lang}_roast`] ?? t.en_roast ?? t.zh_roast
-  return { name, roast, roast_short: shortClause(roast), i: idx, count: tiers.length }
+  return { name, roast, i: idx, count: tiers.length }
 }
 
 export function build(data, copy, lang) {
@@ -175,18 +164,15 @@ export function build(data, copy, lang) {
   const axes = []
   const names = []
   for (const [key, uiLabel, idx] of axesSpec) {
-    const { name, roast, roast_short, i, count } = pick(copy, key, idx, lang)
-    // roast_is_fixture / roast_short_is_fixture: both came verbatim from scorecard-copy.json (兜底);
-    // the model rewrites BOTH axes[].roast (long, → breakdown) and axes[].roast_short (the card hook)
-    // before render and clears both flags.
+    const { name, roast, i, count } = pick(copy, key, idx, lang)
+    // roast_is_fixture: this roast came verbatim from scorecard-copy.json (兜底); the model rewrites
+    // axes[].roast before render and clears the flag. It may mark ONE key phrase with **…** → gold.
     axes.push({
       key,
       label: ui[uiLabel],
       tier: name,
       roast,
-      roast_short,
       roast_is_fixture: true,
-      roast_short_is_fixture: true,
       tier_index: i,
       tier_count: count,
     })

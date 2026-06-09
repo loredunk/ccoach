@@ -72,20 +72,20 @@ function pct(v) {
   return (n * 100).toFixed(1) + '%'
 }
 
-// Compact token count for the share-card stat band (空间有限，要一眼可读).
-// zh → 亿/万; en → B/M/K. Trims a trailing ".0".
+// Compact token count for the share-card stat band, split into { n, u } so the unit can be
+// gold-emphasized separately. zh → 亿/万; en → B/M/K. Trims a trailing ".0"/".00".
 function compactTokens(n, loc) {
   const v = Number(n) || 0
-  const trim = (s) => s.replace(/\.0$/, '')
+  const trim = (s) => s.replace(/\.?0+$/, '')
   if (loc === 'zh') {
-    if (v >= 1e8) return trim((v / 1e8).toFixed(1)) + '亿'
-    if (v >= 1e4) return trim((v / 1e4).toFixed(0)) + '万'
-    return String(Math.trunc(v))
+    if (v >= 1e8) return { n: trim((v / 1e8).toFixed(2)), u: '亿' }
+    if (v >= 1e4) return { n: trim((v / 1e4).toFixed(0)), u: '万' }
+    return { n: String(Math.trunc(v)), u: '' }
   }
-  if (v >= 1e9) return trim((v / 1e9).toFixed(1)) + 'B'
-  if (v >= 1e6) return trim((v / 1e6).toFixed(0)) + 'M'
-  if (v >= 1e3) return trim((v / 1e3).toFixed(0)) + 'K'
-  return String(Math.trunc(v))
+  if (v >= 1e9) return { n: trim((v / 1e9).toFixed(2)), u: 'B' }
+  if (v >= 1e6) return { n: trim((v / 1e6).toFixed(0)), u: 'M' }
+  if (v >= 1e3) return { n: trim((v / 1e3).toFixed(0)), u: 'K' }
+  return { n: String(Math.trunc(v)), u: '' }
 }
 
 // ---- On-page glossary (回合 / 严重程度 / 卡壳) ----
@@ -461,76 +461,78 @@ function claudeServerTools(cc) {
   return `<p class='muted'>${esc(tr('cc_server_tools', { s: comma(c.web_search_requests), f: comma(c.web_fetch_requests) }))}</p>`
 }
 
-// Render the shareable cover scorecard — a BOUNDED, single-screen "share unit"
-// (dark+gold hero card, screenshot-ready). `sc` is the JSON from scripts/scorecard.mjs
-// (fully bilingual via its own copy); `stats` is the headline stat band built in render().
-// The card shows the SHORT roast (one punchy hook); the LONG roast lives in scorecardBreakdown().
+// esc() a roast, then turn ONE model-marked **key phrase** into a gold highlight (the only markup
+// allowed in a roast). esc runs first so ** survive; the phrase content is already escaped.
+function roastHtml(s) {
+  return esc(s).replace(/\*\*(.+?)\*\*/g, "<span class='sc-hl'>$1</span>")
+}
+
+// Render the shareable cover scorecard — ONE bounded, single-screen "share unit" (dark+gold hero
+// card, screenshot-ready) that carries EVERYTHING: brand, title, the headline stat band, and the
+// four axes with their full roasts. `sc` is the JSON from scripts/scorecard.mjs; `stats` is the
+// headline block built in render(). No separate breakdown section — the card is self-contained.
 function scorecardHtml(sc, stats) {
   if (!sc) return ''
   // Render-order guard: persona title + roasts are MODEL-WRITTEN before render (SKILL.md step 6).
   // If still the deterministic fallback, leave a visible HTML marker + warn on stderr (but still
-  // render — offline/test 兜底 stays valid). Short (card) and long (breakdown) are flagged separately.
+  // render — offline/test 兜底 stays valid).
   const titleFallback = sc.title_is_fallback === true || /\s×\s/.test(sc.title ?? '')
-  const fixtureShort = (sc.axes ?? []).filter((ax) => ax.roast_short_is_fixture === true).length
-  const fixtureLong = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
-  if (titleFallback || fixtureShort || fixtureLong) {
+  const fixtureRoasts = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
+  if (titleFallback || fixtureRoasts) {
     const bits = []
     if (titleFallback) bits.push("persona title is still the fallback 'A × B × C × D'")
-    if (fixtureShort) bits.push(`${fixtureShort} short roast(s) still fixture 兜底 (card)`)
-    if (fixtureLong) bits.push(`${fixtureLong} long roast(s) still fixture 兜底 (breakdown)`)
+    if (fixtureRoasts) bits.push(`${fixtureRoasts} roast line(s) are still the fixture 兜底`)
     process.stderr.write(
       `⚠ scorecard: ${bits.join('; ')} — not written back to /tmp/scorecard.json before render. ` +
-        `Compose the persona title / rewrite roasts (short + long), then re-render.\n`,
+        `Compose the persona title / rewrite roasts, then re-render.\n`,
     )
   }
   const parts = ["<section class='scorecard'>"]
   if (titleFallback) parts.push('<!-- ccoach:scorecard_title_is_fallback -->')
-  parts.push(
-    `<span class='sc-kicker'>${esc(sc.scorecard_label ?? '')} · ` + `${esc(sc.title_label ?? '')}</span>`,
-  )
-  parts.push(`<h2 class='sc-title'>${esc(sc.title ?? '')}</h2>`)
-  // stat band bound directly under the title — the headline numbers enter the title's field of view
+  // top bar: brand top-left, run/platform meta top-right
   if (stats) {
-    const items = (stats.items ?? []).map((s) => `<span class='sc-stat'>${esc(s)}</span>`).join('')
-    parts.push(`<div class='sc-stats'><span class='sc-hero'>${esc(stats.hero)}</span>${items}</div>`)
+    const metaLines = (stats.meta ?? []).map((m) => esc(m)).join('<br>')
+    parts.push(
+      `<div class='sc-top'><span class='sc-brand'>${esc(stats.brand ?? 'ccoach')}</span>` +
+        `<span class='sc-meta'>${metaLines}</span></div>`,
+    )
+  }
+  parts.push(`<span class='sc-kicker'>${esc(tr('sc_kicker'))}</span>`)
+  parts.push(`<h2 class='sc-title'>${esc(sc.title ?? '')}</h2>`)
+  // headline stat band: a hero cost block + a 2-cell grid (tokens / cache), numbers gold-emphasized
+  if (stats) {
+    parts.push(
+      "<div class='sc-band'>" +
+        "<div class='sc-hero-cell'>" +
+        `<div class='sc-hero-lab'>${esc(stats.heroLabel)}</div>` +
+        `<div class='sc-hero-cost'>${esc(stats.heroCost)}</div>` +
+        `<div class='sc-hero-sub'>${esc(stats.heroSub)}</div>` +
+        '</div>' +
+        "<div class='sc-grid'>" +
+        `<div class='sc-cell'><div class='sc-cell-lab'>${esc(stats.tokenLabel)}</div>` +
+        `<div class='sc-cell-val'>${esc(stats.tokenMantissa)} <span class='u'>${esc(stats.tokenUnit)}</span></div></div>` +
+        `<div class='sc-cell'><div class='sc-cell-lab'>${esc(stats.cacheLabel)}</div>` +
+        `<div class='sc-cell-val gold'>${esc(stats.cacheVal)}</div></div>` +
+        '</div></div>',
+    )
   }
   for (const ax of sc.axes ?? []) {
-    const roastMark = ax.roast_short_is_fixture === true ? '<!-- ccoach:roast_short_is_fixture -->' : ''
+    const roastMark = ax.roast_is_fixture === true ? '<!-- ccoach:roast_is_fixture -->' : ''
     const topCls = ax.tier_index === 0 ? ' top' : ''
     parts.push(
       "<div class='sc-axis'>" +
         roastMark +
         `<span class='sc-ax-label'>${esc(ax.label)}</span>` +
         `<span class='sc-tier${topCls}'>${esc(ax.tier)}</span>` +
-        `<span class='sc-roast'>${esc(ax.roast_short ?? ax.roast ?? '')}</span>` +
+        `<span class='sc-roast'>${roastHtml(ax.roast ?? '')}</span>` +
         '</div>',
     )
   }
   if (sc.privacy_note) parts.push(`<p class='sc-note'>${esc(sc.privacy_note)}</p>`)
-  // closing boundary: this caption marks "screenshot this card, the rest is the full report"
+  // gold-dot footer caption (the persona title is a model-composed, for-fun estimate)
   if (stats?.caption) parts.push(`<p class='sc-share'>${esc(stats.caption)}</p>`)
   parts.push('</section>')
   return parts.join('')
-}
-
-// The LONG roast per axis, in the report body BELOW the bounded share card — the full,
-// grounded line the model wrote (the card carries only the short hook).
-function scorecardBreakdown(sc) {
-  if (!sc || !(Array.isArray(sc.axes) && sc.axes.length)) return ''
-  const rows = sc.axes
-    .map((ax) => {
-      const mark = ax.roast_is_fixture === true ? '<!-- ccoach:roast_is_fixture -->' : ''
-      return (
-        "<div class='sc-d-axis'>" +
-        mark +
-        `<span class='sc-d-label'>${esc(ax.label)}</span>` +
-        `<span class='sc-d-tier'>${esc(ax.tier)}</span>` +
-        `<p class='sc-d-roast'>${esc(ax.roast ?? '')}</p>` +
-        '</div>'
-      )
-    })
-    .join('')
-  return `<section class='panel sc-detail'><h2>${esc(tr('h_scorecard_detail'))}</h2>${rows}</section>`
 }
 
 function render(data, insights, scorecard = null, copy = null, lang = null) {
@@ -565,10 +567,10 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   // locale bucket for renderer-side bilingual fragments (stat-band units, glossary)
   const loc = String(lang ?? tr('html_lang') ?? 'en').startsWith('zh') ? 'zh' : 'en'
 
-  // shareable cover card + stat band — a BOUNDED, screenshot-ready hero unit at the top.
+  // shareable cover card — ONE bounded, screenshot-ready hero unit at the top, carrying the
+  // brand, the persona title, the headline stat band, and the four axes with their roasts.
   if (scorecard) {
-    // stat band: bind the headline numbers to the persona title. cachePct REUSES tokenComposition()
-    // so the band's "96%靠缓存" equals the token-composition bars further down.
+    // cachePct REUSES tokenComposition() so the band equals the token-composition bars further down.
     const present = [hasCc ? cc : null, hasCx ? cx : null].filter(Boolean)
     let bandCacheRead = 0
     let bandTotal = 0
@@ -577,22 +579,36 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
       bandCacheRead += cmp.cacheRead
       bandTotal += cmp.total
     }
-    const cachePct = bandTotal ? Math.round((bandCacheRead / bandTotal) * 100) : 0
+    const cacheVal = bandTotal ? pct(bandCacheRead / bandTotal) : '0.0%' // one decimal, e.g. 96.2%
     // active days is a calendar-day UNION, not additive across platforms (days overlap)
     const activeDays = both
       ? comb.active_days ?? Math.max(cc.active_days || 0, cx.active_days || 0)
       : (cc ?? cx ?? {}).active_days
-    const u =
-      loc === 'zh'
-        ? { tk: (t) => `${t} token`, dy: (d) => `${d}天`, ca: (pp) => `${pp}%靠缓存` }
-        : { tk: (t) => `${t} tokens`, dy: (d) => `${d} days`, ca: (pp) => `${pp}% cached` }
+    const tok = compactTokens(comb.total_tokens, loc)
+    // top-right meta: window + "Claude Code · Max 订阅" (subscription only when official + subscription)
+    const host = cc ?? cx ?? {}
+    const ep = host.endpoint ?? {}
+    const planLabel =
+      ep.billing_mode === 'subscription' && ep.subscription_type && ep.relay_suspected !== true
+        ? `${ep.subscription_type.charAt(0).toUpperCase() + ep.subscription_type.slice(1)} ${tr('sc_plan_suffix')}`
+        : ep.billing_mode === 'api_or_relay'
+          ? 'API'
+          : ''
+    const heroSub = ep.billing_mode === 'subscription' ? tr('sc_hero_sub_plan') : tr('sc_hero_sub_api')
     const scStats = {
-      hero: '$' + Math.round(Number(comb.total_cost_usd) || 0).toLocaleString('en-US'),
-      items: [u.tk(compactTokens(comb.total_tokens, loc)), u.dy(activeDays), u.ca(cachePct)],
+      brand: 'ccoach',
+      meta: [data.window?.desc ?? data.generated_at, planLabel ? `${scope} · ${planLabel}` : scope],
+      heroLabel: tr('sc_hero_label', { n: activeDays }),
+      heroCost: '$' + Math.trunc(Number(comb.total_cost_usd) || 0).toLocaleString('en-US'),
+      heroSub,
+      tokenLabel: tr('m_total_tokens'),
+      tokenMantissa: tok.n,
+      tokenUnit: tok.u,
+      cacheLabel: tr('sc_cache_label'),
+      cacheVal,
       caption: tr('sc_share_caption'),
     }
     p.push(scorecardHtml(scorecard, scStats))
-    p.push(scorecardBreakdown(scorecard))
   }
 
   // Headline metrics. The share card's stat band already carries cost/tokens/days/cache, so a
@@ -852,27 +868,35 @@ ul.sig{margin:4px 0;padding-left:18px}ul.sig li{font-size:12px;color:var(--muted
 .scorecard::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#e9b949,transparent);opacity:.65}
 .scorecard::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .scorecard>*{position:relative;z-index:1}
-.scorecard .sc-kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:#e8a85a}
-.scorecard .sc-title{margin:10px 0 0;font-size:32px;line-height:1.12;font-weight:800;letter-spacing:.01em;background:linear-gradient(180deg,#fff 6%,#f5b942 128%);-webkit-background-clip:text;background-clip:text;color:transparent}
-.sc-stats{display:flex;flex-wrap:wrap;align-items:baseline;gap:5px 14px;margin:16px 0 2px;font-family:var(--mono)}
-.sc-stats .sc-hero{font-size:34px;font-weight:800;letter-spacing:.01em;background:linear-gradient(90deg,#f5b942,#ff6b35);-webkit-background-clip:text;background-clip:text;color:transparent;margin-right:2px}
-.sc-stats .sc-stat{font-size:12.5px;color:#b8b1a3;font-weight:500;position:relative;padding-left:15px}
-.sc-stats .sc-stat::before{content:"·";position:absolute;left:3px;color:rgba(233,185,73,.6)}
-.sc-axis{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:baseline;padding:11px 0;border-top:1px solid rgba(233,185,73,.12)}
-.sc-axis:first-of-type{margin-top:10px}
+.sc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+.sc-top .sc-brand{display:inline-flex;align-items:center;gap:7px;color:#f5b942;font-weight:700;letter-spacing:.02em}
+.sc-top .sc-brand::before{content:"";width:7px;height:7px;border-radius:50%;background:#f5b942;box-shadow:0 0 9px #f5b942}
+.sc-top .sc-meta{text-align:right;color:#8b857a;line-height:1.55}
+.scorecard .sc-kicker{display:block;margin-top:24px;font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:#e8a85a}
+.scorecard .sc-title{margin:9px 0 0;font-size:34px;line-height:1.12;font-weight:800;letter-spacing:.01em;background:linear-gradient(180deg,#fff 6%,#f5b942 132%);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* stat band: hero cost cell + 2-cell grid (tokens / cache) */
+.sc-band{margin:20px 0 2px;border:1px solid rgba(233,185,73,.20);border-radius:14px;overflow:hidden}
+.sc-hero-cell{padding:15px 18px 14px;background:linear-gradient(110deg,rgba(245,185,66,.12),rgba(255,107,53,.04))}
+.sc-hero-lab{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:#e8a85a}
+.sc-hero-cost{font-family:var(--mono);font-size:46px;font-weight:800;line-height:1;margin:7px 0 6px;background:linear-gradient(92deg,#f5b942,#ff6b35);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sc-hero-sub{font-family:var(--mono);font-size:10.5px;color:#8b857a}
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(233,185,73,.16)}
+.sc-cell{padding:13px 18px}
+.sc-cell+.sc-cell{border-left:1px solid rgba(233,185,73,.16)}
+.sc-cell-lab{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8b857a}
+.sc-cell-val{font-family:var(--mono);font-size:23px;font-weight:800;color:#f1ece1;margin-top:6px}
+.sc-cell-val .u{color:#f5b942}
+.sc-cell-val.gold{color:#f5b942}
+.sc-axis{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline;padding:12px 0;border-top:1px solid rgba(233,185,73,.12)}
+.sc-axis:first-of-type{margin-top:12px}
 .sc-axis .sc-ax-label{grid-row:1;align-self:center;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#8b857a}
-.sc-axis .sc-tier{grid-row:1;justify-self:start;font-size:14px;font-weight:700;color:#f5b942;padding:3px 11px;border:1px solid rgba(233,185,73,.28);border-radius:999px;background:rgba(233,185,73,.06);white-space:nowrap}
+.sc-axis .sc-tier{grid-row:1;justify-self:start;font-size:14px;font-weight:700;color:#f5b942;padding:3px 12px;border:1px solid rgba(233,185,73,.28);border-radius:999px;background:rgba(233,185,73,.06);white-space:nowrap}
 .sc-axis .sc-tier.top{color:#0c0b08;background:linear-gradient(90deg,#f5b942,#e8a85a);border-color:transparent;box-shadow:0 0 16px rgba(245,185,66,.3)}
-.sc-axis .sc-roast{grid-column:1 / -1;font-size:12.5px;line-height:1.5;color:#cfc9bc}
-.scorecard .sc-note{margin:16px 0 0;padding-top:13px;border-top:1px solid rgba(255,255,255,.07);font-family:var(--mono);font-size:9.5px;line-height:1.5;color:#8b857a}
+.sc-axis .sc-roast{grid-column:1 / -1;font-size:13px;line-height:1.55;color:#cfc9bc}
+.sc-axis .sc-roast .sc-hl{color:#f5b942;font-weight:600}
+.scorecard .sc-note{margin:18px 0 0;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font-family:var(--mono);font-size:10px;line-height:1.5;color:#8b857a}
 .scorecard .sc-share{margin:9px 0 0;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:#e8a85a}
 .scorecard .sc-share::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 8px #f5b942;margin-right:7px;vertical-align:middle}
-/* scorecard breakdown — the LONG roast, in the report body below the share unit */
-.sc-detail .sc-d-axis{display:grid;grid-template-columns:auto auto;gap:4px 10px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)}
-.sc-detail .sc-d-axis:first-of-type{border-top:0;padding-top:2px}
-.sc-detail .sc-d-label{font-size:12px;color:var(--muted)}
-.sc-detail .sc-d-tier{font-size:14px;font-weight:700;color:var(--a)}
-.sc-detail .sc-d-roast{grid-column:1 / -1;margin:2px 0 0;font-size:13px;line-height:1.55}
 /* glossary / terms strip (episode / severity / spiral) */
 .terms{border:1px dashed var(--line);border-radius:8px;padding:12px 14px;margin-bottom:12px}
 .terms-k{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}

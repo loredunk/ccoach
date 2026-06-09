@@ -48,8 +48,6 @@ describe('scorecard render-order guard (ADR 0044)', () => {
       for (const ax of card.axes) {
         ax.roast = 'rewritten'
         ax.roast_is_fixture = false
-        ax.roast_short = 'short'
-        ax.roast_short_is_fixture = false
       }
       writeFileSync(scPath, JSON.stringify(card))
       const { html, stderr } = render(d, scPath)

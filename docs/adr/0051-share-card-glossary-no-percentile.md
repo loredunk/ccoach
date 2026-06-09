@@ -21,11 +21,11 @@
 
 ### D2 成绩卡边界化为单屏 share unit + 数字带入卡
 
-把头部三个独立 stat 框并入成绩卡：人设标题正下方一条**数字带**（`$438 · 5.8亿 token · 7天 · 96%靠缓存`），数字用等宽字（JetBrains Mono + 系统等宽兜底，离线不依赖联网字体）。卡片改为**深色金 hero 卡**（自带描边/微光/grain），尾部加金色 hairline + 「截图此卡即可分享」边界脚注——形成自包含、单屏可截的 share unit。`cachePct` 复用 `tokenComposition()` 口径，保证数字带与正文 token 构成条一致；`active_days` 在双平台取**并集**（日历日重叠，非相加）。单平台报告因数字带已承载头部数字而移除独立 metrics 区；`--scorecard` 缺省时回退旧 metrics 块。
+成绩卡做成**一张自包含、单屏可截的深色金 hero 卡**，承载全部信息：左上角 `● ccoach` 品牌 + 右上角运行/平台 meta（窗口 + `Claude Code · Max 订阅`）→ 人设称号 → **数字带**（一个 hero `$cost` 块「N 天烧掉（按 API 价折算）」+ 一个两格网格：总 TOKEN `5.81亿` / 缓存撑起 `96.2%`，关键数字金色突出）→ 四轴（段位药丸 + 完整 roast）→ 金点脚注。数字用等宽字（JetBrains Mono + 系统等宽兜底，离线不依赖联网字体）。`cachePct` 复用 `tokenComposition()` 口径，保证与正文 token 构成条一致；`active_days` 在双平台取**并集**（日历日重叠，非相加）；订阅档（`Max 订阅`）仅在 `endpoint=official` 且非中转时显示。单平台报告因数字带已承载头部数字而移除独立 metrics 区；`--scorecard` 缺省时回退旧 metrics 块。金点脚注文案为「称号为本地估算，仅供娱乐」（颜色不变）。
 
-### D3 short roast 上卡、long roast 进正文
+### D3 完整 roast 直接上卡（不拆分、无独立详解区）
 
-每轴新增 `roast_short`（+ `roast_short_is_fixture` flag），fixture 默认从长 roast 首句**派生**（不手写 17×2 条）；模型在 writeback 时**同时**写短（卡面一句最狠的钩子）+ 长（完整、有数字支撑的句子）。share 卡只显示短 roast；完整长 roast 落在正文新增的「成绩卡详解」区。render-guard（ADR 0044）扩展为 short/long 两个 fixture 标记各自 warn。
+每轴只有一个 `roast`（完整、有数字支撑的句子），**直接渲染在卡上**——不再有 short/long 拆分、也没有独立的「成绩卡详解」区，卡片本身就是 share unit。模型可选地在 roast 里用 `**…**` 包住**一处**关键短语，渲染器转成金色高亮（如「真贵的是那 387 万输出——**量最小，单价最横**」）。render-guard（ADR 0044）只对 `roast_is_fixture` 告警（回退早前一版引入的 `roast_short`）。隐私脚注从「全部分析在你本地完成，prompt 内容不离开你的机器」改为「全部 logs 解析在你本地完成」——ccoach 只在本地解析 logs、不新增外发，但 prompt 本就在跑会话时已发往模型方，旧措辞会误导。
 
 ### D4 术语 on-page glossary + 本地化
 

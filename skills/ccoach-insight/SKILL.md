@@ -102,28 +102,30 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - **Default language is English**; pass `--lang zh` (or another supported locale) to match the user.
    - The **tier scores and tier names** come from `scorecard.mjs` + the copy table — **do not change the names**
      (stable, recognizable, shareable identity; unsupported locales fall back to English).
-   - **Roast lines are yours to write — short AND long.** Each axis carries TWO roast fields:
-     `roast_short` (ONE punchy hook shown on the share card, ~6–12 chars, e.g. "量最小，单价最横") and
-     `roast` (the full grounded sentence shown in the report body's "Scorecard breakdown" section).
-     `scorecard.json` ships a safe fixture for both (the short is derived from the long); rewriting **both**
-     `axes[].roast_short` and `axes[].roast` is **mandatory** (see the **REQUIRED before step 7** step below) — write them into the
-     **user's language, idiomatic/native**, using the fixture roast as the **tone & voice exemplar**. Rules:
+   - **Roast lines are yours to write.** Each axis has ONE `roast` — the full grounded sentence shown
+     on the share card itself (one self-contained card; there is no separate breakdown section).
+     `scorecard.json` ships a safe fixture roast per axis; rewriting each `axes[].roast` is **mandatory**
+     (see the **REQUIRED before step 7** step below) — write it into the **user's language, idiomatic/native**,
+     using the fixture roast as the **tone & voice exemplar**. You MAY wrap ONE key phrase per roast in
+     `**…**` (e.g. "…真贵的是那 387 万输出——**量最小，单价最横**") — the renderer turns it into a gold
+     highlight on the card; use it on the single punchiest phrase, not everywhere. Rules:
      **describe a phenomenon backed by a concrete number** in the merged JSON (cost / tokens / cache-replay / late-night
      share / plan-mode count / active days…) — *describing it is enough*; a light wry note is **optional, NOT a savage
      punchline tacked onto every axis**. **NEVER assert something ccoach doesn't measure**: it tracks tool/command
      CATEGORIES and counts, not intent — so do not claim "never ran a test", "didn't review the code", or "should've
      used plan mode" (there is no test-execution / review / plan-necessity signal; inventing one is a correctness bug,
      not a joke). Tease **changeable habits, never the person/ability**; **aggregate-only — never quote or
-     imply prompt text** (the shareable card stays zero-raw-text).
+     imply prompt text, and never put a repo/project name on the shareable card** (it stays zero-raw-text,
+     zero-identifier — the persona, tiers, roasts and stat band are all derived aggregates).
    - **REQUIRED before step 7 (render).** The scorecard you just generated ships fallback markers
-     (`title_is_fallback: true`, each `axes[].roast_is_fixture: true` AND `axes[].roast_short_is_fixture: true`).
+     (`title_is_fallback: true`, each `axes[].roast_is_fixture: true`).
      Before rendering you MUST overwrite `/tmp/scorecard.json` in place (Read it, edit the fields, then write it back):
      1. **Compose the persona title yourself** — a short, witty handle from the four
        `axes[].tier` names (e.g. 渡劫飞升 + 富哥随意 + 架构师 + 劳模 → "随手烧钱的渡劫劳模"); stay
        faithful to the computed tiers, never invent an axis, never quote prompt text. Set
        `title` to it **and set `title_is_fallback` to `false`**.
-     2. **Rewrite both `axes[].roast` (long) and `axes[].roast_short` (the card hook)** in the user's
-       language per the rules above, and set that axis's `roast_is_fixture` AND `roast_short_is_fixture` to `false`.
+     2. **Rewrite each `axes[].roast`** in the user's language per the rules above (optionally with ONE
+       `**…**` gold-highlighted phrase), and set that axis's `roast_is_fixture` to `false`.
      3. Also write the personality-summary sentence into the insights `executive_summary` — note this field lives in `/tmp/ai-usage-insights.json` (a separate file, not scorecard.json).
      If you skip this, the renderer keeps the fallback `A × B × C × D` title and fixture roasts,
      emits a stderr warning, and leaves a `<!-- ccoach:scorecard_title_is_fallback -->` marker in the
@@ -133,9 +135,8 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    - The whole report skeleton is localized from `references/report-copy.json` (default English). Pass `--lang zh` to render the skeleton in Chinese, etc. `--scorecard` is optional; include it for the screenshot-friendly cover card. **Match `--lang` across scorecard.mjs and render_dual_platform.mjs** (and to the language you wrote the insights in).
    - Use the user-specified output path if given; otherwise `ccoach-insight.html`.
    - **Self-check:** after rendering, look at the command's stderr. If you see a
-     `⚠ scorecard:` warning, the persona title and/or the short/long roasts were NOT written back before
-     render — fix `/tmp/scorecard.json` (step 6 write-back; the warning names whether short or long roasts
-     are still fixture) and **re-run this render command**. Do not ship the
+     `⚠ scorecard:` warning, the persona title and/or the roasts were NOT written back before
+     render — fix `/tmp/scorecard.json` (step 6 write-back) and **re-run this render command**. Do not ship the
      `ccoach-insight.html` while that warning is present.
 
 ### Dual-platform comparison (opt-in)
@@ -211,13 +212,13 @@ price table (models change; a stale snapshot drifts). The CLI stays offline and 
 
 ## Shareable scorecard
 
-`scripts/scorecard.mjs` deterministically grades four axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier indices + tier names + fixture roasts from `references/scorecard-copy.json`. The report skeleton is localized from `references/report-copy.json`. The renderer shows the scorecard as a **bounded, single-screen share unit** (a dark/gold hero card): persona title → a bold stat band (`$cost · tokens · days · cache%`) bound under the title → four axes each with ONE short roast → a "screenshot this card to share" boundary. The full long roast per axis renders in the report body's **Scorecard breakdown** section, below the card.
+`scripts/scorecard.mjs` deterministically grades four axes — Prompt Skill, Spending Style, Engineering Sense, Diligence — into tier indices + tier names + fixture roasts from `references/scorecard-copy.json`. The report skeleton is localized from `references/report-copy.json`. The renderer shows the scorecard as ONE **bounded, single-screen share unit** (a dark/gold hero card) that carries everything: `ccoach` brand top-left + run/platform meta top-right → persona title → a stat band (a hero `$cost` cell + a tokens / cache% grid, key numbers gold) → four axes each with its tier pill + full roast → a gold-dot footer caption. There is **no separate breakdown section** — the card is self-contained and screenshot-ready.
 
 - **Deterministic, fixed**: the tier *score* and the tier *name* (UI labels too) come from `scorecard.mjs` + the copy tables — **don't change names yourself**; **default English**, pass `--lang zh` (or another locale) to match the user. To add a tier-name locale, add its keys to the copy tables (missing keys fall back to the default language). The stat band numbers (cost/tokens/active-days/cache%) come straight from the merged JSON — the renderer computes them, you don't write them.
-- **Model-authored**: the **axis roasts** (`roast_short` for the card + `roast` for the breakdown) AND the personality-summary sentence are **yours to write in the user's language**. The fixtures in `scorecard.json` are a safe default/fallback + your tone exemplar — rewrite both `axes[].roast_short` (one punchy hook) and `axes[].roast` (the full grounded line) before rendering. This is where the LLM's per-language idiom shines, so you don't have to hand-localize roasts into every language.
+- **Model-authored**: the **axis roasts** AND the personality-summary sentence are **yours to write in the user's language**. The fixtures in `scorecard.json` are a safe default/fallback + your tone exemplar — rewrite each `axes[].roast` (the full grounded line, optionally with ONE `**…**` gold-highlighted key phrase) before rendering. This is where the LLM's per-language idiom shines, so you don't have to hand-localize roasts into every language.
 - **Grounded, not savage**: every roast must **describe a real phenomenon backed by a concrete number** in the merged JSON — *describing it is enough*; a light wry note is optional, **not a mocking punchline on every axis**. **Never assert what ccoach doesn't measure** (e.g. "never ran a test", "didn't review", "should've used plan mode" — there is no such signal; making it up is a correctness bug). Tease changeable **habits**, never ability or the person.
-- **Aggregate-only**: roasts may use aggregate numbers (cost/tokens/hours/tier) but **never prompt text** — the shareable card stays zero-raw-text. (The card no longer claims a "beats X%" rank — that local estimate was removed.)
-- Privacy is a selling point: state that all analysis is local and prompt content never leaves the machine.
+- **Aggregate-only, zero-identifier**: roasts may use aggregate numbers (cost/tokens/hours/tier) but **never prompt text and never a repo/project name** — the shareable card stays zero-raw-text and zero-identifier. (The card no longer claims a "beats X%" rank — that local estimate was removed.)
+- Privacy is a selling point: state that the analysis is local — **ccoach only parses your local logs on your machine and never exfiltrates** (don't claim "your prompts never leave your machine" — prompts were already sent to the model provider when you ran the session; ccoach simply doesn't add any new egress).
 
 ## Analysis Guidance
 

@@ -1,5 +1,5 @@
 {
-  "_about": "Copy for the scorecard. Tiers are high->low. The tier NAMES ({LANG}_name) + ui labels are the fixed, deterministic identity (don't run-to-run vary them). The {LANG}_roast lines are the SAFE DEFAULT/FALLBACK + a tone EXEMPLAR: at runtime the model rewrites axes[].roast (the LONG line, shown in the report's Scorecard-breakdown section) in the user's language, idiomatic and aggregate-grounded; it also writes axes[].roast_short (ONE punchy hook shown on the share card, e.g. a 6–12-char clause). scorecard.mjs seeds roast_short by deriving the first clause of the fixture roast — the model overwrites it. GROUNDING RULE: every roast must describe a phenomenon backed by a concrete number in the merged JSON — describing the phenomenon is enough; a light wry note is optional, NOT a savage punchline tacked onto every axis. NEVER assert an activity ccoach does not measure (e.g. whether tests were executed, whether code was reviewed, whether plan mode 'should' have been used) — it tracks tool/command CATEGORIES and counts, not intent; inventing such a claim (e.g. 'never ran a test') is a correctness bug, not a joke. Roasts tease changeable HABITS, never the person/ability, and never quote prompt text. The 'title'/personality summary is model-written. To add a tier-name locale: add {LANG}_name (and optionally {LANG}_roast) to every tier and a ui.{LANG} block; scorecard.mjs reads them generically and falls back to the default language.",
+  "_about": "Copy for the scorecard. Tiers are high->low. The tier NAMES ({LANG}_name) + ui labels are the fixed, deterministic identity (don't run-to-run vary them). The {LANG}_roast lines are the SAFE DEFAULT/FALLBACK + a tone EXEMPLAR: at runtime the model rewrites axes[].roast (the full line shown on the share card itself — there is no separate breakdown section) in the user's language, idiomatic and aggregate-grounded; it may wrap ONE key phrase in **…** which the renderer turns into a gold highlight. GROUNDING RULE: every roast must describe a phenomenon backed by a concrete number in the merged JSON — describing the phenomenon is enough; a light wry note is optional, NOT a savage punchline tacked onto every axis. NEVER assert an activity ccoach does not measure (e.g. whether tests were executed, whether code was reviewed, whether plan mode 'should' have been used) — it tracks tool/command CATEGORIES and counts, not intent; inventing such a claim (e.g. 'never ran a test') is a correctness bug, not a joke. Roasts tease changeable HABITS, never the person/ability, and never quote prompt text. The 'title'/personality summary is model-written. To add a tier-name locale: add {LANG}_name (and optionally {LANG}_roast) to every tier and a ui.{LANG} block; scorecard.mjs reads them generically and falls back to the default language.",
   "ui": {
     "zh": {
       "report_title": "ccoach Insight 成绩卡",
@@ -10,7 +10,7 @@
       "axis_spending": "烧钱姿势",
       "axis_engineering": "工程素养",
       "axis_diligence": "勤奋度",
-      "local_privacy_note": "全部分析在你本地完成，prompt 内容不离开你的机器"
+      "local_privacy_note": "全部 logs 解析在你本地完成"
     },
     "en": {
       "report_title": "ccoach Insight Report",
@@ -21,7 +21,7 @@
       "axis_spending": "Spending Style",
       "axis_engineering": "Engineering Sense",
       "axis_diligence": "Diligence",
-      "local_privacy_note": "Analyzed entirely on your machine — your prompts never leave it."
+      "local_privacy_note": "All log parsing happens on your machine."
     }
   },
   "axes": {
