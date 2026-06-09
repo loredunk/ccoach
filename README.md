@@ -10,9 +10,11 @@
 
 - **Usage report**: read-only parse of your local **Claude Code / Codex** records — tokens, estimated cost,
   tool calls, and breakdowns by repo / hour / source / language / git habits / config scan. Read-only; changes nothing.
-- **Advice** (skill): teaches Claude Code / Codex to interpret this data and give **feature-first** advice —
-  whenever a finding can be solved with a native feature (CLAUDE.md/AGENTS.md, subagents, hooks, plan mode,
-  permission settings, model/effort tiers…), it names the feature. Supports **session / project / global** scopes.
+- **Advice** (two skills): teach Claude Code / Codex to interpret this data — **ccoach-insight** gives
+  **feature-first** advice + the report/scorecard (whenever a finding can be solved with a native feature —
+  CLAUDE.md/AGENTS.md, subagents, hooks, plan mode, permission settings, model/effort tiers… — it names the
+  feature; supports **session / project / global** scopes), and **ccoach-deepinsight** is a semantic
+  **root-cause coach** that reads your real code to explain *why* work churned and the concrete fix.
 - **Shareable scorecard**: grade your usage / habits / prompts across four axes (Prompt Skill, Spending
   Style, Engineering Sense, Diligence) into a screenshot-friendly card at the top of the HTML report
   (bilingual zh/en, rendered by the skill).
@@ -21,41 +23,39 @@
 
 ## ccoach skills
 
-For richer AI-written HTML reports, use the reusable skill
-[skills/ccoach-insight](skills/ccoach-insight/SKILL.md): it reads local **Claude Code + Codex**
-data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms),
-computes authoritative cost from each model's **official online price**, and renders
-a dual-platform HTML report with a scorecard. It can drill from high-token projects down to candidate
-sessions (`ccoach sessions`), reads a selected session's user prompts only after explicit approval, and
-never reads hidden system prompts.
+Two reusable skills turn the raw CLI data into something human — install both with one command:
 
-### Install the skill (Claude Code + Codex)
+- **[ccoach-insight](skills/ccoach-insight/SKILL.md)** — the **usage report + shareable scorecard**. Reads local **Claude Code + Codex** data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms), computes authoritative cost from each model's **official online price**, and renders an HTML report fronted by a screenshot-ready scorecard. It can drill from high-token projects down to candidate sessions (`ccoach sessions`). Glanceable, a little playful.
+- **[ccoach-deepinsight](skills/ccoach-deepinsight/SKILL.md)** — a serious, semantic **root-cause coach** for a single project. Goes beyond aggregate metrics: it reads your own real code (read-only) to tell you, in plain language, **why** your work churned and the concrete fix — always anchored to an official native feature (plan mode, `@file` references, hooks, `/clear`, subagents, CLAUDE.md / AGENTS.md anchors). The deliverable is solutions, not metrics.
 
-Install the skill via the [`skills`](https://github.com/vercel-labs/skills) CLI (you already have Node — nothing else to install):
+Both are privacy-first: read-only, local, and never exfiltrate. They analyze **user prompts + permissions + tool calls only** — never assistant replies; a selected session's prompts are read only after approval, hidden system prompts are never read, and everything written out is desensitized.
+
+### Install the skills (Claude Code + Codex)
+
+Install via the [`skills`](https://github.com/vercel-labs/skills) CLI (you already have Node — nothing else to install):
 
 ```bash
 npx skills add loredunk/ccoach
 ```
 
-It prompts you to pick the agents (Claude Code / Codex) and scope (global / project) — choose what you want. Update with `npx skills update ccoach-insight`, remove with `npx skills remove ccoach-insight`.
+One command installs **both** skills (the repo auto-discovers `skills/*/SKILL.md`). It prompts you to pick the agents (Claude Code / Codex) and scope (global / project) — choose what you want. Update or remove by name, e.g. `npx skills update ccoach-insight ccoach-deepinsight`.
 
 > **Platforms**: the `ccoach` CLI runs natively on macOS / Linux / Windows (pure Node, no shell-out). The skills are Bash command sequences (they use `/tmp` and POSIX shell syntax), so on **Windows run your agent under Git Bash or WSL**; the `.mjs` render scripts themselves are cross-platform.
 
-### Use it
+### Use them
 
-You don't run a command — you just talk to your agent. Once the skill is installed, ask in plain language and the agent picks it up:
+You don't run a command — you just talk to your agent. Once a skill is installed, ask in plain language and the agent picks the right one:
 
-- *"Review my Claude Code and Codex usage for the last 7 days."*
-- *"How much did I spend on Codex this week, and which projects burned the most tokens?"*
-- *"Build me an HTML dashboard of how I used AI today."*
+- **Usage report / scorecard** → *"Review my Claude Code and Codex usage for the last 7 days."* · *"Which projects burned the most tokens this week?"* · *"Build me an HTML dashboard of how I used AI today."*
+- **Deep root-cause coaching** → *"Why do I keep reworking this project?"* · *"Where am I wasting effort with Claude Code here, and what should I change?"* · *"Give me a deep insight into how I work in this repo."*
 
-Prefer to call it by name? In **Claude Code** type `/ccoach-insight`, in **Codex** type `$ccoach-insight` — on its own it covers **today**; add a number of days (`7`) or a date (`2026-06-01`) to widen the window.
+Prefer to call them by name? In **Claude Code** type `/ccoach-insight` or `/ccoach-deepinsight` (in **Codex**, `$ccoach-insight` / `$ccoach-deepinsight`). On its own each covers a sensible default (the report → **today**; the deep coach → the **current project**); add a number of days (`7`) or a date (`2026-06-01`) to widen the window.
 
-The report is **English by default** — just ask in Chinese (or for a Chinese report) and the agent renders it in Chinese (see the skill's [SKILL.md](skills/ccoach-insight/SKILL.md)).
+Both are **English by default** — just ask in Chinese (or for a Chinese report) and the agent renders it in Chinese (see each skill's `SKILL.md`).
 
 ## Install CLI
 
-The `ccoach-insight` skill runs the **`ccoach` CLI** under the hood — you can also use it directly to see the raw usage report the skill builds on. Here's how to install and use it.
+Both skills run the **`ccoach` CLI** under the hood — you can also use it directly to see the raw usage report they build on. Here's how to install and use it.
 
 ccoach is a TypeScript / Node package (ESM, Node ≥ 18); the CLI binary is `ccoach`. Distribution is "everything is npx".
 

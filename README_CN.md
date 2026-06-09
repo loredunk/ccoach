@@ -10,9 +10,10 @@
 
 - **用量报告**：只读本机 **Claude Code / Codex** 记录，输出 Token、估算成本、工具调用、按仓库 /
   时段 / 来源 / 语言 / git 习惯 / 配置扫描的统计。纯只读，不改任何东西。
-- **使用建议**（skill）：教 Claude Code / Codex 解读这些数据，给出**特性优先**的建议——
-  凡能用产品原生特性（CLAUDE.md/AGENTS.md、subagents、hooks、plan mode、permission 设置、
-  模型/effort 档位…）解决的，就点名特性去解决。支持**会话 / 项目 / 全局**三层分析。
+- **使用建议**（两个 skill）：教 Claude Code / Codex 解读这些数据——**ccoach-insight** 给**特性优先**
+  的建议 + 报告/成绩卡（凡能用产品原生特性 CLAUDE.md/AGENTS.md、subagents、hooks、plan mode、
+  permission 设置、模型/effort 档位… 解决的，就点名特性去解决；支持**会话 / 项目 / 全局**三层），
+  **ccoach-deepinsight** 则是**语义根因教练**，读你的真实代码讲清**为什么**返工、以及具体怎么改。
 - **可分享成绩卡**：把用量 / 习惯 / prompt 评成多轴段位（Prompt 功力、烧钱姿势、工程素养、
   勤奋度），在 HTML 报告顶部生成一张能炫能自嘲、可截图的成绩卡（中英双语，由 skill 渲染）。
 
@@ -20,11 +21,12 @@
 
 ## ccoach skills
 
-更深入的 AI 解读与 HTML 报告，用可复用的 skill
-[skills/ccoach-insight](skills/ccoach-insight/SKILL.md)：它从 `ccoach report --json` 读取
-**Claude Code + Codex** 两平台的本机数据（token、按模型拆分、行为画像），并按报告里实际出现的模型**联网查官方单价**计算权威成本，产出双平台 HTML 报告与成绩卡，
-并能从高耗项目下钻到候选会话（`ccoach sessions`）；只在你明确授权后才读取所选会话的 user prompt，
-且绝不读取隐藏的系统提示。
+两个可复用的 skill 把原始 CLI 数据变成「给人看」的东西——一条命令一起装上：
+
+- **[ccoach-insight](skills/ccoach-insight/SKILL.md)** —— **用量报告 + 可分享成绩卡**。从 `ccoach report --json` 读取 **Claude Code + Codex** 两平台的本机数据（token、按模型拆分、行为画像），按报告里实际出现的模型**联网查官方单价**计算权威成本，产出双平台 HTML 报告，开头是一张可截图分享的成绩卡；还能从高耗项目下钻到候选会话（`ccoach sessions`）。一眼可读、略带自嘲。
+- **[ccoach-deepinsight](skills/ccoach-deepinsight/SKILL.md)** —— 面向单个项目的**语义根因教练**，认真的那种。它不止看聚合指标，而是只读地读你自己的真实代码，用大白话告诉你**为什么**这块活儿在反复返工、以及该怎么具体地改——并且始终落到官方原生特性上（plan mode、`@文件` 引用、hooks、`/clear`、子代理、CLAUDE.md / AGENTS.md 锚点）。交付的是解决办法，不是指标。
+
+两者都**隐私优先**：全程只读、仅本机、绝不外发；只分析 **user prompt + 权限 + tool 调用**，绝不读 assistant 回复；所选会话的 prompt 只在授权后才读，隐藏的系统提示从不读取，写出的内容一律脱敏。
 
 ### 安装 skill（Claude Code + Codex）
 
@@ -34,25 +36,24 @@
 npx skills add loredunk/ccoach
 ```
 
-它会让你**自行选择 agent（Claude Code / Codex）与范围（全局 / 项目）**。后续 `npx skills update ccoach-insight` 更新、`npx skills remove ccoach-insight` 卸载。
+一条命令同时装上**两个** skill（仓库自动发现 `skills/*/SKILL.md`）。它会让你**自行选择 agent（Claude Code / Codex）与范围（全局 / 项目）**。后续按名更新/卸载，例如 `npx skills update ccoach-insight ccoach-deepinsight`。
 
 > **平台**：`ccoach` CLI 原生支持 macOS / Linux / Windows（纯 Node、零 shell 调用）。skill 的步骤是 Bash 命令序列（用到 `/tmp` 与 POSIX shell 语法），所以 **Windows 上请在 Git Bash 或 WSL 里运行你的 agent**；`.mjs` 渲染脚本本身是跨平台的。
 
 ### 怎么用
 
-你不用敲命令——直接跟你的 agent 说话就行。装好 skill 后，用自然语言问一句，agent 就会自动唤起它：
+你不用敲命令——直接跟你的 agent 说话就行。装好后用自然语言问一句，agent 会挑对那个 skill：
 
-- *“看看我最近 7 天 Claude Code 和 Codex 的用量。”*
-- *“我这周在 Codex 上花了多少，哪些项目最烧 token？”*
-- *“把我今天用 AI 的情况做成一张 HTML 报告。”*
+- **用量报告 / 成绩卡** → *“看看我最近 7 天 Claude Code 和 Codex 的用量。”* · *“我这周哪些项目最烧 token？”* · *“把我今天用 AI 的情况做成一张 HTML 报告。”*
+- **深度根因教练** → *“为什么我在这个项目里老是返工？”* · *“我在这个仓库里用 Claude Code 哪儿在浪费力气，该改什么？”* · *“给我一份这个项目的深度洞察。”*
 
-想点名调用？在 **Claude Code** 里输入 `/ccoach-insight`，在 **Codex** 里输入 `$ccoach-insight`——单独用就是**今天**；想放宽窗口就加「往回数几天」（`7`）或某个日期（`2026-06-01`）。
+想点名调用？在 **Claude Code** 里输入 `/ccoach-insight` 或 `/ccoach-deepinsight`（在 **Codex** 里是 `$ccoach-insight` / `$ccoach-deepinsight`）。单独用各有合理默认（报告 → **今天**；深度教练 → **当前项目**）；想放宽窗口就加「往回数几天」（`7`）或某个日期（`2026-06-01`）。
 
-报告**默认英文**——用中文问（或直接说要中文），agent 就会渲染成中文（见 [SKILL.md](skills/ccoach-insight/SKILL.md)）。
+两者都**默认英文**——用中文问（或直接说要中文），agent 就会渲染成中文（见各自的 `SKILL.md`）。
 
 ## 安装 CLI
 
-ccoach-insight skill 底层调用的就是 **`ccoach` CLI**——你也可以直接用它，查看 skill 所基于的原始用量报告。下面是安装与使用方式。
+两个 skill 底层调用的都是 **`ccoach` CLI**——你也可以直接用它，查看 skill 所基于的原始用量报告。下面是安装与使用方式。
 
 ccoach 是 TypeScript / Node 包（ESM，Node ≥ 18），CLI 命令为 `ccoach`，分发统一成「一切皆 npx」。
 
