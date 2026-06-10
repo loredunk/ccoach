@@ -55,10 +55,16 @@ cli
       const daysRaw = options.days
       const days = daysRaw != null ? Number(daysRaw) : undefined
       if (days !== undefined && !Number.isFinite(days)) throw new Error(`invalid --days ${String(daysRaw)}`)
-      const window = resolveWindow(
-        { date: options.date as string | undefined, since: options.since as string | undefined, days },
-        new Date(),
-      )
+      // --id/--rollout 点名了会话 → 会话本身即范围：未显式给时间窗就放开为全时段，
+      // 否则默认「只看今天」会让历史会话钻取返回空（与 ccoach digest 去时间窗的语义对齐）。
+      const hasExplicitWindow = options.date != null || options.since != null || days !== undefined
+      const idScoped = (options.id != null && options.id !== '') || (options.rollout != null && options.rollout !== '')
+      const window = idScoped && !hasExplicitWindow
+        ? { fromYmd: '0000-01-01', toYmd: '9999-12-31', desc: 'all time (session selected by --id)' }
+        : resolveWindow(
+            { date: options.date as string | undefined, since: options.since as string | undefined, days },
+            new Date(),
+          )
       const includePrompts = options.includeUserPrompts === true
       // Codex 预览需显式选择会话（延续 session_drilldown 的 opt-in 门控）；Claude 缺 id 时自动选 token 最高单会话（ADR 0015）。
       if (platform === 'codex' && includePrompts && !options.id && !options.rollout) {

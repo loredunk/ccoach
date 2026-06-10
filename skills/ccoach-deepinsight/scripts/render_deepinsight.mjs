@@ -52,6 +52,31 @@ function glossarySection(loc) {
   return `<section class="terms"><div class="terms-k">${esc(g.head)}</div><dl>${items}</dl></section>`
 }
 
+// Fixed page chrome, localized (zh reports must not show English jargon chrome). Plain words only.
+const CHROME = {
+  zh: {
+    kicker: 'ccoach · 讲人话的根因教练',
+    seal: '只读 · 本地 · 分享前可脱敏',
+    ledger: '依据 · 会话窗口内的提交（实锤）',
+    notes: '工具自身的局限说明——不是你的行为问题',
+    digest: '正文摘要',
+    novel: '新类别',
+    novelTitle: '从证据里新发现的类别，不在预设分类里',
+    privacy: '本地只读分析。指标只是佐证——根因和改法才是产品。绝不读取思考过程 / 系统提示词 / 文件内容；正文摘要为显式开启、已脱敏、限额读取。',
+  },
+  en: {
+    kicker: 'ccoach · plain-language root-cause coach',
+    seal: 'read-only · local · maskable before sharing',
+    ledger: 'evidence · commits inside the session window (ground truth)',
+    notes: 'tool limits — about the tool, not your behavior',
+    digest: 'digest',
+    novel: 'novel',
+    novelTitle: 'a category discovered from the evidence, not predefined',
+    privacy: 'Local, read-only analysis. Metrics are supporting evidence only — the root cause and the fix are the product. Never reads thinking / system prompts / file contents as content; assistant/tool_result content is opt-in, redacted, token-bounded.',
+  },
+}
+let L = CHROME.en // set per render in renderDeepinsight (single render per process)
+
 const CAT = {
   cognitive_gap: { label: 'Cognitive Gap', v: '--c-cog' },
   prompt_issue: { label: 'Prompt', v: '--c-prompt' },
@@ -86,7 +111,7 @@ function findingCard(f, i) {
     ? `<div class='signal'><span class='sig-k'>signal</span> ${esc(f.signal)}</div>`
     : ''
   const novel = f.novel_category === true
-    ? `<span class='chip chip-novel' title='discovered category, not predefined'>novel</span>`
+    ? `<span class='chip chip-novel' title='${esc(L.novelTitle)}'>${esc(L.novel)}</span>`
     : ''
   return (
     `<article class='card' style='--cat: var(${c.v})' data-i='${i}'>` +
@@ -111,7 +136,7 @@ function groundingLedger(rows) {
     )
     .join('')
   return (
-    `<div class='ledger'><div class='ledger-k'>grounding · in-window commits (ground truth)</div>` +
+    `<div class='ledger'><div class='ledger-k'>${esc(L.ledger)}</div>` +
     `<ol class='ledger-l'>${items}</ol></div>`
   )
 }
@@ -132,7 +157,7 @@ function passSection(p, idx) {
   const verdict = verdictBanner(p.verdict)
   const headline = p.headline ? `<p class='headline'>${esc(p.headline)}</p>` : ''
   const ledger = groundingLedger(p.grounding)
-  const stats = p.digest_stats ? `<div class='dstats'><span class='ds-k'>digest</span> ${esc(p.digest_stats)}</div>` : ''
+  const stats = p.digest_stats ? `<div class='dstats'><span class='ds-k'>${esc(L.digest)}</span> ${esc(p.digest_stats)}</div>` : ''
   const cards = (p.findings || []).map((f, i) => findingCard(f, i)).join('')
   return (
     `<section class='pass' style='--d:${idx}'>` +
@@ -148,10 +173,11 @@ const GRAIN =
 export function renderDeepinsight(data) {
   const d = data || {}
   const loc = String(d.lang ?? '').startsWith('zh') ? 'zh' : 'en'
+  L = CHROME[loc] ?? CHROME.en
   const passes = (d.passes || []).map((p, i) => passSection(p, i)).join('')
   const honesty =
     Array.isArray(d.honesty) && d.honesty.length
-      ? `<section class='notes'><div class='notes-k'>instrument notes — tool limits, not your behavior</div><ul>${d.honesty
+      ? `<section class='notes'><div class='notes-k'>${esc(L.notes)}</div><ul>${d.honesty
           .map((h) => `<li>${esc(h)}</li>`)
           .join('')}</ul></section>`
       : ''
@@ -284,16 +310,16 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 <body>
 <div class="wrap">
   <header class="mast">
-    <p class="kicker">ccoach · semantic root-cause coach</p>
+    <p class="kicker">${esc(L.kicker)}</p>
     <h1>Deep&nbsp;<em>Insight</em></h1>
     <div class="metastrip">${meta}</div>
-    <span class="seal">read-only · local · desensitizable</span>
+    <span class="seal">${esc(L.seal)}</span>
   </header>
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
   ${glossarySection(loc)}
   ${passes}
   ${honesty}
-  <footer class="foot">${esc(d.privacy || 'Local, read-only analysis. Metrics are supporting evidence only — the root cause and the fix are the product. Never reads thinking / system prompts / file contents as content; assistant/tool_result content is opt-in, redacted, token-bounded.')}</footer>
+  <footer class="foot">${esc(d.privacy || L.privacy)}</footer>
 </div>
 </body>
 </html>`

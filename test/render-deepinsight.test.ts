@@ -33,7 +33,7 @@ describe('render_deepinsight', () => {
     expect(html).toContain('verdict healthy') // verdict banner tone
     expect(html).toContain('shipped T15') // grounding ledger row
     expect(html).toContain("class='signal'") // metric is demoted to a signal margin, never the headline
-    expect(html).toContain('instrument notes')
+    expect(html).toContain('tool limits') // honesty notes chrome (plain words, localized)
   })
 
   it('HTML-escapes injected content (no raw tags survive)', () => {
