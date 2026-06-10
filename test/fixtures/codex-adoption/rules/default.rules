@@ -1,0 +1,4 @@
+# accepted by smart approvals
+prefix_rule(pattern=["git", "status"], decision="allow")
+prefix_rule(pattern=["npm", "test"], decision="allow")
+prefix_rule(pattern=["ls"], decision="allow")

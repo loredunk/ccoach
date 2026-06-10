@@ -233,6 +233,32 @@ export interface FeatureAdoption {
   tips?: FeatureAdoptionTip[]    // 条件型 tip 水位（旁证）
   caveats: string[]              // 固定告诫标签（水位≠次数 / 条件随版本漂移 / 各证据源口径不同）
 }
+// Codex 特性采用信号（ADR 0057）：从 $CODEX_HOME 本机文件/索引库派生，与 ADR 0056（Claude）对称。
+// 全部为布尔/纯计数/白名单枚举标签：trusted 项目路径仅瞬时用于计数与 broad_trust 判定、绝不存储；
+// 规则内容、记忆正文（stage1_outputs 为 assistant 蒸馏内容，红线）、prompt 文本一律不读不存。
+export interface CodexFeatureAdoption {
+  config?: {
+    personality: string | null              // config.toml 配置意图（rollout turn_context 是实际值，差值即洞察）
+    model_reasoning_effort: string | null
+    plan_mode_reasoning_effort: string | null
+    trusted_projects: number                // [projects] trust_level="trusted" 计数（不含路径）
+    broad_trust: boolean                    // 有 trusted 根 = home 目录本身（信任面过宽提示）
+    plugins_enabled: string[]               // 启用插件名标签（同 skill 名白名单口径，ADR 0017）
+    features_enabled: string[]              // [features] 中为 true 的开关名
+  }
+  approvals?: { prefix_rules: number }      // rules/default.rules 已接受 prefix_rule 行数（智能审批采用度）
+  skills?: { user: number; system: number } // skills/ 装机计数（user=非隐藏目录；system=.system 内置）
+  sessions_db?: { threads: number; archived: number } | null // state_5.sqlite threads 索引（null=库不可读）
+  multi_agent?: { spawn_edges: number; parent_threads: number } | null // thread_spawn_edges 精确子代理边
+  memories?: { memory_files: number; stage1_rollouts: number | null; enabled_threads: number | null }
+  automations?: { automations: number; runs: number; inbox_items: number } | null // codex-dev.db（Codex App 定时任务）
+  app?: { present: boolean; fast_mode_saved_ms?: number; fast_mode_rollouts?: number; cloud_access?: string }
+  version?: { latest: string | null; last_checked_at: string | null }
+  ambient?: { projects: number; suggestions: number }
+  guides?: { global_agents_md: 'missing' | 'empty' | 'present'; global_agents_md_bytes: number }
+  unadopted: string[]                       // 仅由无歧义 0 计数判定（同 ADR 0056 证据纪律）
+  caveats: string[]                         // 固定告诫标签（索引可能漂移 / App 字段非文档化 / 自报估算 / 记忆需新版本）
+}
 // 环境/使用画像——只由记录元数据派生的非敏感标签/计数（ADR 0017）。
 export interface EnvironmentSignals {
   claude_versions?: string[]        // Claude Code 版本
@@ -285,6 +311,7 @@ export interface Report {
   claude_specific?: ClaudeSpecific // 平台特色：Claude 服务端工具计数（ADR 0023 D2）
   endpoints?: EndpointDetection[] // 端点/计费模式检测（ADR 0022 D2/D3/D4）：账户级当前快照，读 config 派生白名单标签
   feature_adoption?: FeatureAdoption // 特性采用信号（ADR 0056，仅 Claude）：~/.claude.json 白名单计数器 + 条件型 tip 水位
+  codex_feature_adoption?: CodexFeatureAdoption // 特性采用信号（ADR 0057，仅 Codex）：$CODEX_HOME 本机文件/索引库白名单计数
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
   scope?: string              // "global" | "project" | "session"
   projects?: ProjectScope[]   // --scope project：每项目跨会话的派生信号桶
@@ -333,6 +360,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   'episode_summary.effort_calibration': 'Effort-elasticity aggregates: rows grouped by (dial, value, task_type) over ALL episodes (not the severity-capped episodes_detail). dial=effort (Codex turn label) | model (model gradient, both platforms) | thinking (Claude thinking-directive on/off). Each row: episodes, spiral_rate, corrected_rate, avg duration/total/reasoning tokens, low_confidence (episodes < 5). Policy advice (e.g. "default medium, escalate on spiral") MUST compare rows within the SAME task_type and only when low_confidence is false.',
   'episode_summary.context_rot': 'Context-decay curve: episodes bucketed by their in-session index (0-4, 5-9, 10-14, 15-19, 20+) with spiral_rate / corrected_rate / rot_rate (spiral or corrected) / avg_error_rate per bucket, over ALL episodes. baseline_rot_rate = first well-sampled bucket; inflection_index = start index of the first well-sampled bucket whose rot_rate >= max(2x baseline, baseline+0.15), i.e. an estimate of "your personal context shelf life in turns" — null when no inflection observed. low_confidence=true when fewer than 2 buckets have enough samples; then the curve is descriptive only. Maps to native actions: /clear or a fresh session at task boundaries, subagents to isolate exploration.',
   feature_adoption: 'Claude Code only, account-level current snapshot from whitelisted ~/.claude.json keys. Evidence tiers: counters (direct adoption counts/booleans, e.g. memory_usage_count, prompt_queue_use_count, has_used_background_task) are PRIMARY — unadopted[] is derived from counters only. tips[] are adoption-conditional tip watermarks, CORROBORATION only: the value is "numStartups when the tip was LAST shown" (not a display count); still_showing=true means Claude Code itself still judges the feature unadopted (it only shows these tips while its adoption condition holds). Promotional always-on tips are excluded by whitelist. Caveats: tip conditions drift across CLI versions; different evidence sources use different definitions (e.g. the custom-agents tip checks configured agent FILES, not Task/subagent usage) — name the definition when citing a source.',
+  codex_feature_adoption: 'Codex only, machine-level current snapshot derived from $CODEX_HOME local files and index databases — counts, booleans and whitelisted enum labels only. Evidence sources: config.toml (configured intent: personality/reasoning efforts, trusted-project COUNT plus broad_trust boolean — paths are never stored; enabled plugin/feature name labels), rules/default.rules (accepted prefix_rule line count = smart-approvals adoption; rule contents never read), skills/ (installed user vs bundled .system skill counts), state_5.sqlite (thread/archived counts, exact subagent spawn edges, memories stage1 output COUNT — content columns never selected), sqlite/codex-dev.db (automations/runs/inbox counts), .codex-global-state.json (Codex App presence, fast_mode_saved_ms — the App OWN self-reported estimate, label it as such), version.json (latest known version), ambient-suggestions (suggestion counts), global AGENTS.md missing|empty|present. unadopted[] is derived only from unambiguous zero counters. null sub-blocks mean that source was unreadable (e.g. no node:sqlite); honor caveats[]: the sqlite index can drift from rollout files, App state fields are undocumented and drift across versions, the memories pipeline requires a newer CLI version.',
   'projects.file_churn': 'Per-project cross-session file-edit concentration: distinct edited files, total edits, top files by edits (file BASENAME only — never a directory or full path) with edit and session counts, and top3_share (share of edits landing in the top-3 files). Local analysis only; shareable artifacts must not include file names.',
   duration: 'Active duration (counted only when adjacent events are ≤5 minutes apart), not wall-clock span.',
   active_days: 'Number of distinct local-timezone days with token activity in the window — true full count, not bounded by the models_timeline display caps (top-10 models / last-31 days).',

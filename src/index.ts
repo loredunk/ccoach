@@ -7,6 +7,7 @@ import { feedClaudeCode, claudeProjectsDir } from './parsers/claude-code.js'
 import { feedCodex, codexHome } from './parsers/codex.js'
 import { detectCodexEndpoint, detectClaudeEndpoint } from './endpoint.js'
 import { readFeatureAdoption, defaultClaudeJsonPath } from './feature-adoption.js'
+import { readCodexFeatureAdoption } from './codex-feature-adoption.js'
 
 export const VERSION: string = pkg.version
 export { claudeProjectsDir, codexHome }
@@ -55,6 +56,12 @@ export function buildReport(opts: BuildOpts): Report {
     const jsonPath = opts.claudeJsonPath ?? (opts.claudeDir ? null : defaultClaudeJsonPath())
     const fa = jsonPath ? readFeatureAdoption(jsonPath) : null
     if (fa) report.feature_adoption = fa
+  }
+  // Codex 特性采用信号（ADR 0057）：与会话数据同根（$CODEX_HOME），故直接从 cxHome 派生——
+  // fixture/测试传自定义 codexHome 时读的就是 fixture 自己的 config/rules/sqlite，天然可重现。
+  if (wantCodex) {
+    const cfa = readCodexFeatureAdoption(cxHome)
+    if (cfa) report.codex_feature_adoption = cfa
   }
   return report
 }

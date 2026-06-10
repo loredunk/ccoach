@@ -1,0 +1,23 @@
+model = "gpt-5.5"
+model_reasoning_effort = "medium"
+personality = "pragmatic"
+plan_mode_reasoning_effort = "high"
+
+[projects."/Users/someone/workspace/proj-a"]
+trust_level = "trusted"
+
+[projects."/Users/someone"]
+trust_level = "trusted"
+
+[projects."/Users/someone/workspace/proj-b"]
+trust_level = "untrusted"
+
+[plugins."superpowers@openai-curated"]
+enabled = true
+
+[plugins."computer-use@openai-bundled"]
+enabled = false
+
+[features]
+apps = false
+sandbox_v2 = true

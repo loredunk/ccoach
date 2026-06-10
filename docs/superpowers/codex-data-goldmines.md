@@ -148,6 +148,8 @@ reasoning_effort）、`automation_runs`、`inbox_items`。
 - **P0 `codex_feature_adoption`**（对称 ADR 0056）：config.toml（personality/plugins/features/trusted 数）+
   rules 计数 + skills 装机数 + automations/inbox 计数 + memories 产出计数 + ambient 条数 + 版本陈旧度 +
   AGENTS.md 存在性/字节数 → 填掉 Codex 报告里恒 null 的 `feature_adoption`。全计数/布尔，隐私零新增面。
+  **✅ 已落地（ADR 0057）**：`src/codex-feature-adoption.ts` + `report.codex_feature_adoption` +
+  deepinsight `magic_time` 高光条（schema + 渲染器 + SKILL.md Codex notes）。
 - **P0 threads 表作 `ccoach sessions` 快路径**：免全量 JSONL 解析的会话索引（tokens_used/model/branch/
   source/archived），JSONL 仍是权威、SQLite 作索引并交叉校验（两库漂移有已知 issue，需容错）。
 - **P1 `history.jsonl` 接入 prompt-signals**：补齐 Codex prompt 评级短板（ADR 0015 全套红线照旧）。
