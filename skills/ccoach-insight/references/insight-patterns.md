@@ -2,6 +2,13 @@
 
 Use this reference when generating `insight_ladder` for the enriched HTML report.
 
+> **These patterns are a scaffold, not a ceiling — illustrative, not exhaustive.** They show the *shape*
+> of a good insight (signals → interpretation → intervention). When the data supports a pattern not listed
+> here, write it — aim for at least one finding beyond this list per report when the evidence allows.
+> Before recommending any feature/config, verify it against the current official docs/changelog at run time
+> (WebFetch/WebSearch) and check whether a newer native feature fits better; the lookup is the source of
+> truth, not this file.
+
 ## Insight Ladder
 
 Each useful insight should move from observation to action:
@@ -31,7 +38,7 @@ Interpretation:
 - Prompt cache is working, so this is not necessarily full-price repeated reading.
 - Cost can still accumulate because a large cached prefix is carried across many turns.
 
-Recommended wording:
+Example wording (illustrative — rewrite for the actual data, never recite):
 
 > High total tokens plus high cached input suggests long context reuse: the session kept carrying a large shared context across many turns. Cache reduced repeated-processing cost, but the repeated large prefix still accumulated meaningful usage.
 
@@ -131,7 +138,7 @@ Interpretation:
   newer model may not have existed for most of the window. "94% on the old model" across a month where
   the new model shipped 7 days ago is an artifact of release timing, **not** waste or a user mistake.
 
-Recommended wording:
+Example wording (illustrative — rewrite for the actual data, never recite):
 
 > Most spend is on `<old-model>` because `<new-model>` only became available on `<date>` (it appears in
 > the data starting then). That earlier spend was expected. Going forward, `<new-model>` is the stronger
@@ -144,6 +151,24 @@ Interventions:
 - Never compute a "% wasted on the old model" over a span where the newer model didn't exist.
 - If the user already started adopting it recently, acknowledge it as good behavior — no correction needed.
 
+### Context Shelf Life (context rot)
+
+Signals:
+
+- `episode_summary.context_rot` with `low_confidence: false` and a non-null `inflection_index`.
+- Per-bucket `rot_rate` rising with the in-session turn index.
+
+Interpretation:
+
+- The user's sessions degrade past a certain turn count: later turns spiral or get corrected more often.
+- "Your personal context shelf life is ≈ N turns" is the headline form — concrete and memorable.
+
+Interventions:
+
+- `/clear` or a fresh session at task boundaries before hitting the inflection point.
+- Push exploration into subagents to keep the main context clean.
+- If `low_confidence: true` or no inflection: do not headline this; at most note it as an observation.
+
 ## Writing Rules
 
 - Phrase insights as likely interpretations, not absolute truth, unless the report directly proves them.
@@ -151,4 +176,10 @@ Interventions:
 - Connect each insight to an observable next step.
 - Avoid generic advice that would apply to any report.
 - **Feature-first**: when an intervention can be a native Claude Code / Codex feature, name it.
-  See `feature-mapping.md` for the finding → feature table (verify against current official docs first).
+  See `feature-mapping.md` for illustrative finding → feature examples — but always verify against
+  current official docs/changelog at run time; the lookup, not the table, is the source of truth.
+- **Policy claims need samples**: any "default to X / always do Y" advice must compare within the same
+  task type and respect the CLI's `low_confidence` flags (`effort_calibration`, `context_rot`). With thin
+  samples, present the observation explicitly labeled low-confidence — never a conclusion.
+- **Open pattern set**: these patterns are examples, not a checklist ceiling — novel, evidence-backed
+  findings beyond this file are encouraged.

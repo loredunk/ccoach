@@ -4,8 +4,11 @@ Use this when writing `recommendations`. **Feature-first**: whenever a finding c
 solved with a native Claude Code / Codex feature, recommend that feature (by name)
 before any generic habit advice.
 
-Before recommending any configuration/feature, **verify it against current official
-docs** (these tools change fast). Only suggest — never auto-change the user's config.
+**Run-time verification is the primary mechanism — this table is a few-shot style guide, illustrative,
+not exhaustive.** Before recommending any configuration/feature, WebFetch/WebSearch the current official
+docs/changelog to (1) confirm the feature still exists and behaves as you'll describe, and (2) check whether
+a **newer** native feature fits the finding better (these tools ship features faster than any bundled table).
+Only suggest — never auto-change the user's config.
 
 ## 映射表
 

@@ -266,6 +266,11 @@ function episodePanel(ep, platform) {
   p.push(metric(tr('ep_autonomy'), pct(ep.autonomy_rate)))
   p.push(metric(tr('ep_style'), tr('ep_style_' + ep.intervention_style)))
   p.push(metric(tr('ep_spirals'), comma(ep.spiral_episodes)))
+  // Context shelf life (star metric): only when the CLI curve is well-sampled — honor low_confidence.
+  const rot = ep.context_rot
+  if (rot && !rot.low_confidence) {
+    p.push(metric(tr('ep_shelf'), rot.inflection_index != null ? tr('ep_shelf_val', { n: rot.inflection_index }) : tr('ep_shelf_none')))
+  }
   const mix = Object.entries(ep.task_mix ?? {}).sort((a, b) => b[1] - a[1]).filter(([, v]) => v > 0)
   if (mix.length) {
     const chips = mix.map(([k, v]) => `<span class='chip'>${esc(tr('task_' + k))} ${(v * 100).toFixed(0)}%</span>`).join('')
