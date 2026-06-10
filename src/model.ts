@@ -62,7 +62,16 @@ export interface ScopeBucket {
   git_top: CommandCount[]
   prompt_signals: PromptSignals
 }
-export interface ProjectScope extends ScopeBucket { repo: string; sessions: number }
+// 跨会话文件级 churn 集中度（ADR 0054，0017 的受控扩展）：仅文件 basename（不含目录/路径）、
+// top-N 封顶、只在 --scope project 的本地分析产物出现；可分享成绩卡绝不引用文件名。
+export interface FileChurnTop { file: string; edits: number; sessions: number }
+export interface FileChurn {
+  files: number              // 被编辑过的去重文件数（basename 口径）
+  edits: number              // 编辑总次数（分母）
+  top: FileChurnTop[]        // 按编辑次数取前 N（basename + 次数 + 涉及会话数）
+  top3_share: number         // 前 3 个文件的编辑占比 0–1（集中度）
+}
+export interface ProjectScope extends ScopeBucket { repo: string; sessions: number; file_churn?: FileChurn }
 export interface SessionScope extends ScopeBucket { session_id: string; repo: string; duration_seconds: number }
 // 回合（Episode）抽象（ADR 0032/0033/0034）：以用户指令为边界切分会话；全部派生信号、瞬时序列即弃。
 export type TaskType =
@@ -97,6 +106,41 @@ export interface EpisodeDetail {
   task_type: TaskType
   task_type_confidence: number
   spiral: SpiralSignals
+  // Effort 证据（ADR 0053）：全部为白名单标签/布尔，无内容。
+  effort?: string             // Codex：该回合 turn_context.effort 标签（high/medium/…）
+  model?: string              // 回合内 token 占比最高的模型（normalize 后；两平台通用，Claude 侧 effort 梯度证据）
+  thinking_directive?: boolean // Claude：本人 prompt 显式调高思考强度（ultrathink/think hard…），仅派生布尔
+  compacted?: boolean         // Codex：该回合内发生过上下文压缩事件
+}
+// Effort 校准（ADR 0053）：同 task_type 内按「档位」分组的聚合行，供 effort 弹性分析。
+// dial：effort=Codex turn 档；model=模型梯度（两平台）；thinking=Claude 思考指令 on/off（仅 claude 模型回合）。
+export interface EffortCalibrationRow {
+  dial: 'effort' | 'model' | 'thinking'
+  value: string
+  task_type: TaskType
+  episodes: number
+  spiral_rate: number
+  corrected_rate: number
+  avg_duration_seconds: number
+  avg_total_tokens: number
+  avg_reasoning_tokens: number
+  low_confidence: boolean     // episodes < MIN_SAMPLES：样本不足，只可描述、不可下政策结论
+}
+// 上下文衰减曲线（ADR 0053）：会话内回合序号分桶 × 打转/纠正/错误率，找「上下文保质期」拐点。
+export interface ContextRotBucket {
+  index_from: number
+  index_to: number | null    // null = 开区间（最后一桶）
+  episodes: number
+  spiral_rate: number        // severity>0 占比
+  corrected_rate: number     // end_type=corrected 占比（Claude only 信号，Codex 恒 0）
+  rot_rate: number           // spiral 或 corrected 的回合占比（曲线主指标）
+  avg_error_rate: number
+}
+export interface ContextRot {
+  buckets: ContextRotBucket[]
+  baseline_rot_rate: number       // 首个足样本桶的 rot_rate
+  inflection_index: number | null // 首个 rot_rate ≥ max(2×baseline, baseline+0.15) 的足样本桶起点；null=未观测到拐点
+  low_confidence: boolean         // 足样本桶 < 2 个：曲线只可参考、不可下结论
 }
 // 主报告恒附的回合概览（ADR 0034）：加性、契约安全；token 之和仅主会话，故 ≤ report.tokens.total。
 export interface EpisodeSummary {
@@ -108,6 +152,8 @@ export interface EpisodeSummary {
   spiral_episodes: number     // severity>0 的 episode 数
   task_mix: Record<string, number>   // task_type -> 占比 0–1
   deepest_pit?: { session_id: string; index: number; severity: number; tokens: number; task_type: TaskType }
+  effort_calibration?: EffortCalibrationRow[] // Effort 校准（ADR 0053）：恒附（有可分组档位时）、加性
+  context_rot?: ContextRot                    // 上下文衰减曲线（ADR 0053）：恒附（有回合时）、加性
 }
 // 错误/卡顿信号——只由工具结果派生的数值与白名单类别，绝不含原始 stderr/输出/文件内容（ADR 0016）。
 export interface ErrorSignals {
@@ -264,6 +310,13 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   sessions_detail: 'Per-session derived-signal buckets (incl. session_id/duration_seconds); only with --scope session; contains no raw prompt text.',
   episode_summary: 'Per-turn (episode) rollup; an episode is "one user instruction -> the next". Empty episodes with no token/tool activity (back-to-back user messages, aborted turns, trailing prompts) are excluded. autonomy_rate=share of episodes with no interruption; intervention_style derived from interrupt+correction rates; spiral_episodes=episodes with any structural loop signal; task_mix=share of episodes per task type; deepest_pit=worst spiral episode (severity x tokens). Episode token sums are main-session only (sidechain excluded), so they are <= report.tokens.total. Always present (additive).',
   episodes_detail: 'Per-episode derived signals (only with --scope episode): duration/tokens/tool_calls/files_touched(count only)/error stats/interrupted/end_type/task_type/spiral. Contains no prompt text, no paths, no file names, no diff text (ADR 0016/0017). end_type=corrected is Claude-only (Codex does not read user prompts, ADR 0041).',
+  'episodes_detail.effort': 'Codex only: the turn_context.effort label (high/medium/…) the episode ran under. Whitelisted label only. Use with episode_summary.effort_calibration for effort-elasticity analysis.',
+  'episodes_detail.model': 'Dominant model of the episode (most tokens, normalized name). On Claude Code this is the effort-gradient evidence (opus vs sonnet vs haiku); on Codex it complements the effort label.',
+  'episodes_detail.thinking_directive': 'Claude Code only: true when the user own prompt explicitly dialed thinking up (e.g. "ultrathink", "think harder"). Derived boolean from the user own prompt, no text stored.',
+  'episodes_detail.compacted': 'Codex only: true when a context-compaction event happened inside this episode. Useful alongside context_rot (compaction marks heavy-context turns).',
+  'episode_summary.effort_calibration': 'Effort-elasticity aggregates: rows grouped by (dial, value, task_type) over ALL episodes (not the severity-capped episodes_detail). dial=effort (Codex turn label) | model (model gradient, both platforms) | thinking (Claude thinking-directive on/off). Each row: episodes, spiral_rate, corrected_rate, avg duration/total/reasoning tokens, low_confidence (episodes < 5). Policy advice (e.g. "default medium, escalate on spiral") MUST compare rows within the SAME task_type and only when low_confidence is false.',
+  'episode_summary.context_rot': 'Context-decay curve: episodes bucketed by their in-session index (0-4, 5-9, 10-14, 15-19, 20+) with spiral_rate / corrected_rate / rot_rate (spiral or corrected) / avg_error_rate per bucket, over ALL episodes. baseline_rot_rate = first well-sampled bucket; inflection_index = start index of the first well-sampled bucket whose rot_rate >= max(2x baseline, baseline+0.15), i.e. an estimate of "your personal context shelf life in turns" — null when no inflection observed. low_confidence=true when fewer than 2 buckets have enough samples; then the curve is descriptive only. Maps to native actions: /clear or a fresh session at task boundaries, subagents to isolate exploration.',
+  'projects.file_churn': 'Per-project cross-session file-edit concentration: distinct edited files, total edits, top files by edits (file BASENAME only — never a directory or full path) with edit and session counts, and top3_share (share of edits landing in the top-3 files). Local analysis only; shareable artifacts must not include file names.',
   duration: 'Active duration (counted only when adjacent events are ≤5 minutes apart), not wall-clock span.',
   active_days: 'Number of distinct local-timezone days with token activity in the window — true full count, not bounded by the models_timeline display caps (top-10 models / last-31 days).',
 }

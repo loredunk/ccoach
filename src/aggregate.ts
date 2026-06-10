@@ -2,7 +2,7 @@ import {
   type Tokens, type Report, type RepoReport, type UsageReport, type ErrorSignals,
   type ReworkSignals, type EnvironmentSignals, type FileLanguage,
   type BillingReport, type CodexSpecific, type ClaudeSpecific,
-  type ScopeBucket, type ProjectScope, type SessionScope,
+  type ScopeBucket, type ProjectScope, type SessionScope, type FileChurn,
   type ModelTimeline, type ModelDayCount, type ModelTokenBreakdown,
   REPORT_GLOSSARY, emptyTokens,
 } from './model.js'
@@ -109,6 +109,8 @@ export class Aggregator {
   private rwUserModified = 0
   private rwLinesAdded = 0
   private rwLinesRemoved = 0
+  // 跨会话文件级 churn（ADR 0054，0017 受控扩展）：仅 basename（绝不含目录/全路径），repo -> basename -> 计数。
+  private fileChurnByRepo = new Map<string, Map<string, { edits: number; sessions: Set<string> }>>()
   // 技能 / 环境画像
   private skillCounts = new Map<string, number>()
   private versions = new Set<string>()
@@ -347,6 +349,17 @@ export class Aggregator {
     this.rwLinesRemoved += linesRemoved
     this.curEpisode?.addLines(linesAdded, linesRemoved)
   }
+  // 文件级 churn（ADR 0054）：parser 在每次"编辑"时喂 basename（不含目录）；仅主会话、窗口内调用方已过滤。
+  applyFileChurn(repo: string, session: string, base: string): void {
+    if (!base) return
+    const key = (repo ?? '').trim() || '(unknown)'
+    let files = this.fileChurnByRepo.get(key)
+    if (!files) { files = new Map(); this.fileChurnByRepo.set(key, files) }
+    let f = files.get(base)
+    if (!f) { f = { edits: 0, sessions: new Set() }; files.set(base, f) }
+    f.edits++
+    if (session) f.sessions.add(session)
+  }
   applySkill(name: string): void { if (name) this.skillCounts.set(name, (this.skillCounts.get(name) ?? 0) + 1) }
   applyVersion(v: string): void { if (v) this.versions.add(v) }
   applyPermissionMode(m: string): void { if (m) this.permModes.set(m, (this.permModes.get(m) ?? 0) + 1) }
@@ -373,7 +386,10 @@ export class Aggregator {
     if (!m) { m = new Map(); this.cxLabels.set(field, m) }
     m.set(label, (m.get(label) ?? 0) + 1)
   }
-  markCodexCompaction(): void { this.cxCompactions++ }
+  markCodexCompaction(): void { this.cxCompactions++; this.curEpisode?.markCompacted() }
+  // Effort 证据（ADR 0053）：挂到当前 episode 的白名单标签/布尔。
+  setEpisodeEffort(label: string): void { this.curEpisode?.setEffort(label) }
+  markEpisodeThinkingDirective(): void { this.curEpisode?.markThinkingDirective() }
   markCodexAbortedTurn(): void { this.cxAbortedTurns++ }
   applyCodexContextWindow(n: number): void { if (n > 0) this.cxContextWindow.set(n, (this.cxContextWindow.get(n) ?? 0) + 1) }
   markCodexGitIdentity(): void { this.cxGitIdentity = true }
@@ -599,7 +615,12 @@ export class Aggregator {
       }
       if (this.scope === 'project') {
         report.projects = [...this.groups.values()]
-          .map((g): ProjectScope => ({ repo: g.key, sessions: g.sessions.size, ...toBucket(g) }))
+          .map((g): ProjectScope => {
+            const p: ProjectScope = { repo: g.key, sessions: g.sessions.size, ...toBucket(g) }
+            const fc = buildFileChurn(this.fileChurnByRepo.get(g.key))
+            if (fc) p.file_churn = fc
+            return p
+          })
           .sort((a, b) => b.tokens - a.tokens)
       } else {
         report.sessions_detail = [...this.groups.values()]
@@ -627,6 +648,25 @@ export class Aggregator {
       report.model_tokens = buildModelTokens(this.byModelDay, this.missingPrice)
     }
     return report
+  }
+}
+
+// 文件级 churn 集中度（ADR 0054）：top-N 封顶、仅 basename；top3_share 为集中度主指标。
+const FILE_CHURN_TOP = 8
+function buildFileChurn(files: Map<string, { edits: number; sessions: Set<string> }> | undefined): FileChurn | null {
+  if (!files || !files.size) return null
+  let total = 0
+  const all = [...files.entries()].map(([file, f]) => {
+    total += f.edits
+    return { file, edits: f.edits, sessions: f.sessions.size }
+  })
+  all.sort((a, b) => (b.edits !== a.edits ? b.edits - a.edits : a.file < b.file ? -1 : a.file > b.file ? 1 : 0))
+  const top3 = all.slice(0, 3).reduce((s, f) => s + f.edits, 0)
+  return {
+    files: all.length,
+    edits: total,
+    top: all.slice(0, FILE_CHURN_TOP),
+    top3_share: total ? Math.round((top3 / total) * 1e4) / 1e4 : 0,
   }
 }
 

@@ -35,6 +35,8 @@ function num(x: unknown): number {
 const CORRECTION_RE = /\b(actually|sorry|wait|wrong|instead|nope|no,)\b|不对|不是|错了|重来|撤销|改成/i
 // 长任务弱信号（experiment 分型；仅瞬时匹配命令、不存命令全行）。
 const LONGRUN_RE = /\b(train|fit|pytest|jest|vitest|benchmark|bench|notebook|jupyter)\b/i
+// 思考强度指令（ADR 0053）：用户 prompt 显式调高思考预算的关键词；瞬时匹配派生布尔、绝不存原文。
+const THINKING_RE = /\b(ultrathink|megathink|think\s+(hard|harder|deeply|intensely|longer))\b/i
 
 // 机器注入的 "user 角色" 记录不是真人指令（ADR 0043）：isHumanPrompt 抽到 ../human-prompt.ts，
 // 由主解析器与 `ccoach sessions` 钻取共用同一谓词（单一真相源），两条路径口径不再分叉。
@@ -171,6 +173,8 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
             // 用户 prompt = 一个新回合的边界（ADR 0032 D2，口径见 0043：排除 isMeta/命令桩/中断）；
             // 纠错词命中则把上一回合标记为 corrected。
             agg.beginEpisode(session, repo, ts, CORRECTION_RE.test(text))
+            // Claude 侧 effort 证据（ADR 0053）：prompt 显式调高思考强度 → 该回合标记布尔。
+            if (THINKING_RE.test(text)) agg.markEpisodeThinkingDirective()
             agg.applyPrompt(text)
           }
           // 错误/卡顿信号：扫描 tool_result（is_error）+ toolUseResult.interrupted。
@@ -263,7 +267,9 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
               const fp = typeof inp.file_path === 'string' ? inp.file_path : ''
               const ext = extOf(fp)
               // fileKey=basename 仅瞬时传给 episode 层映射成局部 id（ADR 0032 D5），不存全路径。
-              agg.applyTool('file', undefined, { isEdit: name !== 'Read', fileKey: fp ? fp.split(/[\\/]/).pop() : undefined, ext })
+              const base = fp ? fp.split(/[\\/]/).pop() : undefined
+              agg.applyTool('file', undefined, { isEdit: name !== 'Read', fileKey: base, ext })
+              if (name !== 'Read' && base) agg.applyFileChurn(repo, session, base) // 跨会话文件级 churn（ADR 0054）：仅 basename
               agg.applyFileChangeExt(repo, ext)
               agg.applyLanguageFile(ext)
             } else if (name === 'Glob' || name === 'Grep' || name === 'ToolSearch') {

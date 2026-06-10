@@ -185,7 +185,8 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
             // 回合边界（ADR 0032 D2）：Codex 无用户消息记录，turn_context≈一次用户指令；无 corrected（不读 prompt，ADR 0041）。
             // 口径审计（ADR 0043）：Codex rollout 无 isMeta/命令桩/中断哨兵这类机器注入的 user 记录，turn_context 本身已是真实回合边界，无需对称过滤。
             agg.beginEpisode(sessionId || '(unknown)', repo, ts, false)
-            if (typeof payload.effort === 'string') agg.applyCodexLabel('effort', payload.effort)
+            // per-turn effort 同时挂到 episode（ADR 0053）：session 级分布之外，支持同 task_type 的 effort 弹性分析。
+            if (typeof payload.effort === 'string') { agg.applyCodexLabel('effort', payload.effort); agg.setEpisodeEffort(payload.effort) }
             if (typeof payload.approval_policy === 'string') agg.applyCodexLabel('approval_policy', payload.approval_policy)
             const sb = payload.sandbox_policy
             if (sb && typeof sb === 'object') {
@@ -225,6 +226,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
                 const ext = dot > 0 ? base.slice(dot) : ''
                 agg.applyEdit(added, removed, false) // Codex 无 userModified 概念，恒 false
                 agg.applyTool('file', undefined, { isEdit: true, fileKey: base, ext })
+                agg.applyFileChurn(repo, sessionId, base) // 跨会话文件级 churn（ADR 0054）：仅 basename
               }
             }
             break
