@@ -24,7 +24,7 @@ function esc(v) {
     .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
 }
 
-// ---- On-page glossary (回合 / 严重程度 / 卡壳) ----
+// ---- On-page glossary (回合 / 严重程度 / 原地打转) ----
 // Plain-language defs for the jargon the report uses, so a general reader can follow it.
 // Bilingual, keyed by locale; product language only — NO internal markers.
 const GLOSSARY = {
@@ -32,16 +32,16 @@ const GLOSSARY = {
     head: '术语',
     terms: [
       ['回合 episode', '你下的一条指令 → agent 为它做的整段工作；下一条指令开启下一个回合。'],
-      ['严重程度 severity', '0–6，衡量一个回合「卡壳」的程度：反复改同一文件、连环报错、原地没进展、耗时异常四类信号加权相加，0=完全顺畅，越高越像深坑。'],
-      ['卡壳 spiral', 'agent 卡住、原地空转的回合——反复改同几个文件、命令一直报错、却没往前推，很烧 token。'],
+      ['严重程度 severity', '0–6，衡量一个回合「原地打转」的程度：反复改同一个文件、连着报错、没有新进展、耗时异常，加在一起打分；0=完全顺畅，越高越卡。'],
+      ['原地打转 spiral', 'agent 卡住、在原地兜圈子的回合——反复改同几个文件、命令一直报错、却没往前推进，很费 token。'],
     ],
   },
   en: {
     head: 'Terms',
     terms: [
-      ['episode', 'One instruction you gave → the work the agent did for it; the next instruction starts the next episode.'],
-      ['severity', '0-6 — how stuck an episode got, weighted from re-editing the same file, repeated errors, no progress, and time-outliers. 0 = smooth.'],
-      ['spiral', 'An episode where the agent got stuck going in circles — same files re-edited, repeated errors, no progress; costly in tokens.'],
+      ['episode', 'One instruction from you → all the work the agent did for it. The next instruction starts the next episode.'],
+      ['severity', '0-6 — how badly an episode got stuck. Points add up for: editing the same file again and again, repeated errors, no new progress, taking unusually long. 0 = smooth.'],
+      ['spiral (going in circles)', 'An episode where the agent went in circles — same files edited over and over, same errors, no forward progress. Wastes tokens.'],
     ],
   },
 }

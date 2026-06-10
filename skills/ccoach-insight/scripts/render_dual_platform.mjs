@@ -88,7 +88,7 @@ function compactTokens(n, loc) {
   return { n: String(Math.trunc(v)), u: '' }
 }
 
-// ---- On-page glossary (回合 / 严重程度 / 卡壳) ----
+// ---- On-page glossary (回合 / 严重程度 / 原地打转) ----
 // Single source of truth for the HTML term definitions, bilingual, keyed by locale.
 // (.mjs can't import src/i18n.ts; the CLI/text path keeps its own copy in i18n.ts.)
 // Product language only — NO internal markers (ADR numbers etc.).
@@ -97,16 +97,16 @@ const GLOSSARY = {
     head: '术语',
     terms: [
       ['回合 episode', '你下的一条指令 → agent 为它做的整段工作；下一条指令开启下一个回合。'],
-      ['严重程度 severity', '0–6，衡量一个回合「卡壳」的程度：反复改同一文件、连环报错、原地没进展、耗时异常四类信号加权相加，0=完全顺畅，越高越像深坑。'],
-      ['卡壳 spiral', 'agent 卡住、原地空转的回合——反复改同几个文件、命令一直报错、却没往前推，很烧 token。'],
+      ['严重程度 severity', '0–6，衡量一个回合「原地打转」的程度：反复改同一个文件、连着报错、没有新进展、耗时异常，加在一起打分；0=完全顺畅，越高越卡。'],
+      ['原地打转 spiral', 'agent 卡住、在原地兜圈子的回合——反复改同几个文件、命令一直报错、却没往前推进，很费 token。'],
     ],
   },
   en: {
     head: 'Terms',
     terms: [
-      ['episode', 'One instruction you gave → the work the agent did for it; the next instruction starts the next episode.'],
-      ['severity', '0-6 — how stuck an episode got, weighted from re-editing the same file, repeated errors, no progress, and time-outliers. 0 = smooth.'],
-      ['spiral', 'An episode where the agent got stuck going in circles — same files re-edited, repeated errors, no progress; costly in tokens.'],
+      ['episode', 'One instruction from you → all the work the agent did for it. The next instruction starts the next episode.'],
+      ['severity', '0-6 — how badly an episode got stuck. Points add up for: editing the same file again and again, repeated errors, no new progress, taking unusually long. 0 = smooth.'],
+      ['spiral (going in circles)', 'An episode where the agent went in circles — same files edited over and over, same errors, no forward progress. Wastes tokens.'],
     ],
   },
 }
@@ -808,7 +808,7 @@ function render(data, insights, scorecard = null, copy = null, lang = null) {
   if (hasCx) p.push(behaviorPanel(cx.behavior, '#b45309', 'Codex'))
   p.push('</div></section>')
 
-  // per-turn episode analysis — 按在场平台渲染。先给术语条（回合/严重程度/卡壳），让黑话可读
+  // per-turn episode analysis — 按在场平台渲染。先给术语条（回合/严重程度/原地打转），让黑话可读
   const hasEpisodes = (hasCc && cc.episode_summary?.episodes) || (hasCx && cx.episode_summary?.episodes)
   if (hasEpisodes) {
     p.push(`<section><h2 class='section-h'>${esc(tr('h_episode_section'))}</h2>`)

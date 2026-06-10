@@ -84,7 +84,17 @@ When both passes reach the same conclusion (e.g. plan mode, @file refs), state i
 
 ## Output
 
-Markdown by default. For each root cause: a plain-language semantic statement, the concrete fix (official feature named), confidence, and at most one supporting metric line. **False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change. **Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior. Desensitize all paths/identifiers to `<…>` before writing/sharing.
+Markdown by default. For each root cause: a plain-language semantic statement, the concrete fix (official feature named), confidence, and at most one supporting metric line.
+
+**Plain words, always (both languages).** The reader is not an ML engineer, and many English readers are not
+native speakers — use simple, everyday words and short sentences. Internal field names stay in the `signal`
+margin only; in prose, translate the jargon:
+- `spiral` → "went in circles / got stuck" · zh **原地打转**（不要写「卡壳/螺旋」）
+- `churn` / re-edit counts → "edited the same file again and again / repeated edits" · zh **反复改动 / 文件被反复改**
+- taxonomy → "categories / the category list" · zh **分类**
+- `episode` → "episode (one instruction → the agent's work for it)" · zh **回合**
+- `context rot` → "sessions get worse after ~N turns" · zh **上下文保质期（约 N 回合后开始变差）**
+- `effort` → "thinking effort level (how hard the model thinks)" · zh **思考强度档位** **False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change. **Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior. Desensitize all paths/identifiers to `<…>` before writing/sharing.
 
 ### HTML report (optional)
 
