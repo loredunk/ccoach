@@ -62,6 +62,8 @@ const CHROME = {
     digest: '正文摘要',
     novel: '新类别',
     novelTitle: '从证据里新发现的类别，不在预设分类里',
+    magic: 'Magic Time',
+    magicSub: '平台自己报的数 + 精确计数——不是估算拍脑袋',
     privacy: '本地只读分析。指标只是佐证——根因和改法才是产品。绝不读取思考过程 / 系统提示词 / 文件内容；正文摘要为显式开启、已脱敏、限额读取。',
   },
   en: {
@@ -72,6 +74,8 @@ const CHROME = {
     digest: 'digest',
     novel: 'novel',
     novelTitle: 'a category discovered from the evidence, not predefined',
+    magic: 'Magic Time',
+    magicSub: 'platform-reported numbers + exact counts — no made-up estimates',
     privacy: 'Local, read-only analysis. Metrics are supporting evidence only — the root cause and the fix are the product. Never reads thinking / system prompts / file contents as content; assistant/tool_result content is opt-in, redacted, token-bounded.',
   },
 }
@@ -163,6 +167,33 @@ function passSection(p, idx) {
     `<section class='pass' style='--d:${idx}'>` +
     head + verdict + headline + ledger + stats +
     `<div class='cards'>${cards}</div>` +
+    `</section>`
+  )
+}
+
+// Magic Time — Codex-flavored highlight strip: big numbers the PLATFORM ITSELF reported
+// (e.g. fast-mode time saved) or exact counts (accepted approval rules, subagents spawned).
+// Each item: { value, unit?, label, basis, tone? win|loss|neutral }. basis is mandatory by
+// schema discipline — a magic number with no provenance line is not rendered as magic, it is noise.
+function magicSection(items) {
+  if (!Array.isArray(items) || !items.length) return ''
+  const cards = items
+    .map((m) => {
+      const tone = m.tone === 'win' ? 'mt-win' : m.tone === 'loss' ? 'mt-loss' : 'mt-neutral'
+      const unit = m.unit ? `<span class='mt-unit'>${esc(m.unit)}</span>` : ''
+      return (
+        `<div class='mt-card ${tone}'>` +
+        `<div class='mt-v'>${esc(m.value ?? '')}${unit}</div>` +
+        `<div class='mt-l'>${esc(m.label ?? '')}</div>` +
+        (m.basis ? `<div class='mt-b'>${esc(m.basis)}</div>` : '') +
+        `</div>`
+      )
+    })
+    .join('')
+  return (
+    `<section class='magic'>` +
+    `<div class='magic-h'><span class='magic-k'>${esc(L.magic)}</span><span class='magic-sub'>${esc(L.magicSub)}</span></div>` +
+    `<div class='mt-grid'>${cards}</div>` +
     `</section>`
   )
 }
@@ -297,6 +328,20 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .notes-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-other);margin-bottom:10px}
 .notes ul{margin:0;padding-left:18px;color:var(--muted);font-size:15px}
 .notes li{margin:5px 0}
+/* magic time — highlight strip (platform-reported numbers + exact counts) */
+.magic{margin:0 0 44px}
+.magic-h{display:flex;align-items:baseline;gap:14px;margin-bottom:14px}
+.magic-k{font-family:var(--mono);font-size:11.5px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent)}
+.magic-sub{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.04em}
+.mt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.mt-card{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px 16px 13px;position:relative;overflow:hidden}
+.mt-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--c-other)}
+.mt-win::before{background:var(--c-flow)}
+.mt-loss::before{background:var(--c-cog)}
+.mt-v{font-family:var(--disp);font-size:clamp(30px,4.4vw,44px);line-height:1;letter-spacing:-.01em}
+.mt-unit{font-size:.45em;color:var(--muted);margin-left:5px;letter-spacing:.02em}
+.mt-l{font-size:13.5px;line-height:1.45;color:var(--paper);margin-top:8px}
+.mt-b{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:7px;letter-spacing:.02em;line-height:1.5}
 .foot{border-top:1px solid var(--rule);padding-top:20px;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.03em;line-height:1.7}
 @keyframes rise{to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.pass{animation:none;opacity:1;transform:none}}
@@ -317,6 +362,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
   </header>
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
   ${glossarySection(loc)}
+  ${magicSection(d.magic_time)}
   ${passes}
   ${honesty}
   <footer class="foot">${esc(d.privacy || L.privacy)}</footer>

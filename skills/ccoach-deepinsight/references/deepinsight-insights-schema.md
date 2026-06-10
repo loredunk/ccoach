@@ -34,6 +34,14 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
       ]
     }
   ],
+  "magic_time": [
+    {
+      "value": "74", "unit": "min",
+      "label": "fast mode saved you about 74 minutes of waiting",
+      "basis": "Codex App's own estimate, across 56 completed runs",
+      "tone": "win"
+    }
+  ],
   "honesty": [ "instrument-limitation / dogfooding notes (not user behavior)" ],
   "privacy": "footer line"
 }
@@ -46,5 +54,11 @@ Notes:
   discovered, not predefined, class.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
+- `magic_time` (optional, currently Codex-flavored) is a highlight strip of big numbers rendered above the passes.
+  **Hard rule: every number must be either platform-self-reported (e.g. the Codex App's own fast-mode time-saved
+  estimate) or an exact count from local data (accepted approval rules, subagents spawned, threads indexed). Never
+  invent conversions or multipliers** ("each rule saves ~10s" is fabrication — don't). `basis` is mandatory and must
+  name the provenance ("Codex App's own estimate", "exact count from your approval rules"); self-reported estimates
+  must say so. `tone`: win (green edge) / loss (amber edge) / neutral. 3-5 items max — it's a highlight, not a table.
 - `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 严重程度 / 原地打转 with plain-language defs). Write your findings using these reader-friendly terms (回合 / 严重程度 / 原地打转; en: episode / severity / "went in circles"), not raw `episode`/`severity`/`spiral` jargon, so the glossary explains what the prose uses.
 - Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`.

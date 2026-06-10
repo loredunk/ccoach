@@ -53,4 +53,24 @@ describe('render_deepinsight', () => {
     expect(() => renderDeepinsight({})).not.toThrow()
     expect(renderDeepinsight({})).toContain('Deep')
   })
+
+  it('renders the magic_time highlight strip (value/unit/basis/tone), omits when absent', () => {
+    const html = renderDeepinsight({
+      project: 'demo', platform: 'codex',
+      magic_time: [
+        { value: '74', unit: 'min', label: 'fast mode saved you ~74 minutes', basis: "Codex App's own estimate · 56 runs", tone: 'win' },
+        { value: '88', label: 'threads indexed, 0 ever archived', basis: 'exact count from your local session index', tone: 'loss' },
+        { value: '<b>x</b>', label: 'escape me', basis: 'b' },
+      ],
+    })
+    expect(html).toContain('Magic Time')
+    expect(html.match(/class='mt-card/g)?.length).toBe(3)
+    expect(html).toContain('mt-win')
+    expect(html).toContain('mt-loss')
+    expect(html).toContain("class='mt-unit'>min")
+    expect(html).toContain("Codex App&#39;s own estimate") // provenance line rendered
+    expect(html).not.toContain('<b>x</b>') // escaped
+    const without = renderDeepinsight({ project: 'demo' })
+    expect(without).not.toContain('Magic Time')
+  })
 })
