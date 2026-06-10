@@ -2,9 +2,14 @@
 // （--id 点名会话即范围，对齐 digest 的去时间窗语义；曾经默认「只看今天」导致历史会话返回空）。
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
+
+// Windows 下 `npx` 是 npx.cmd、execFile 直接 spawn 会 ENOENT——
+// 改用 node 可执行文件 + 解析 tsx 的 CLI 入口，跨平台无壳。
+const tsxCli = createRequire(import.meta.url).resolve('tsx/cli')
 
 function runSessions(args: string[]): any {
-  const out = execFileSync('npx', ['tsx', 'src/cli.ts', 'sessions', ...args], {
+  const out = execFileSync(process.execPath, [tsxCli, 'src/cli.ts', 'sessions', ...args], {
     env: { ...process.env, CLAUDE_CONFIG_DIR: 'test/fixtures/claude-home', TZ: 'UTC' },
     encoding: 'utf8',
     timeout: 60_000,

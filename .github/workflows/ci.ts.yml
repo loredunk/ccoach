@@ -12,10 +12,10 @@ jobs:
     env:
       TZ: UTC # 窗口/本地日期判定确定化（Node 跨平台尊重 TZ）
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5 # v4 跑在被弃用的 runner Node 20 上（2026-09 移除），v5 起走 Node 24
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
       - run: npm run typecheck
       - run: npm test # vitest（含 scorecard 回归 + Windows 反斜杠路径 basename 回归）
