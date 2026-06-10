@@ -10,6 +10,11 @@
 
 - **Usage report**: read-only parse of your local **Claude Code / Codex** records — tokens, estimated cost,
   tool calls, and breakdowns by repo / hour / source / language / git habits / config scan. Read-only; changes nothing.
+- **Behavior signals (per turn)**: every instruction you give becomes one *episode*, with derived numbers only —
+  where work went in circles, your personal **context shelf life** (after roughly how many turns sessions get
+  worse), how outcomes compare across **effort levels / models** for the same kind of task, which files get
+  edited again and again across sessions, and which **native features you haven't adopted yet** (backed by the
+  tool's own usage counters, not guesswork).
 - **Advice** (two skills): teach Claude Code / Codex to interpret this data — **ccoach-insight** gives
   **feature-first** advice + the report/scorecard (whenever a finding can be solved with a native feature —
   CLAUDE.md/AGENTS.md, subagents, hooks, plan mode, permission settings, model/effort tiers… — it names the
@@ -26,7 +31,7 @@
 Two reusable skills turn the raw CLI data into something human — install both with one command:
 
 - **[ccoach-insight](skills/ccoach-insight/SKILL.md)** — the **usage report + shareable scorecard**. Reads local **Claude Code + Codex** data from `ccoach report --json` (tokens, per-model breakdown and behavior for *both* platforms), computes authoritative cost from each model's **official online price**, and renders an HTML report fronted by a screenshot-ready scorecard. It can drill from high-token projects down to candidate sessions (`ccoach sessions`). Glanceable, a little playful.
-- **[ccoach-deepinsight](skills/ccoach-deepinsight/SKILL.md)** — a serious, semantic **root-cause coach** for a single project. Goes beyond aggregate metrics: it reads your own real code (read-only) to tell you, in plain language, **why** your work churned and the concrete fix — always anchored to an official native feature (plan mode, `@file` references, hooks, `/clear`, subagents, CLAUDE.md / AGENTS.md anchors). The deliverable is solutions, not metrics.
+- **[ccoach-deepinsight](skills/ccoach-deepinsight/SKILL.md)** — a serious, semantic **root-cause coach** for a single project. Goes beyond aggregate metrics: it reads your own real code (read-only) to tell you, in plain language, **why** your work kept getting redone and the concrete fix — always anchored to an official native feature (plan mode, `@file` references, hooks, `/clear`, subagents, CLAUDE.md / AGENTS.md anchors), and always **verified against the current official docs before it recommends anything**. It also reads the new per-turn signals — context shelf life, effort comparisons, file-edit hotspots, feature-adoption hints — and is honest by design: it says "this is healthy work, no change needed" when that's the truth, and labels thin samples as low-confidence instead of forcing a conclusion. The deliverable is solutions, not metrics.
 
 Both are privacy-first: read-only, local, and never exfiltrate. They analyze **user prompts + permissions + tool calls only** — never assistant replies; a selected session's prompts are read only after approval, hidden system prompts are never read, and everything written out is desensitized.
 
@@ -84,15 +89,18 @@ ccoach --since 2026-05-01       # from a day through today
 ccoach --days 7                 # the last 7 days
 ccoach --platform claude-code   # claude-code | codex | all (default: all)
 ccoach --by-repo                # per-repository breakdown (with branches)
-ccoach --scope project          # global | project | session (adds projects[] / sessions_detail[])
+ccoach --scope project          # global | project | session | episode (adds projects[] / sessions_detail[] / episodes_detail[])
 ccoach --lang zh                # output language: en | zh (default: en)
 ccoach --json                   # JSON output, script / agent friendly
+ccoach sessions --top 20        # session candidates (numbers only); --id <id> drills ONE session — no date window needed
+ccoach digest --id <id>         # opt-in: token-bounded, redacted content digest of one session (never thinking/system)
 ```
 
 ## Notes & boundaries
 
 - **Local machine only**: rollouts are per-machine; this tool reads only local files and never aggregates across machines.
 - **No quota percentages**: `rate_limits` is always null under the CLI, and quota is account-level / cross-machine.
+- **Behavior signals are derived values only**: counts, rates, and whitelisted labels — never raw text. File-edit hotspots show file names (base name only, no paths) and only in local project analysis — never on the shareable card; feature-adoption signals read a fixed whitelist of local counters and nothing else.
 - **Cost is an estimate**, not your actual bill. The CLI ships a best-effort **offline fallback** price table; **authoritative** cost is computed by the report skill, which looks up each observed model's **official online price** per token class. Tokens (and the offline cost) are cross-checked against `ccusage` — token-exact, cost within 1% — via `npm run verify:ccusage` (ccusage is a dev/CI check only, never a runtime dependency).
 - Time windows use absolute local-timezone day boundaries; the report header states the timezone.
 
