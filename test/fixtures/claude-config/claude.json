@@ -1,0 +1,20 @@
+{
+  "numStartups": 386,
+  "promptQueueUseCount": 4300,
+  "memoryUsageCount": 0,
+  "btwUseCount": 12,
+  "hasUsedBackgroundTask": false,
+  "tipsHistory": {
+    "todo-list": 386,
+    "theme-command": 385,
+    "prompt-queue": 8,
+    "memory-command": 384,
+    "git-worktrees": 375,
+    "custom-agents": 380,
+    "unknown-future-tip": 386
+  },
+  "projects": {
+    "/Users/secret/path/proj": { "allowedTools": ["Bash(rm -rf *)"], "lastCost": 1.23 }
+  },
+  "oauthAccount": { "emailAddress": "secret@example.com" }
+}

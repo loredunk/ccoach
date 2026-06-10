@@ -6,6 +6,7 @@ import { Aggregator, type Scope } from './aggregate.js'
 import { feedClaudeCode, claudeProjectsDir } from './parsers/claude-code.js'
 import { feedCodex, codexHome } from './parsers/codex.js'
 import { detectCodexEndpoint, detectClaudeEndpoint } from './endpoint.js'
+import { readFeatureAdoption, defaultClaudeJsonPath } from './feature-adoption.js'
 
 export const VERSION: string = pkg.version
 export { claudeProjectsDir, codexHome }
@@ -20,6 +21,7 @@ export interface BuildOpts {
   claudeDir?: string
   codexHome?: string
   scope?: Scope
+  claudeJsonPath?: string // 测试/覆盖用：~/.claude.json 路径（特性采用信号，ADR 0056）
 }
 
 // 库导出：用同一个聚合器按平台喂入后 assemble 一次（含 'all' 喂两平台）。统一走聚合器（不再分单/双平台
@@ -46,5 +48,13 @@ export function buildReport(opts: BuildOpts): Report {
   if (wantCodex) endpoints.push(detectCodexEndpoint(cxHome, agg.getCodexNonDefaultProvider()))
   if (wantClaude) endpoints.push(detectClaudeEndpoint(dirname(claudeDir)))
   if (endpoints.length) report.endpoints = endpoints
+  // 特性采用信号（ADR 0056，仅 Claude）：账户级当前快照，读 ~/.claude.json 白名单键；缺文件静默跳过。
+  // 仅在「真实 home 运行」（未覆盖 claudeDir）或显式给了 claudeJsonPath 时读取——
+  // fixture/测试传了自定义 claudeDir 时不去摸真实 home，保证测试可重现。
+  if (wantClaude) {
+    const jsonPath = opts.claudeJsonPath ?? (opts.claudeDir ? null : defaultClaudeJsonPath())
+    const fa = jsonPath ? readFeatureAdoption(jsonPath) : null
+    if (fa) report.feature_adoption = fa
+  }
   return report
 }

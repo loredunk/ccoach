@@ -218,6 +218,21 @@ export interface ClaudeSpecific {
   web_search_requests: number  // usage.server_tool_use.web_search_requests 累计
   web_fetch_requests: number   // usage.server_tool_use.web_fetch_requests 累计
 }
+// 特性采用信号（ADR 0056）：只读 ~/.claude.json 的**白名单键**（计数器/布尔/tip id 水位），绝不读其它内容。
+// 证据层级：直接采用计数器（主证据，零解释成本）> 条件型 tip 水位（旁证——tip 的展示条件随版本漂移）；
+// 无条件轮播的宣传型 tip（如 todo-list）对画像零价值，一律排除（白名单只含采用条件型）。
+export interface FeatureAdoptionTip {
+  tip: string                    // 采用条件型 tip id（白名单）
+  last_shown_at_startup: number  // 水位语义：最后一次展示发生在第 N 次启动（不是展示次数）
+  still_showing: boolean         // 距 num_startups ≤ 一个冷却周期 → 近期仍在轮播 = 官方仍判定该特性未被采用
+}
+export interface FeatureAdoption {
+  num_startups?: number
+  counters: Record<string, number | boolean> // 白名单直接计数器（prompt_queue_use_count / memory_usage_count / …）
+  unadopted: string[]            // 仅由计数器判定的未采用特性（一级证据；tip 水位不参与判定）
+  tips?: FeatureAdoptionTip[]    // 条件型 tip 水位（旁证）
+  caveats: string[]              // 固定告诫标签（水位≠次数 / 条件随版本漂移 / 各证据源口径不同）
+}
 // 环境/使用画像——只由记录元数据派生的非敏感标签/计数（ADR 0017）。
 export interface EnvironmentSignals {
   claude_versions?: string[]        // Claude Code 版本
@@ -269,6 +284,7 @@ export interface Report {
   codex_specific?: CodexSpecific // 平台特色：Codex 执行画像（ADR 0023 D1）
   claude_specific?: ClaudeSpecific // 平台特色：Claude 服务端工具计数（ADR 0023 D2）
   endpoints?: EndpointDetection[] // 端点/计费模式检测（ADR 0022 D2/D3/D4）：账户级当前快照，读 config 派生白名单标签
+  feature_adoption?: FeatureAdoption // 特性采用信号（ADR 0056，仅 Claude）：~/.claude.json 白名单计数器 + 条件型 tip 水位
   rate_limits: null           // 恒 null（配额是账号级，CLI 不输出）
   scope?: string              // "global" | "project" | "session"
   projects?: ProjectScope[]   // --scope project：每项目跨会话的派生信号桶
@@ -316,6 +332,7 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   'episodes_detail.compacted': 'Codex only: true when a context-compaction event happened inside this episode. Useful alongside context_rot (compaction marks heavy-context turns).',
   'episode_summary.effort_calibration': 'Effort-elasticity aggregates: rows grouped by (dial, value, task_type) over ALL episodes (not the severity-capped episodes_detail). dial=effort (Codex turn label) | model (model gradient, both platforms) | thinking (Claude thinking-directive on/off). Each row: episodes, spiral_rate, corrected_rate, avg duration/total/reasoning tokens, low_confidence (episodes < 5). Policy advice (e.g. "default medium, escalate on spiral") MUST compare rows within the SAME task_type and only when low_confidence is false.',
   'episode_summary.context_rot': 'Context-decay curve: episodes bucketed by their in-session index (0-4, 5-9, 10-14, 15-19, 20+) with spiral_rate / corrected_rate / rot_rate (spiral or corrected) / avg_error_rate per bucket, over ALL episodes. baseline_rot_rate = first well-sampled bucket; inflection_index = start index of the first well-sampled bucket whose rot_rate >= max(2x baseline, baseline+0.15), i.e. an estimate of "your personal context shelf life in turns" — null when no inflection observed. low_confidence=true when fewer than 2 buckets have enough samples; then the curve is descriptive only. Maps to native actions: /clear or a fresh session at task boundaries, subagents to isolate exploration.',
+  feature_adoption: 'Claude Code only, account-level current snapshot from whitelisted ~/.claude.json keys. Evidence tiers: counters (direct adoption counts/booleans, e.g. memory_usage_count, prompt_queue_use_count, has_used_background_task) are PRIMARY — unadopted[] is derived from counters only. tips[] are adoption-conditional tip watermarks, CORROBORATION only: the value is "numStartups when the tip was LAST shown" (not a display count); still_showing=true means Claude Code itself still judges the feature unadopted (it only shows these tips while its adoption condition holds). Promotional always-on tips are excluded by whitelist. Caveats: tip conditions drift across CLI versions; different evidence sources use different definitions (e.g. the custom-agents tip checks configured agent FILES, not Task/subagent usage) — name the definition when citing a source.',
   'projects.file_churn': 'Per-project cross-session file-edit concentration: distinct edited files, total edits, top files by edits (file BASENAME only — never a directory or full path) with edit and session counts, and top3_share (share of edits landing in the top-3 files). Local analysis only; shareable artifacts must not include file names.',
   duration: 'Active duration (counted only when adjacent events are ≤5 minutes apart), not wall-clock span.',
   active_days: 'Number of distinct local-timezone days with token activity in the window — true full count, not bounded by the models_timeline display caps (top-10 models / last-31 days).',
