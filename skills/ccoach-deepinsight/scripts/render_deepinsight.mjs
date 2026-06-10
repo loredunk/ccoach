@@ -60,7 +60,12 @@ const CAT = {
   unknown_feature: { label: 'Unknown Feature', v: '--c-feat' },
   other: { label: 'Other', v: '--c-other' },
 }
-const cat = (k) => CAT[k] || CAT.other
+// Open taxonomy: an unknown category keeps its own literal label (neutral color) instead of collapsing to Other.
+const cat = (k) => {
+  if (CAT[k]) return CAT[k]
+  const label = String(k || '').trim().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  return label ? { label, v: '--c-other' } : CAT.other
+}
 
 const CONF = { high: 3, med: 2, medium: 2, low: 1 }
 function confMeter(level) {
@@ -80,10 +85,13 @@ function findingCard(f, i) {
   const signal = f.signal
     ? `<div class='signal'><span class='sig-k'>signal</span> ${esc(f.signal)}</div>`
     : ''
+  const novel = f.novel_category === true
+    ? `<span class='chip chip-novel' title='discovered category, not predefined'>novel</span>`
+    : ''
   return (
     `<article class='card' style='--cat: var(${c.v})' data-i='${i}'>` +
     `<header class='card-h'>` +
-    `<span class='chip'>${esc(c.label)}</span>` +
+    `<span class='chips'><span class='chip'>${esc(c.label)}</span>${novel}</span>` +
     confMeter(f.confidence) +
     `</header>` +
     `<h3>${esc(f.title)}</h3>` +
@@ -242,7 +250,9 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .card{position:relative;background:var(--panel);border:1px solid var(--rule);border-left:3px solid var(--cat);border-radius:4px;padding:20px 22px 18px;transition:transform .25s,border-color .25s,background .25s}
 .card:hover{transform:translateX(3px);background:var(--panel2);border-color:color-mix(in srgb,var(--cat) 45%,var(--rule))}
 .card-h{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:11px}
+.chips{display:inline-flex;gap:6px;align-items:center}
 .chip{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--cat);border:1px solid color-mix(in srgb,var(--cat) 40%,transparent);background:color-mix(in srgb,var(--cat) 9%,transparent);padding:3px 9px;border-radius:100px}
+.chip-novel{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 40%,transparent);background:color-mix(in srgb,var(--accent2) 9%,transparent);border-style:dashed}
 .conf{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 .conf-bars{display:inline-flex;gap:3px}
 .conf-bars i{width:14px;height:4px;border-radius:2px;background:var(--rule)}

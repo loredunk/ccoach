@@ -1,7 +1,13 @@
 # deep-insight method — root-cause taxonomy, grounding gate, honesty
 
 ## Root-cause ladder (semantic-first)
-For each observed churn/waste: 1) what the work was trying to do (from prompts + code, paraphrased); 2) the SEMANTIC reason it churned (from reading the code); 3) classify: cognitive_gap | prompt_issue | code_structure | workflow | unknown_feature; 4) the concrete fix (official feature named); 5) at most ONE supporting metric line. Metrics never lead.
+For each observed churn/waste: 1) what the work was trying to do (from prompts + code, paraphrased); 2) the SEMANTIC reason it churned (from reading the code); 3) classify: cognitive_gap | prompt_issue | code_structure | workflow | unknown_feature — **or a new category you create when the evidence fits none** (snake_case, mark `novel_category: true`; never shoehorn); 4) the concrete fix (official feature named, verified against current official docs at run time); 5) at most ONE supporting metric line. Metrics never lead.
+
+## Open taxonomy
+The five categories are a scaffold, not a ceiling. Each report must attempt ≥1 finding outside the known list; if none survives the evidence bar, say so honestly in one line. Novel categories that recur across reports are candidates for promotion into the known list.
+
+## Policy-recommendation gate
+Any policy advice (effort defaults, model choice, /clear timing, "always X") must compare within the SAME task_type and clear the minimum-sample bar — honor every `low_confidence: true` the CLI emits (effort_calibration rows, context_rot). Under-sampled → state as a low-confidence observation, never a conclusion.
 
 ## Grounding gate (never violate)
 A session's intent claim ("this turn did X / shipped / drifted") must be anchored to that session's own prompts + commits inside its [first,last] window (via scripts/grounding.mjs). NEVER time-correlate to commits outside the window. Proven failure: a trace-only diagnosis confidently asserted a session "drifted and didn't ship" by matching commits 7–11h outside the session; git+prompts showed it TDD-shipped the right features. When intent matters and confidence≥high, run a tight `ccoach digest` to falsify first.

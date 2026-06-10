@@ -23,7 +23,8 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
       "findings": [
         {
           "title": "plain-language root-cause statement",
-          "category": "cognitive_gap | prompt_issue | code_structure | workflow | unknown_feature | other",
+          "category": "cognitive_gap | prompt_issue | code_structure | workflow | unknown_feature | other | <any snake_case category you create>",
+          "novel_category": false,
           "confidence": "high | med | low",
           "root_cause": "the semantic why, in human terms",
           "fix": "the concrete action to take",
@@ -39,7 +40,10 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
 ```
 
 Notes:
-- `category` drives the color code; unknown values fall back to `other`.
+- `category` is an **open** enum: the known values drive the color code; any other snake_case value is rendered
+  with its own literal label (neutral color). When you created the category from evidence (it fits none of the
+  known five), set `novel_category: true` — the renderer adds a small "novel" marker so readers see it is a
+  discovered, not predefined, class.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
 - `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 严重程度 / 卡壳 with plain-language defs). Write your findings using these reader-friendly terms (回合 / 严重程度 / 卡壳), not raw `episode`/`severity`/`spiral`, so the glossary explains what the prose uses.

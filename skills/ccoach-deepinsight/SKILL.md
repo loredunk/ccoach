@@ -15,14 +15,24 @@ Tell the user, in plain human language, WHY their work in a project churns/waste
 
 **First principle (non-negotiable):** CLI aggregate metrics (spiral, edit_ring, structured_ratio, any "pass rate") mislead and are machine-speak. They are **minor supporting evidence only — never the headline.** The real product is the **semantic root cause**, found by reading the user's own real code (read-only) and, when needed, an opt-in content digest.
 
-Every root cause is classified and stated as a human fix:
+Every root cause is classified and stated as a human fix. The known categories:
 - **cognitive_gap** — didn't know something about the domain/code/tool.
 - **prompt_issue** — communication; say it as "next time do X", never a scold.
 - **code_structure** — the code made it hard.
 - **workflow** — process.
 - **unknown_feature** — an official Claude Code feature already solves it.
 
-**Feature-first:** name the official native feature (plan mode, @file references, PostToolUse hooks, /clear, subagents, CLAUDE.md anchors). Official only — never recommend third-party habit skills.
+**The taxonomy is a scaffold, not a ceiling.** If the evidence supports a root cause that fits none of the
+known categories, CREATE the category (snake_case, human-meaningful) and mark the finding `novel_category: true`
+— do not shoehorn it into the closest known bucket. Every report must **attempt at least one finding outside
+the known taxonomy**; if nothing novel survives the evidence bar, say so in one honest line instead of forcing one.
+
+**Verification-first feature advice (the primary rule):** before recommending ANY feature or config, WebFetch /
+WebSearch the current official docs/changelog for the user's platform and (1) confirm the feature still exists
+and works the way you'll describe, (2) check whether a NEWER native feature fits this root cause better than the
+one you had in mind. The harness evolves faster than any bundled table — the lookup is the source of truth;
+`references/feature-mapping-deep.md` is a handful of illustrative examples, not a knowledge base. Official only —
+never recommend third-party habit skills.
 
 ## Privacy (red lines)
 
@@ -40,7 +50,10 @@ Find systemic root causes that recur across sessions and are fixable once.
 
 1. `ccoach --platform claude-code --since <date> --scope project --json` and `--scope episode --json` → project + episode/spiral signals.
 2. Read the repo itself (read-only): the **platform's own project guide** — `CLAUDE.md` for Claude Code, **`AGENTS.md` for Codex (Codex does NOT read CLAUDE.md)** — plus the build/test manifest (`package.json` / `pyproject.toml`), whether an auto-verify gate exists (`.claude/settings.json` for Claude Code), and the hot files git churn points at. Use Grep/Glob/Read.
-3. Emit **ship-once** root causes + fixes, e.g.: a missing `.claude/settings.json` PostToolUse hook running the repo's typecheck/test; a CLAUDE.md Commands block + one-line-per-file module map. Ground each in the code you read; demote metrics to a single supporting line.
+3. **File-churn concentration:** `projects[].file_churn` (basename-only, cross-session) names the most re-edited files and how concentrated edits are (`top3_share`). Cross-check against git hot files: overlap = a true structural hotspot (code_structure candidate — oversized file, a signal threading layers); transcript-only churn = pre-commit rewrite loops git never sees. Open the named files (read-only) for the semantic reason. Never carry file names into anything shareable.
+4. **Effort calibration curve:** `episode_summary.effort_calibration` compares, within the SAME task_type, outcomes per dial — Codex per-turn `effort` (high/medium/…), model gradient (both platforms), Claude thinking-directive on/off. Look for elasticity: does high effort actually reduce spiral/churn for this task type, or just multiply reasoning tokens? A finding like "your debug tasks show no spiral difference high vs medium but ~2x reasoning tokens — default medium, escalate only after an edit-ring triggers" is the shape to aim for. **Only compare rows with `low_confidence: false`; otherwise present as a low-confidence observation, never a policy.**
+5. **Context-rot curve:** `episode_summary.context_rot` buckets episodes by their in-session turn index; `inflection_index` estimates the user's personal **context shelf life in turns**. If present (and not `low_confidence`), it is a star, sticky finding: "your sessions degrade after ~N turns — /clear or start a fresh session at task boundaries; push exploration into subagents to keep the main context clean." Episode `compacted` flags (Codex) corroborate heavy-context turns.
+6. Emit **ship-once** root causes + fixes, e.g.: a missing `.claude/settings.json` PostToolUse hook running the repo's typecheck/test; a CLAUDE.md Commands block + one-line-per-file module map. Ground each in the code you read; demote metrics to a single supporting line.
 
 This pass alone is the highest-leverage, lowest-risk output. Stop here unless the user wants per-session depth or a session is spiral-flagged.
 
@@ -62,7 +75,7 @@ Codex works the same way; swap `--platform codex`:
 - **Signals:** `ccoach --platform codex --since <date> --scope project|episode --json` + `ccoach sessions --platform codex --repo <repo> --top 20`. Episode edit/error/spiral signals are populated from Codex rollouts (`patch_apply_end` diffs + `exec_command_end` exit codes).
 - **Content gate:** `ccoach digest --platform codex --id <session-id> --budget tight` (assistant text + tool args + tool results; **NO reasoning**).
 - **Grounding:** Codex sessions carry their `cwd`; the same `grounding.mjs "<first>" "<last>" <cwd>` works (platform-agnostic). Read the repo code at that cwd. For the **project guide read `AGENTS.md`** — Codex does NOT read CLAUDE.md, so if a repo has only CLAUDE.md, faithfully report that Codex ran with **no** project guide and recommend adding an `AGENTS.md` (do not point the user at CLAUDE.md in a Codex report).
-- **Codex-only treasures (optional):** per-turn effort / approval / sandbox, collab/subagent events, compaction — available for richer dimensions later.
+- **Codex-only treasures:** per-turn `effort` is on each episode (plus session-level approval/sandbox/collab distributions, and per-episode `compacted`). This makes Codex the best platform for the effort-calibration curve — `reasoning_output` tokens are fully populated there. The Claude-side symmetric evidence is the model gradient + `thinking_directive`.
 - **Limitation:** Codex user prompts are still thin (env-context injected; not yet parsed) — lean on the digest narrative + grounding + episode signals rather than prompt text. Red lines unchanged: never read reasoning / developer / system content.
 
 ### Dedup
@@ -83,4 +96,10 @@ The renderer is a standalone "diagnostic dossier" (dark editorial; root-cause ca
 
 ## Honesty rules
 
-Never assert what ccoach doesn't measure (no "you never ran tests", "didn't review", "should've used plan mode" unless a real signal supports it). Verify any feature/config recommendation against current official Claude Code docs (WebSearch) before suggesting; only suggest, never auto-change config.
+Never assert what ccoach doesn't measure (no "you never ran tests", "didn't review", "should've used plan mode" unless a real signal supports it). Verify any feature/config recommendation against current official docs/changelog (WebFetch/WebSearch) before suggesting — this is the primary rule, not a fallback; only suggest, never auto-change config.
+
+**Policy-recommendation gate:** any policy advice (effort defaults, model choice, /clear timing, "always do X") must
+(1) compare within the SAME task_type, and (2) clear the minimum-sample bar — the CLI marks under-sampled rows/curves
+`low_confidence: true`; honor it. With insufficient samples, state the observation explicitly labeled low-confidence
+and stop — never harden it into a conclusion. Confident-sounding numbers on thin samples are exactly how metric-led
+analysis fabricates root causes; this gate is what separates this skill from that failure mode.
