@@ -17,7 +17,7 @@ describe('render_deepinsight', () => {
         {
           id: '02', kind: 'Pass · Session', title: 'Session x', verdict: { label: 'Healthy', tone: 'healthy' },
           grounding: [{ hash: 'abc1234', ts: '2026-06-04', subject: 'shipped T15' }],
-          digest_stats: 'tight ~7.5K', findings: [
+          digest_stats: 'compact summary ~7.5K tokens', findings: [
             { title: 'opener', category: 'prompt_issue', confidence: 'high', root_cause: 'terse', fix: 'use @file', feature: '@file references', signal: 'len 41' },
           ],
         },

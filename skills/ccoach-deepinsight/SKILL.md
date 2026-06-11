@@ -97,7 +97,26 @@ margin only; in prose, translate the jargon:
 - taxonomy → "categories / the category list" · zh **分类**
 - `episode` → "episode (one instruction → the agent's work for it)" · zh **回合**
 - `context rot` → "sessions get worse after ~N turns" · zh **上下文保质期（约 N 回合后开始变差）**
-- `effort` → "thinking effort level (how hard the model thinks)" · zh **思考强度档位** **False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change. **Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior. Desensitize all paths/identifiers to `<…>` before writing/sharing.
+- `effort` → "thinking effort level (how hard the model thinks)" · zh **思考强度档位**
+
+**Say it plainly (deepinsight is the SERIOUS report — the roast voice belongs to ccoach-insight, not here).**
+Headlines and findings should read like a calm senior engineer stating facts: a reader who has never seen
+ccoach should parse them on first scan, without decoding metaphors or coined terms. Bad cases seen in real
+reports, with the plain version to prefer:
+- 「缺一道闸门」 → 「编辑后缺少自动编译检查」 — state the fact, not a metaphor for it.
+- 「双料冠军」 → just say it: 「这个文件既是改动最多、也是报错最多的」.
+- 「人肉转发被测系统的症状」 → 「你在手动把报错信息逐条贴回给 agent」.
+- 「tight 内容摘要」 → 「精简摘要（约 7.5K token）」 — internal/pipeline words (`tight`, `grounding`,
+  `digest`, `RESULT_ERR`…) belong in the `signal` margin, not in prose — including inside `digest_stats`.
+
+A quick self-check before emitting the report JSON: reread each headline as that first-time reader, and
+rewrite anything that needs the body to decode.
+
+**False-positive honesty:** explicitly say "this is healthy work, no change needed" when a flagged spiral is actually a disciplined, test-verified change.
+
+**Dogfooding honesty:** flag when a signal is the tool's own instrument limitation (e.g. task_mix mostly "unknown" = uncalibrated classifier), not user behavior.
+
+Desensitize all paths/identifiers to `<…>` before writing/sharing.
 
 ### HTML report (optional)
 

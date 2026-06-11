@@ -19,7 +19,7 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
       "verdict": { "label": "False alarm — healthy delivery", "tone": "healthy|churn|mixed", "note": "optional" },
       "headline": "optional reframing sentence (session passes)",
       "grounding": [ { "hash": "37c4343", "ts": "2026-06-04 21:11 +08", "subject": "what shipped in-window" } ],
-      "digest_stats": "tight ~7.5K tok · RESULT_ERR 1/75 · redacted · no thinking",
+      "digest_stats": "compact summary ~7.5K tokens · 1 of 75 turns errored · redacted · no thinking content",
       "findings": [
         {
           "title": "plain-language root-cause statement",
@@ -54,6 +54,9 @@ Notes:
   discovered, not predefined, class.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
+- `digest_stats` is reader-facing prose like every other field: write it in the report language with plain
+  words (as the example above), never internal pipeline tokens (`tight`, `RESULT_ERR`, …) — those stay in
+  the `signal` margin.
 - `magic_time` (optional, currently Codex-flavored) is a highlight strip of big numbers rendered above the passes.
   **Hard rule: every number must be either platform-self-reported (e.g. the Codex App's own fast-mode time-saved
   estimate) or an exact count from local data (accepted approval rules, subagents spawned, threads indexed). Never

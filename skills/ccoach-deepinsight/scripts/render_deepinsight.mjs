@@ -71,7 +71,7 @@ const CHROME = {
     seal: 'read-only · local · maskable before sharing',
     ledger: 'evidence · commits inside the session window (ground truth)',
     notes: 'tool limits — about the tool, not your behavior',
-    digest: 'digest',
+    digest: 'content summary',
     novel: 'novel',
     novelTitle: 'a category discovered from the evidence, not predefined',
     magic: 'Magic Time',
