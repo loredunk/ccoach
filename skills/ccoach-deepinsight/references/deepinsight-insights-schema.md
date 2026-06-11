@@ -9,7 +9,7 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
   "lang": "zh",
   "window": "last 60 days (… → …)",
   "generated_at": "2026-06-07",
-  "tldr": "one-paragraph verdict (solutions, not metrics)",
+  "tldr": "1-2 sentence verdict (solutions, not metrics) — keep it short; the renderer auto-generates a clickable findings list right below it, so do NOT enumerate findings here",
   "passes": [
     {
       "id": "01",

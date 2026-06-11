@@ -54,6 +54,31 @@ describe('render_deepinsight', () => {
     expect(renderDeepinsight({})).toContain('Deep')
   })
 
+  it('renders a clickable findings TOC with matching card anchors; omits when no findings', () => {
+    const html = renderDeepinsight({
+      lang: 'zh',
+      passes: [
+        { id: '01', kind: 'Pass · Project', title: 'Systemic', findings: [
+          { title: 'first finding', category: 'workflow', root_cause: 'x' },
+          { title: 'second finding', category: 'unknown_feature', root_cause: 'y' },
+        ] },
+        { id: '02', kind: 'Pass · Session', title: 'Deep dive', findings: [
+          { title: 'third finding', category: 'prompt_issue', root_cause: 'z' },
+        ] },
+      ],
+    })
+    expect(html).toContain("class='toc'")
+    expect(html).toContain('发现清单')
+    // every TOC link has a matching card anchor
+    expect(html).toContain("href='#f-0-1'")
+    expect(html).toContain("id='f-0-1'")
+    expect(html).toContain("href='#f-1-0'")
+    expect(html).toContain("id='f-1-0'")
+    expect(html).toContain('Pass · Session · Deep dive') // grouped headers when >1 pass has findings
+    const none = renderDeepinsight({ lang: 'zh', passes: [{ id: '01', kind: 'P', title: 'T', findings: [] }] })
+    expect(none).not.toContain("class='toc'")
+  })
+
   it('localizes category badges per lang — unknown_feature is self-explanatory, never "Unknown Feature"', () => {
     const passes = [{ id: '01', kind: 'P', title: 'T', findings: [
       { title: 'memory unused', category: 'unknown_feature', confidence: 'high', root_cause: 'x', fix: 'use /memory', feature: '/memory', signal: 'memory_usage_count 0' },
