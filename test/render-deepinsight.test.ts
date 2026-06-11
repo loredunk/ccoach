@@ -120,6 +120,15 @@ describe('render_deepinsight', () => {
     expect(html).toContain('Observability Gap') // fallback unchanged
   })
 
+  it('category/dimension keys colliding with Object.prototype take the fallback path, not inherited members', () => {
+    const html = renderDeepinsight({ lang: 'en', passes: [{ id: '01', kind: 'P', title: 'T', findings: [
+      { title: 'a', category: 'constructor', root_cause: 'x' },
+    ] }] })
+    expect(html).toContain('Constructor') // title-cased fallback, not Object.prototype.constructor
+    expect(html).not.toContain('var(undefined)')
+    expect(html).not.toContain("class='legend'") // not treated as a known category
+  })
+
   it('renders the project health check beta section from the full fixture', () => {
     const data = JSON.parse(readFileSync(join(__dirname, 'fixtures/deepinsight/report-health.json'), 'utf8'))
     const html = renderDeepinsight(data)

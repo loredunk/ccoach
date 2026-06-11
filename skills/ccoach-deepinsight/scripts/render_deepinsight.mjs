@@ -46,8 +46,8 @@ const GLOSSARY = {
   },
 }
 
-function glossarySection(loc) {
-  const g = GLOSSARY[loc] ?? GLOSSARY.en
+function glossarySection() {
+  const g = GLOSSARY[LOC] ?? GLOSSARY.en
   const items = g.terms.map(([t, dfn]) => `<div><dt>${esc(t)}</dt><dd>${esc(dfn)}</dd></div>`).join('')
   return `<section class="terms"><div class="terms-k">${esc(g.head)}</div><dl>${items}</dl></section>`
 }
@@ -122,54 +122,54 @@ let LOC = 'en'
 
 // Category badges are reader-facing and self-explanatory in the report language —
 // e.g. unknown_feature renders as "Native feature available", an opportunity, never "Unknown Feature".
+// `def` is the one-line plain-language definition for the legend near the top of the report.
 const CAT = {
-  cognitive_gap: { en: 'Knowledge gap', zh: '知识盲区', v: '--c-cog' },
-  prompt_issue: { en: 'Prompt wording', zh: '提示词写法', v: '--c-prompt' },
-  code_structure: { en: 'Code structure', zh: '代码结构', v: '--c-code' },
-  workflow: { en: 'Workflow', zh: '工作流程', v: '--c-flow' },
-  unknown_feature: { en: 'Native feature available', zh: '有现成官方特性', v: '--c-feat' },
-  other: { en: 'Other', zh: '其他', v: '--c-other' },
-}
-// One-line plain-language definitions for the category legend printed near the top of the report.
-const CAT_DEFS = {
-  zh: {
-    cognitive_gap: '对领域、代码或工具有一处还不知道的事，导致绕了路。',
-    prompt_issue: '指令的表达方式让 agent 理解偏了——换个说法就能避免。',
-    code_structure: '代码本身的结构让改动变难——问题在代码，不在你。',
-    workflow: '做事的流程顺序可以调整，让同样的工作更省力。',
-    unknown_feature: '平台已有一个现成的官方特性能解决这个问题——你还没用上。这是机会，不是故障。',
-    other: '不属于以上几类的发现。',
+  cognitive_gap: {
+    en: 'Knowledge gap', zh: '知识盲区', v: '--c-cog',
+    def: { en: 'Something about the domain, code, or tool you did not know yet — it caused a detour.', zh: '对领域、代码或工具有一处还不知道的事，导致绕了路。' },
   },
-  en: {
-    cognitive_gap: 'Something about the domain, code, or tool you did not know yet — it caused a detour.',
-    prompt_issue: 'The way an instruction was phrased sent the agent the wrong way — a rewording avoids it.',
-    code_structure: 'The code structure itself made the change hard — the code, not you.',
-    workflow: 'A change in the order or process of the work would make the same work cheaper.',
-    unknown_feature: "An official feature already solves this — you just haven't adopted it yet. An opportunity, not a bug.",
-    other: 'Findings that fit none of the categories above.',
+  prompt_issue: {
+    en: 'Prompt wording', zh: '提示词写法', v: '--c-prompt',
+    def: { en: 'The way an instruction was phrased sent the agent the wrong way — a rewording avoids it.', zh: '指令的表达方式让 agent 理解偏了——换个说法就能避免。' },
+  },
+  code_structure: {
+    en: 'Code structure', zh: '代码结构', v: '--c-code',
+    def: { en: 'The code structure itself made the change hard — the code, not you.', zh: '代码本身的结构让改动变难——问题在代码，不在你。' },
+  },
+  workflow: {
+    en: 'Workflow', zh: '工作流程', v: '--c-flow',
+    def: { en: 'A change in the order or process of the work would make the same work cheaper.', zh: '做事的流程顺序可以调整，让同样的工作更省力。' },
+  },
+  unknown_feature: {
+    en: 'Native feature available', zh: '有现成官方特性', v: '--c-feat',
+    def: { en: "An official feature already solves this — you just haven't adopted it yet. An opportunity, not a bug.", zh: '平台已有一个现成的官方特性能解决这个问题——你还没用上。这是机会，不是故障。' },
+  },
+  other: {
+    en: 'Other', zh: '其他', v: '--c-other',
+    def: { en: 'Findings that fit none of the categories above.', zh: '不属于以上几类的发现。' },
   },
 }
 // Open taxonomy: an unknown category keeps its own label (neutral color) instead of collapsing to Other.
 // Preference: known table (localized) → category_label supplied by the report → title-cased key.
+// Object.hasOwn guards keep prototype keys ('constructor', 'toString'…) on the fallback path.
+const knownCat = (k) => typeof k === 'string' && Object.hasOwn(CAT, k)
 const cat = (k, categoryLabel) => {
-  const known = CAT[k]
-  if (known) return { label: known[LOC] ?? known.en, v: known.v }
+  if (knownCat(k)) return { label: CAT[k][LOC] ?? CAT[k].en, v: CAT[k].v }
   if (categoryLabel) return { label: String(categoryLabel), v: '--c-other' }
   const label = String(k || '').trim().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   return label ? { label, v: '--c-other' } : { label: CAT.other[LOC] ?? CAT.other.en, v: CAT.other.v }
 }
 
 // Legend: only the known categories that actually appear in this report, each with its plain definition.
-function legendSection(passes, loc) {
+function legendSection(passes) {
   const seen = new Set()
-  for (const p of passes || []) for (const f of p.findings || []) if (CAT[f.category]) seen.add(f.category)
+  for (const p of passes || []) for (const f of p.findings || []) if (f && knownCat(f.category)) seen.add(f.category)
   if (!seen.size) return ''
-  const defs = CAT_DEFS[loc] ?? CAT_DEFS.en
   const rows = Object.keys(CAT)
     .filter((k) => seen.has(k))
     .map((k) => {
       const c = CAT[k]
-      return `<div class='lg-row' style='--cat: var(${c.v})'><span class='chip'>${esc(c[loc] ?? c.en)}</span><span class='lg-d'>${esc(defs[k])}</span></div>`
+      return `<div class='lg-row' style='--cat: var(${c.v})'><span class='chip'>${esc(c[LOC] ?? c.en)}</span><span class='lg-d'>${esc(c.def[LOC] ?? c.def.en)}</span></div>`
     })
     .join('')
   return `<section class='legend'><div class='legend-k'>${esc(L.legend)}</div>${rows}</section>`
@@ -179,7 +179,7 @@ const CONF = { high: 3, med: 2, medium: 2, low: 1 }
 function confMeter(level) {
   const n = CONF[String(level || '').toLowerCase()] ?? 0
   const bars = [0, 1, 2].map((i) => `<i class='${i < n ? 'on' : ''}'></i>`).join('')
-  return `<span class='conf' title='confidence: ${esc(level || 'n/a')}'><span class='conf-k'>${esc(L.confK)}</span><span class='conf-bars'>${bars}</span></span>`
+  return `<span class='conf' title='${esc(L.confK)}: ${esc(level || 'n/a')}'><span class='conf-k'>${esc(L.confK)}</span><span class='conf-bars'>${bars}</span></span>`
 }
 
 // Project health check (Beta) — four common-sense dimensions, scored only from code actually read.
@@ -254,14 +254,17 @@ function tocSection(passes, health) {
   return `<nav class='toc'><div class='toc-k'>${esc(L.toc)}</div>${groups}${healthRow}</nav>`
 }
 
+// Shared "fix" highlight block — used by finding cards and blind-spot homework rows.
+function fixBlock(bodyHtml) {
+  return `<div class='fix'><span class='fix-k'>${esc(L.fixK)}</span><div class='fix-b'>${bodyHtml}</div></div>`
+}
+
 function findingCard(f, i, passIdx) {
   const c = cat(f.category, f.category_label)
   const feature = f.feature
     ? `<span class='feat'>${esc(f.feature)}</span>`
     : ''
-  const fix = f.fix
-    ? `<div class='fix'><span class='fix-k'>${esc(L.fixK)}</span><div class='fix-b'>${esc(f.fix)} ${feature}</div></div>`
-    : ''
+  const fix = f.fix ? fixBlock(`${esc(f.fix)} ${feature}`) : ''
   const signal = f.signal
     ? `<div class='signal'><span class='sig-k'>${esc(L.sigK)}</span> ${esc(f.signal)}</div>`
     : ''
@@ -479,7 +482,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .card-h{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:11px}
 .chips{display:inline-flex;gap:6px;align-items:center}
 .chip{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--cat);border:1px solid color-mix(in srgb,var(--cat) 40%,transparent);background:color-mix(in srgb,var(--cat) 9%,transparent);padding:3px 9px;border-radius:100px}
-.chip-novel{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 40%,transparent);background:color-mix(in srgb,var(--accent2) 9%,transparent);border-style:dashed}
+.chip-novel,.chip-beta{color:var(--accent2);border-color:color-mix(in srgb,var(--accent2) 40%,transparent);background:color-mix(in srgb,var(--accent2) 9%,transparent);border-style:dashed}
 .conf{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
 .conf-bars{display:inline-flex;gap:3px}
 .conf-bars i{width:14px;height:4px;border-radius:2px;background:var(--rule)}
@@ -497,7 +500,6 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .health{border:1px solid var(--rule);border-radius:4px;background:var(--ink2);padding:22px 24px 20px;margin:0 0 56px;scroll-margin-top:24px}
 .health-h{display:flex;align-items:center;gap:10px}
 .health-k{font-family:var(--mono);font-size:11.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent)}
-.chip-beta{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;padding:3px 9px;border-radius:100px;color:var(--accent2);border:1px dashed color-mix(in srgb,var(--accent2) 40%,transparent);background:color-mix(in srgb,var(--accent2) 9%,transparent)}
 .health-sub{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin:8px 0 18px;letter-spacing:.04em}
 .hds{display:flex;flex-direction:column;gap:18px}
 .hd{border-top:1px dotted var(--rule);padding-top:16px}
@@ -535,7 +537,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .mt-b{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:7px;letter-spacing:.02em;line-height:1.5}
 .foot{border-top:1px solid var(--rule);padding-top:20px;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.03em;line-height:1.7}
 @keyframes rise{to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){.pass{animation:none;opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.pass{animation:none;opacity:1;transform:none}}
 @media (max-width:680px){
   body{background-size:44px 44px,44px 44px}
   .ledger-l li{grid-template-columns:1fr;gap:1px}
@@ -553,8 +555,8 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
   </header>
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
   ${tocSection(d.passes, d.project_health)}
-  ${glossarySection(loc)}
-  ${legendSection(d.passes, loc)}
+  ${glossarySection()}
+  ${legendSection(d.passes)}
   ${magicSection(d.magic_time)}
   ${passes}
   ${healthSection(d.project_health)}

@@ -79,6 +79,9 @@ Notes:
   from evidence (it fits none of the known five), set `novel_category: true` — the renderer adds a small
   "novel" marker so readers see it is a discovered, not predefined, class.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
+- `kind` and `title` are reader-facing headers (section heading + findings-list group label) — write them
+  in the report language like everything else (zh report → e.g. `"kind": "项目层"`,
+  `"title": "一次修好的系统性问题"`); the English example values above are placeholders, not a template.
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
 - `digest_stats` is reader-facing prose like every other field: write it in the report language with plain
   words (as the example above), never internal pipeline tokens (`tight`, `RESULT_ERR`, …) — those stay in
