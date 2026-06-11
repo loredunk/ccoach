@@ -104,5 +104,5 @@ Notes:
   - `threshold` (optional, mainly for `architecture_layering`) states when refactoring starts to pay off,
     anchored to this repo's real numbers — not generic dogma.
   - this block is for the local report only — never carry it into anything shareable.
-- `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 严重程度 / 原地打转 with plain-language defs). Write your findings using these reader-friendly terms (回合 / 严重程度 / 原地打转; en: episode / severity / "went in circles"), not raw `episode`/`severity`/`spiral` jargon, so the glossary explains what the prose uses.
+- `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 原地打转 / 严重程度 with plain-language defs — spiral before severity, since severity is defined as the degree of spiraling). Write your findings using these reader-friendly terms (回合 / 原地打转 / 严重程度; en: episode / "went in circles" / severity), not raw `episode`/`spiral`/`severity` jargon, so the glossary explains what the prose uses.
 - Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`.
