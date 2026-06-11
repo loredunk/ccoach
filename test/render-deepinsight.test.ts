@@ -1,4 +1,6 @@
 // test/render-deepinsight.test.ts — deepinsight HTML renderer (structure + escaping + robustness)
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 // @ts-expect-error — skill .mjs has no types; we only assert on the returned HTML string
 import { renderDeepinsight } from '../skills/ccoach-deepinsight/scripts/render_deepinsight.mjs'
@@ -116,6 +118,34 @@ describe('render_deepinsight', () => {
     ] }] })
     expect(html).toContain('上下文反复重建')
     expect(html).toContain('Observability Gap') // fallback unchanged
+  })
+
+  it('renders the project health check beta section from the full fixture', () => {
+    const data = JSON.parse(readFileSync(join(__dirname, 'fixtures/deepinsight/report-health.json'), 'utf8'))
+    const html = renderDeepinsight(data)
+    expect(html).toContain("id='project-health'")
+    expect(html).toContain('项目体检')
+    expect(html).toContain('chip-beta') // beta badge
+    expect(html.match(/<div class='hd[ ']/g)?.length).toBe(4) // four dimension rows
+    expect(html).toContain('安全与数据')
+    expect(html).toContain('验证门与测试')
+    // score=2 lights exactly 2 of 4 segments, amber tone
+    expect(html).toContain("--hb: var(--accent)'><i class='on'></i><i class='on'></i><i class=''></i><i class=''></i>")
+    // score=1 lights exactly 1, risk tone
+    expect(html).toContain("--hb: var(--c-risk)'><i class='on'></i><i class=''></i><i class=''></i><i class=''></i>")
+    // omitted score renders as not-assessed: dashed empty bar + level word, never zero
+    expect(html).toContain('hd-na')
+    expect(html).toContain('未评估')
+    // refactor threshold row
+    expect(html).toContain('重构阈值')
+    expect(html).toContain('该拆的程度')
+    // findings TOC gets a final row linking to the health section
+    expect(html).toContain("href='#project-health'")
+    // injected content in evidence is escaped
+    expect(html).not.toContain('<script>alert(1)</script>')
+    // absent project_health → section omitted entirely
+    const without = renderDeepinsight({ project: 'demo', passes: data.passes })
+    expect(without).not.toContain('project-health')
   })
 
   it('renders the magic_time highlight strip (value/unit/basis/tone), omits when absent', () => {

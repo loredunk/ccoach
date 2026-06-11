@@ -43,6 +43,28 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
       "tone": "win"
     }
   ],
+  "project_health": {
+    "summary": "one sentence: the single piece of common-sense project hygiene this repo most lacks",
+    "dimensions": [
+      {
+        "id": "security_data",
+        "score": 2,
+        "status": "登录鉴权完整，但配置文件里有一处硬编码的数据库口令；未见迁移目录",
+        "evidence": "读了 <config file> 与 db 连接模块；发现一处明文凭据（值已隐去）",
+        "advice": "把口令移入环境变量并确认已 gitignore；引入迁移工具管理表结构变更"
+      },
+      { "id": "stability_resources", "score": 3, "status": "…", "evidence": "…", "advice": "…" },
+      { "id": "verification_testing", "status": "未评估：本次没有读到 CI 配置与测试目录" },
+      {
+        "id": "architecture_layering",
+        "score": 1,
+        "status": "路由、业务逻辑和 SQL 都挤在同一层文件里",
+        "evidence": "3 个文件超过 900 行，且各被 5 个以上模块引用",
+        "advice": "先把数据访问抽成独立模块，再拆业务层",
+        "threshold": "单文件超过 ~800 行、同时被 3 个以上模块引用时，就到了该拆的程度"
+      }
+    ]
+  },
   "honesty": [ "instrument-limitation / dogfooding notes (not user behavior)" ],
   "privacy": "footer line"
 }
@@ -67,5 +89,20 @@ Notes:
   invent conversions or multipliers** ("each rule saves ~10s" is fabrication — don't). `basis` is mandatory and must
   name the provenance ("Codex App's own estimate", "exact count from your approval rules"); self-reported estimates
   must say so. `tone`: win (green edge) / loss (amber edge) / neutral. 3-5 items max — it's a highlight, not a table.
+- `project_health` (optional, **Beta**) is the project health check rendered after the passes, with a
+  clickable row in the findings list. Rules:
+  - `id` is a fixed enum — `security_data | stability_resources | verification_testing |
+    architecture_layering` — the renderer carries bilingual labels for these. A non-standard `id` must
+    bring its own `label` (report language) and renders in a neutral color.
+  - `score` is an integer 0-4; the renderer derives the level word (0 missing/缺失 · 1 weak/薄弱 ·
+    2 gaps/有缺口 · 3 good/良好 · 4 solid/扎实) — do not invent your own level field. **Omitting `score`
+    means "not assessed"** (rendered as an empty dashed bar): use it whenever you did not actually read
+    enough to judge, and say in `status` what was not assessed and why. Never guess a score.
+  - a score may only come from files you actually opened; `evidence` says what you read (identifiers
+    desensitized to `<…>`, file names at most a basename). If you find a hardcoded secret, report the
+    finding — **never write the secret's value into any field**.
+  - `threshold` (optional, mainly for `architecture_layering`) states when refactoring starts to pay off,
+    anchored to this repo's real numbers — not generic dogma.
+  - this block is for the local report only — never carry it into anything shareable.
 - `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 严重程度 / 原地打转 with plain-language defs). Write your findings using these reader-friendly terms (回合 / 严重程度 / 原地打转; en: episode / severity / "went in circles"), not raw `episode`/`severity`/`spiral` jargon, so the glossary explains what the prose uses.
 - Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`.
