@@ -44,25 +44,32 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
     }
   ],
   "project_health": {
-    "summary": "one sentence: the single piece of common-sense project hygiene this repo most lacks",
+    "stage": {
+      "level": "prototype | shipping | serving",
+      "label": "原型期",
+      "basis": "近 30 天提交 ~3 次/周 · repo 无 CI 配置 · 会话与提交从未提及部署或真实用户",
+      "note": "原型期只看安全红线级别的盲区，其余维度先不打扰"
+    },
+    "summary": "一句话：当前协作里最值得补的一个盲区",
     "dimensions": [
       {
         "id": "security_data",
-        "score": 2,
-        "status": "登录鉴权完整，但配置文件里有一处硬编码的数据库口令；未见迁移目录",
-        "evidence": "读了 <config file> 与 db 连接模块；发现一处明文凭据（值已隐去）",
-        "advice": "把口令移入环境变量并确认已 gitignore；引入迁移工具管理表结构变更"
+        "attention": "never",
+        "statement": "过去 30 天的会话和提交里，鉴权/密钥相关的工作从未出现过，而 repo 里已有登录模块",
+        "basis": "检索了本窗口的会话提示词与提交信息：0 次命中鉴权/密钥/迁移相关词；<auth 模块> 存在于 repo",
+        "homework": "下个会话让 Claude 跑一遍 security review，重点看 <…> 这三个文件",
+        "feature": "/security-review"
       },
-      { "id": "stability_resources", "score": 3, "status": "…", "evidence": "…", "advice": "…" },
-      { "id": "verification_testing", "status": "未评估：本次没有读到 CI 配置与测试目录" },
       {
-        "id": "architecture_layering",
-        "score": 1,
-        "status": "路由、业务逻辑和 SQL 都挤在同一层文件里",
-        "evidence": "3 个文件超过 900 行，且各被 5 个以上模块引用",
-        "advice": "先把数据访问抽成独立模块，再拆业务层",
-        "threshold": "单文件超过 ~800 行、同时被 3 个以上模块引用时，就到了该拆的程度"
-      }
+        "id": "verification_testing",
+        "attention": "touched",
+        "statement": "测试只在 2 个会话里出现过，编辑后没有任何自动验证动作跟随",
+        "basis": "会话提示词与命令记录里测试相关词命中 2 次；repo 无 CI 配置文件",
+        "homework": "让 agent 配一个编辑后自动跑 typecheck/test 的钩子，结果直接喂回",
+        "feature": "PostToolUse hook"
+      },
+      { "id": "stability_resources", "locked": true, "statement": "原型期先不打扰——出现真实用户信号后解锁" },
+      { "id": "architecture_layering", "statement": "未核查：本次没有读取文件长度与引用关系" }
     ]
   },
   "honesty": [ "instrument-limitation / dogfooding notes (not user behavior)" ],
@@ -92,20 +99,31 @@ Notes:
   invent conversions or multipliers** ("each rule saves ~10s" is fabrication — don't). `basis` is mandatory and must
   name the provenance ("Codex App's own estimate", "exact count from your approval rules"); self-reported estimates
   must say so. `tone`: win (green edge) / loss (amber edge) / neutral. 3-5 items max — it's a highlight, not a table.
-- `project_health` (optional, **Beta**) is the project health check rendered after the passes, with a
-  clickable row in the findings list. Rules:
+- `project_health` (optional, **Beta**) is the **project blind-spot coach** rendered after the passes
+  (with a clickable row in the findings list whenever the section renders). ccoach is a coach, not an
+  auditor: it names blind spots and assigns homework — the audit itself is the agent's job in a
+  follow-up session. Rules:
+  - **Stage gate first.** `stage.level` is judged from verifiable signals only (commit frequency, CI
+    config presence, deployment/real-user mentions in sessions/commits) and `stage.basis` states those
+    signals. At `prototype`, report only security-redline blind spots and mark the other dimensions
+    `locked: true` (rendered as a quiet "not unlocked at this stage" row, no homework) — telling a
+    weekend prototype it lacks observability is noise, not coaching.
+  - **Statements are verifiable behavior/presence facts, never audit verdicts.** Good: "auth/secret
+    work never appeared in your sessions or commits in this window", "no CI config file exists",
+    "a ~1,400-line file imported by 5 modules" — all checkable with a grep. Never: "your project's
+    auth is weak / lacks X" — one false positive there (tests living in an unusual directory ≠ no
+    tests) costs all trust. `basis` says how you checked.
+  - `attention` is the dimension's presence in THIS window's sessions/commits: `never | touched |
+    practiced`. **Omitting `attention` means "not checked"** (rendered as a dashed empty track) — use
+    it whenever you did not actually check; never guess.
+  - `homework` is one assignment the user can hand to the agent next session, anchored to an official
+    feature (`feature` renders as a pill; the verification-first rule applies): a security review run,
+    a test-gate hook, a refactor assessment — ccoach never performs the audit itself.
   - `id` is a fixed enum — `security_data | stability_resources | verification_testing |
-    architecture_layering` — the renderer carries bilingual labels for these. A non-standard `id` must
-    bring its own `label` (report language) and renders in a neutral color.
-  - `score` is an integer 0-4; the renderer derives the level word (0 missing/缺失 · 1 weak/薄弱 ·
-    2 gaps/有缺口 · 3 good/良好 · 4 solid/扎实) — do not invent your own level field. **Omitting `score`
-    means "not assessed"** (rendered as an empty dashed bar): use it whenever you did not actually read
-    enough to judge, and say in `status` what was not assessed and why. Never guess a score.
-  - a score may only come from files you actually opened; `evidence` says what you read (identifiers
-    desensitized to `<…>`, file names at most a basename). If you find a hardcoded secret, report the
-    finding — **never write the secret's value into any field**.
-  - `threshold` (optional, mainly for `architecture_layering`) states when refactoring starts to pay off,
-    anchored to this repo's real numbers — not generic dogma.
-  - this block is for the local report only — never carry it into anything shareable.
+    architecture_layering` — the renderer carries bilingual labels. A non-standard `id` must bring its
+    own `label` in the report language.
+  - Desensitize as everywhere (identifiers → `<…>`, file names at most a basename); if you find a
+    hardcoded secret (a presence fact — reportable), **never write the secret's value into any field**.
+  - This block is for the local report only — never carry it into anything shareable.
 - `lang` (`"zh"` / `"en"`, default `en`) sets `<html lang>` and the on-page **术语 / Terms** glossary the renderer prints after the TL;DR (回合 / 原地打转 / 严重程度 with plain-language defs — spiral before severity, since severity is defined as the degree of spiraling). Write your findings using these reader-friendly terms (回合 / 原地打转 / 严重程度; en: episode / "went in circles" / severity), not raw `episode`/`spiral`/`severity` jargon, so the glossary explains what the prose uses.
 - Render: `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`.

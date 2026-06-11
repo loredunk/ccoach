@@ -129,32 +129,59 @@ describe('render_deepinsight', () => {
     expect(html).not.toContain("class='legend'") // not treated as a known category
   })
 
-  it('renders the project health check beta section from the full fixture', () => {
+  it('renders the stage-gated blind-spot coach section from the full fixture', () => {
     const data = JSON.parse(readFileSync(join(__dirname, 'fixtures/deepinsight/report-health.json'), 'utf8'))
     const html = renderDeepinsight(data)
     expect(html).toContain("id='project-health'")
-    expect(html).toContain('项目体检')
-    expect(html).toContain('chip-beta') // beta badge
+    expect(html).toContain('项目盲区')
+    expect(html).toContain("class='chip chip-beta'") // beta badge markup, not just the CSS rule
     expect(html.match(/<div class='hd[ ']/g)?.length).toBe(4) // four dimension rows
-    expect(html).toContain('安全与数据')
-    expect(html).toContain('验证门与测试')
-    // score=2 lights exactly 2 of 4 segments, amber tone
-    expect(html).toContain("--hb: var(--accent)'><i class='on'></i><i class='on'></i><i class=''></i><i class=''></i>")
-    // score=1 lights exactly 1, risk tone
-    expect(html).toContain("--hb: var(--c-risk)'><i class='on'></i><i class=''></i><i class=''></i><i class=''></i>")
-    // omitted score renders as not-assessed: dashed empty bar + level word, never zero
-    expect(html).toContain('hd-na')
-    expect(html).toContain('未评估')
-    // refactor threshold row
-    expect(html).toContain('重构阈值')
-    expect(html).toContain('该拆的程度')
+    // stage banner with verifiable basis + gating note
+    expect(html).toContain('阶段判定')
+    expect(html).toContain('原型期')
+    expect(html).toContain('无 CI 配置')
+    // attention states: never → 0% risk-tone track; touched → 50% amber track
+    expect(html).toContain("--hf:0%;--hb:var(--c-risk)")
+    expect(html).toContain("--hf:50%;--hb:var(--accent)")
+    expect(html).toContain('从未出现')
+    expect(html).toContain('零星出现过')
+    // locked dimension renders quietly, no homework
+    expect(html).toContain('hd-locked')
+    expect(html).toContain('此阶段未解锁')
+    // omitted attention = not checked (dashed track), never zero
+    expect(html).toContain("class='hd-track hd-off'")
+    expect(html).toContain('未核查')
+    // homework rendered as a fix block with the official feature pill
+    expect(html).toContain('security review')
+    expect(html).toContain("class='feat'>/security-review")
     // findings TOC gets a final row linking to the health section
     expect(html).toContain("href='#project-health'")
-    // injected content in evidence is escaped
+    // injected content in basis is escaped
     expect(html).not.toContain('<script>alert(1)</script>')
     // absent project_health → section omitted entirely
     const without = renderDeepinsight({ project: 'demo', passes: data.passes })
     expect(without).not.toContain('project-health')
+  })
+
+  it('blind-spot section: TOC renders with just the health row when there are no findings; null dims tolerated', () => {
+    const html = renderDeepinsight({
+      lang: 'zh',
+      passes: [{ id: '01', kind: '项目层', title: '健康', findings: [] }],
+      project_health: { dimensions: [
+        { id: 'security_data', attention: 'practiced', statement: '安全工作已是常规动作。' },
+        null,
+      ] },
+    })
+    expect(html).toContain("class='toc'")
+    expect(html).toContain("href='#project-health'")
+    expect(html).toContain("--hf:100%;--hb:var(--c-flow)") // practiced → full green track
+    expect(html.match(/<div class='hd[ ']/g)?.length).toBe(1) // null entry dropped, no crash
+    // invalid attention value degrades to not-checked, never a fake state
+    const bad = renderDeepinsight({ lang: 'zh', project_health: { dimensions: [
+      { id: 'security_data', attention: 'constructor', statement: 's' },
+    ] } })
+    expect(bad).toContain('未核查')
+    expect(bad).not.toContain('--hf:')
   })
 
   it('renders the magic_time highlight strip (value/unit/basis/tone), omits when absent', () => {

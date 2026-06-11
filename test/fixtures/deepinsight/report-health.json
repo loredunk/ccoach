@@ -4,13 +4,13 @@
   "lang": "zh",
   "window": "last 30 days (2026-05-12 → 2026-06-11)",
   "generated_at": "2026-06-11",
-  "tldr": "你和 agent 的配合本身是健康的；这个项目最该补的是数据层的安全常识。",
+  "tldr": "你和 agent 的配合本身是健康的；最值得补的盲区是安全工作从未进入过你们的协作。",
   "passes": [
     {
       "id": "01",
-      "kind": "Pass · Project",
-      "title": "Systemic",
-      "verdict": { "label": "总体健康 · 数据层有缺口", "tone": "mixed" },
+      "kind": "项目层",
+      "title": "一次修好的系统性问题",
+      "verdict": { "label": "总体健康 · 有一个安全盲区", "tone": "mixed" },
       "findings": [
         {
           "title": "编辑后缺少自动编译检查",
@@ -34,33 +34,38 @@
     }
   ],
   "project_health": {
-    "summary": "最缺的一项常识性建设：数据层的密钥管理和迁移机制。",
+    "stage": {
+      "level": "prototype",
+      "label": "原型期",
+      "basis": "近 30 天提交 ~3 次/周 · repo 无 CI 配置 · 会话与提交从未提及部署或真实用户",
+      "note": "原型期只看安全红线级别的盲区，其余维度先不打扰。"
+    },
+    "summary": "当前协作里最值得补的盲区：安全相关的工作从未出现过。",
     "dimensions": [
       {
         "id": "security_data",
-        "score": 2,
-        "status": "登录鉴权完整，但配置文件里有一处硬编码的数据库口令；未见迁移目录。",
-        "evidence": "读了 <config file> 与 db 连接模块；发现一处明文凭据（值已隐去）<script>alert(1)</script>",
-        "advice": "把口令移入环境变量并确认已 gitignore；引入迁移工具管理表结构变更。"
-      },
-      {
-        "id": "stability_resources",
-        "score": 3,
-        "status": "错误处理覆盖良好；只有一处定时器在退出路径上没有清理。",
-        "evidence": "读了服务入口与两个 worker 模块。",
-        "advice": "在进程退出钩子里统一清理定时器。"
+        "attention": "never",
+        "statement": "过去 30 天的会话和提交里，鉴权/密钥相关的工作从未出现过，而 repo 里已有登录模块。",
+        "basis": "检索了本窗口的会话提示词与提交信息：0 次命中鉴权/密钥/迁移相关词 <script>alert(1)</script>",
+        "homework": "下个会话让 Claude 跑一遍 security review，重点看 <auth 模块> 这三个文件。",
+        "feature": "/security-review"
       },
       {
         "id": "verification_testing",
-        "status": "未评估：本次没有读到 CI 配置与测试目录。"
+        "attention": "touched",
+        "statement": "测试只在 2 个会话里出现过，编辑后没有任何自动验证动作跟随。",
+        "basis": "会话提示词与命令记录里测试相关词命中 2 次；repo 无 CI 配置文件。",
+        "homework": "让 agent 配一个编辑后自动跑 typecheck/test 的钩子，结果直接喂回。",
+        "feature": "PostToolUse hook"
+      },
+      {
+        "id": "stability_resources",
+        "locked": true,
+        "statement": "原型期先不打扰——出现真实用户信号后解锁。"
       },
       {
         "id": "architecture_layering",
-        "score": 1,
-        "status": "路由、业务逻辑和 SQL 都挤在同一层文件里。",
-        "evidence": "3 个文件超过 900 行，且各被 5 个以上模块引用。",
-        "advice": "先把数据访问抽成独立模块，再拆业务层。",
-        "threshold": "单文件超过 ~800 行、同时被 3 个以上模块引用时，就到了该拆的程度。"
+        "statement": "未核查：本次没有读取文件长度与引用关系。"
       }
     ]
   },

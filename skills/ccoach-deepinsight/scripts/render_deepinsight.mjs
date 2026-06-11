@@ -67,14 +67,15 @@ const CHROME = {
     confK: '置信',
     legend: '分类含义',
     toc: '发现清单 · 点击跳转',
-    health: '项目体检',
+    health: '项目盲区',
     healthBeta: 'Beta',
-    healthBetaTitle: '测试版——评估口径还在校准，先当第一印象看',
-    healthSub: '只基于真实读到的代码 · 本地报告，不进可分享成绩卡',
-    healthEvidence: '依据',
-    healthThreshold: '重构阈值',
-    healthLevels: ['缺失', '薄弱', '有缺口', '良好', '扎实'],
-    healthNA: '未评估',
+    healthBetaTitle: '测试版——阶段判定和盲区口径还在校准',
+    healthSub: '只指出盲区、布置作业——审计本身交给 agent 下个会话执行 · 本地报告，不进可分享产物',
+    healthBasis: '依据',
+    healthAttention: { never: '从未出现', touched: '零星出现过', practiced: '已是常规动作' },
+    healthNA: '未核查',
+    healthLocked: '此阶段未解锁',
+    stageK: '阶段判定',
     healthDims: {
       security_data: '安全与数据',
       stability_resources: '稳定性与资源',
@@ -98,14 +99,15 @@ const CHROME = {
     confK: 'conf',
     legend: 'categories',
     toc: 'findings · click to jump',
-    health: 'Project health check',
+    health: 'Project blind spots',
     healthBeta: 'Beta',
-    healthBetaTitle: 'beta — the rubric is still being calibrated; read scores as a first impression',
-    healthSub: 'based only on code actually read · local report, never in the shareable scorecard',
-    healthEvidence: 'evidence',
-    healthThreshold: 'refactor threshold',
-    healthLevels: ['missing', 'weak', 'gaps', 'good', 'solid'],
-    healthNA: 'not assessed',
+    healthBetaTitle: 'beta — the stage gate and blind-spot buckets are still being calibrated',
+    healthSub: 'names blind spots and assigns homework — the audit itself runs in your agent next session · local report, never in anything shareable',
+    healthBasis: 'basis',
+    healthAttention: { never: 'never came up', touched: 'came up occasionally', practiced: 'a regular practice' },
+    healthNA: 'not checked',
+    healthLocked: 'not unlocked at this stage',
+    stageK: 'stage',
     healthDims: {
       security_data: 'Security & data',
       stability_resources: 'Stability & resources',
@@ -182,37 +184,62 @@ function confMeter(level) {
   return `<span class='conf' title='${esc(L.confK)}: ${esc(level || 'n/a')}'><span class='conf-k'>${esc(L.confK)}</span><span class='conf-bars'>${bars}</span></span>`
 }
 
-// Project health check (Beta) — four common-sense dimensions, scored only from code actually read.
-// A missing score means "not assessed" (rendered as an empty dashed bar), never zero.
-function healthBar(score) {
-  const n = Number.isInteger(score) ? Math.max(0, Math.min(4, score)) : null
-  if (n === null) return `<span class='hd-bars hd-na'><i></i><i></i><i></i><i></i></span>`
-  const toneVar = n >= 3 ? '--c-flow' : n === 2 ? '--accent' : '--c-risk'
-  const segs = [0, 1, 2, 3].map((i) => `<i class='${i < n ? 'on' : ''}'></i>`).join('')
-  return `<span class='hd-bars' style='--hb: var(${toneVar})'>${segs}</span>`
+// Project blind spots (Beta) — coach, not auditor. Stage-gated: only dimensions the project's
+// stage warrants are assessed; the rest render as quiet locked rows. Each unlocked dimension is a
+// verifiable behavior/presence statement ("this never came up in your sessions"), never an audit
+// verdict; homework hands the actual audit to the agent. Omitted attention = not checked, never zero.
+const ATTENTION = {
+  never: { fill: '0%', tone: '--c-risk' },
+  touched: { fill: '50%', tone: '--accent' },
+  practiced: { fill: '100%', tone: '--c-flow' },
+}
+
+function healthDimensions(h) {
+  if (!h || !Array.isArray(h.dimensions)) return []
+  return h.dimensions.filter((d) => d && typeof d === 'object')
 }
 
 function healthSection(h) {
-  if (!h || !Array.isArray(h.dimensions) || !h.dimensions.length) return ''
-  const dims = h.dimensions
+  const dims = healthDimensions(h)
+  if (!dims.length) return ''
+  const stage = h.stage && (h.stage.label || h.stage.basis)
+    ? `<div class='stage'><span class='stage-k'>${esc(L.stageK)}</span><b>${esc(h.stage.label ?? '')}</b>` +
+      (h.stage.basis ? `<span class='stage-b'>${esc(h.stage.basis)}</span>` : '') +
+      (h.stage.note ? `<div class='stage-n'>${esc(h.stage.note)}</div>` : '') +
+      `</div>`
+    : ''
+  const rows = dims
     .map((dim) => {
-      const label = L.healthDims[dim.id] ?? (dim.label ? String(dim.label) : String(dim.id || ''))
-      const n = Number.isInteger(dim.score) ? Math.max(0, Math.min(4, dim.score)) : null
-      const levelWord = n === null ? L.healthNA : L.healthLevels[n]
-      const threshold = dim.threshold
-        ? `<div class='hd-th'><span class='hd-th-k'>${esc(L.healthThreshold)}</span> ${esc(dim.threshold)}</div>`
-        : ''
-      const advice = dim.advice
-        ? `<div class='fix'><span class='fix-k'>${esc(L.fixK)}</span><div class='fix-b'>${esc(dim.advice)}</div></div>`
-        : ''
-      const evidence = dim.evidence
-        ? `<div class='hd-ev'><span class='hd-ev-k'>${esc(L.healthEvidence)}</span> ${esc(dim.evidence)}</div>`
+      const label = Object.hasOwn(L.healthDims, dim.id)
+        ? L.healthDims[dim.id]
+        : dim.label
+          ? String(dim.label)
+          : String(dim.id || '')
+      if (dim.locked) {
+        return (
+          `<div class='hd hd-locked'>` +
+          `<div class='hd-h'><span class='hd-l'>${esc(label)}</span><span class='hd-track hd-off'></span><span class='hd-lv'>${esc(L.healthLocked)}</span></div>` +
+          (dim.statement ? `<p class='cause'>${esc(dim.statement)}</p>` : '') +
+          `</div>`
+        )
+      }
+      const att = typeof dim.attention === 'string' && Object.hasOwn(ATTENTION, dim.attention) ? dim.attention : null
+      const word = att
+        ? `<span class='hd-lv' style='color:var(${ATTENTION[att].tone})'>${esc(L.healthAttention[att])}</span>`
+        : `<span class='hd-lv'>${esc(L.healthNA)}</span>`
+      const track = att
+        ? `<span class='hd-track' style='--hf:${ATTENTION[att].fill};--hb:var(${ATTENTION[att].tone})'><i></i></span>`
+        : `<span class='hd-track hd-off'></span>`
+      const feature = dim.feature ? ` <span class='feat'>${esc(dim.feature)}</span>` : ''
+      const homework = dim.homework ? fixBlock(`${esc(dim.homework)}${feature}`) : ''
+      const basis = dim.basis
+        ? `<div class='hd-ev'><span class='hd-ev-k'>${esc(L.healthBasis)}</span> ${esc(dim.basis)}</div>`
         : ''
       return (
-        `<div class='hd${n === null ? ' hd-unassessed' : ''}'>` +
-        `<div class='hd-h'><span class='hd-l'>${esc(label)}</span>${healthBar(dim.score)}<span class='hd-lv'>${esc(levelWord)}</span></div>` +
-        (dim.status ? `<p class='cause'>${esc(dim.status)}</p>` : '') +
-        threshold + advice + evidence +
+        `<div class='hd${att ? '' : ' hd-unassessed'}'>` +
+        `<div class='hd-h'><span class='hd-l'>${esc(label)}</span>${track}${word}</div>` +
+        (dim.statement ? `<p class='cause'>${esc(dim.statement)}</p>` : '') +
+        homework + basis +
         `</div>`
       )
     })
@@ -221,23 +248,23 @@ function healthSection(h) {
     `<section class='health' id='project-health'>` +
     `<div class='health-h'><span class='health-k'>${esc(L.health)}</span><span class='chip chip-beta' title='${esc(L.healthBetaTitle)}'>${esc(L.healthBeta)}</span></div>` +
     `<div class='health-sub'>${esc(L.healthSub)}</div>` +
+    stage +
     (h.summary ? `<p class='headline'>${esc(h.summary)}</p>` : '') +
-    `<div class='hds'>${dims}</div>` +
+    `<div class='hds'>${rows}</div>` +
     `</section>`
   )
 }
 
 // Findings table of contents — generated by the renderer from the findings themselves
-// (the report JSON never carries a TOC). Pure anchor links, no JS.
-function tocSection(passes, health) {
-  const withFindings = (passes || []).filter((p) => (p.findings || []).length)
-  if (!withFindings.length) return ''
-  const grouped = withFindings.length > 1
-  const groups = (passes || [])
-    .map((p, pi) => {
-      const fs = p.findings || []
-      if (!fs.length) return ''
-      const rows = fs
+// (the report JSON never carries a TOC). Pure anchor links, no JS. hasHealth is derived from
+// the already-rendered health section, so the link and its target cannot disagree.
+function tocSection(passes, hasHealth) {
+  const entries = (passes || []).map((p, pi) => [p, pi]).filter(([p]) => (p.findings || []).length)
+  if (!entries.length && !hasHealth) return ''
+  const grouped = entries.length > 1
+  const groups = entries
+    .map(([p, pi]) => {
+      const rows = (p.findings || [])
         .map((f, i) => {
           const c = cat(f.category, f.category_label)
           return `<li><a href='#f-${pi}-${i}'><span class='chip' style='--cat: var(${c.v})'>${esc(c.label)}</span><span class='toc-t'>${esc(f.title)}</span></a></li>`
@@ -247,10 +274,9 @@ function tocSection(passes, health) {
       return `${head}<ol class='toc-l'>${rows}</ol>`
     })
     .join('')
-  const healthRow =
-    health && Array.isArray(health.dimensions) && health.dimensions.length
-      ? `<ol class='toc-l toc-x'><li><a href='#project-health'><span class='chip' style='--cat: var(--accent2)'>${esc(L.healthBeta)}</span><span class='toc-t'>${esc(L.health)}</span></a></li></ol>`
-      : ''
+  const healthRow = hasHealth
+    ? `<ol class='toc-l toc-x'><li><a href='#project-health'><span class='chip' style='--cat: var(--accent2)'>${esc(L.healthBeta)}</span><span class='toc-t'>${esc(L.health)}</span></a></li></ol>`
+    : ''
   return `<nav class='toc'><div class='toc-k'>${esc(L.toc)}</div>${groups}${healthRow}</nav>`
 }
 
@@ -361,6 +387,7 @@ export function renderDeepinsight(data) {
   L = CHROME[loc] ?? CHROME.en
   LOC = loc
   const passes = (d.passes || []).map((p, i) => passSection(p, i)).join('')
+  const health = healthSection(d.project_health)
   const honesty =
     Array.isArray(d.honesty) && d.honesty.length
       ? `<section class='notes'><div class='notes-k'>${esc(L.notes)}</div><ul>${d.honesty
@@ -496,23 +523,26 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .signal{margin-top:12px;font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.02em;opacity:.78}
 .signal .sig-k{text-transform:uppercase;letter-spacing:.16em;color:color-mix(in srgb,var(--cat) 55%,var(--faint));margin-right:7px}
 
-/* project health check (beta) */
+/* project blind spots (beta) */
 .health{border:1px solid var(--rule);border-radius:4px;background:var(--ink2);padding:22px 24px 20px;margin:0 0 56px;scroll-margin-top:24px}
 .health-h{display:flex;align-items:center;gap:10px}
 .health-k{font-family:var(--mono);font-size:11.5px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent)}
 .health-sub{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin:8px 0 18px;letter-spacing:.04em}
+.stage{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;border:1px solid var(--rule);border-left:3px solid var(--c-prompt);background:linear-gradient(90deg,rgba(95,201,214,.06),transparent);border-radius:3px;padding:11px 14px;margin:0 0 16px;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em}
+.stage-k{text-transform:uppercase;letter-spacing:.16em;color:var(--c-prompt)}
+.stage b{color:var(--paper);letter-spacing:.08em}
+.stage-b{color:var(--muted)}
+.stage-n{flex-basis:100%;font-family:var(--serif);font-size:13.5px;color:var(--faint)}
 .hds{display:flex;flex-direction:column;gap:18px}
 .hd{border-top:1px dotted var(--rule);padding-top:16px}
 .hd-h{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .hd-l{font-family:var(--serif);font-weight:600;font-size:17px;color:var(--paper)}
-.hd-bars{display:inline-flex;gap:4px}
-.hd-bars i{width:34px;height:6px;border-radius:3px;background:var(--rule)}
-.hd-bars i.on{background:var(--hb,var(--accent))}
-.hd-na i{border:1px dashed var(--rule);background:transparent}
+.hd-track{position:relative;flex:0 0 130px;height:6px;border-radius:3px;background:var(--rule);overflow:hidden}
+.hd-track i{position:absolute;left:0;top:0;bottom:0;width:var(--hf,0%);background:var(--hb,var(--accent));border-radius:3px}
+.hd-off{background:transparent;border:1px dashed var(--rule)}
 .hd-lv{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.hd-unassessed .hd-lv{color:var(--faint)}
-.hd-th{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--accent2)}
-.hd-th-k{text-transform:uppercase;letter-spacing:.14em;margin-right:8px;color:var(--accent)}
+.hd-unassessed .hd-lv,.hd-locked .hd-lv{color:var(--faint)}
+.hd-locked .hd-l{color:var(--muted);font-weight:500}
 .hd-ev{margin-top:10px;font-family:var(--mono);font-size:10.5px;color:var(--faint);opacity:.78}
 .hd-ev-k{text-transform:uppercase;letter-spacing:.16em;margin-right:7px}
 
@@ -554,12 +584,12 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
     <span class="seal">${esc(L.seal)}</span>
   </header>
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
-  ${tocSection(d.passes, d.project_health)}
+  ${tocSection(d.passes, Boolean(health))}
   ${glossarySection()}
   ${legendSection(d.passes)}
   ${magicSection(d.magic_time)}
   ${passes}
-  ${healthSection(d.project_health)}
+  ${health}
   ${honesty}
   <footer class="foot">${esc(d.privacy || L.privacy)}</footer>
 </div>

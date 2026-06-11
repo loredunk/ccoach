@@ -4,7 +4,7 @@ description: Deep, semantic root-cause coaching for how you work with Claude Cod
 when_to_use: 'Trigger when the user wants a SERIOUS productivity / behavioral deep-dive on how they use Claude Code in a project — "why do I keep reworking this", "where am I wasting effort", "deep insight", "what should I change to use Claude Code better", "/ccoach-deepinsight". NOT for the fun usage scorecard (that is ccoach-insight).'
 argument-hint: "[YYYY-MM-DD | N (days back)]"
 arguments: period
-allowed-tools: Read Grep Glob WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
+allowed-tools: Read Write Grep Glob WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
 ---
 
 # ccoach-deepinsight — semantic root-cause deep coach (Claude Code + Codex)
@@ -55,12 +55,11 @@ Find systemic root causes that recur across sessions and are fixable once.
 5. **Context-rot curve:** `episode_summary.context_rot` buckets episodes by their in-session turn index; `inflection_index` estimates the user's personal **context shelf life in turns**. If present (and not `low_confidence`), it is a star, sticky finding: "your sessions degrade after ~N turns — /clear or start a fresh session at task boundaries; push exploration into subagents to keep the main context clean." Episode `compacted` flags (Codex) corroborate heavy-context turns.
 6. **Feature adoption (Claude Code only):** `report.feature_adoption` is official-backed evidence for "feature you haven't used" findings. `unadopted` comes from Claude Code's own usage counters (e.g. `memory_usage_count: 0`); a tip in `tips[]` with `still_showing: true` means Claude Code ITSELF still judges that feature unadopted (it only shows these tips while the user hasn't adopted it) — the strongest grounding an unknown-feature finding can have (e.g. `/memory`). Honor the `caveats`: the tip watermark is "last shown at startup #N", not a count; tip conditions drift across versions (corroboration only); and each evidence source has its own definition — e.g. the custom-agents tip checks configured agent FILES, so it can say "unadopted" while the transcripts show heavy subagent use. When sources conflict, present the conflict and name each source's definition; never pick one silently.
 7. Emit **ship-once** root causes + fixes, e.g.: a missing `.claude/settings.json` PostToolUse hook running the repo's typecheck/test; a CLAUDE.md Commands block + one-line-per-file module map. Ground each in the code you read; demote metrics to a single supporting line.
-8. **Project health check (Beta):** while the repo is already open in this pass, also rate four dimensions of common-sense project hygiene — many fast-built projects are missing one of these without the author knowing. 1-2 quick probes per dimension:
-   - **Security & data** — real auth/account handling vs none; hardcoded credentials (grep obvious key/password/token patterns); DB schema changes through migrations or ad-hoc; any backup story.
-   - **Stability & resources** — error handling at I/O boundaries; leak-prone patterns (listeners/connections/timers acquired but never released); cleanup on shutdown paths.
-   - **Verification gates & tests** — test directory + runnable test script; typecheck/lint wired into the manifest; CI workflow present.
-   - **Architecture & layering** — oversized files, mixed responsibilities, fan-in concentration; state a **refactor threshold** anchored to THIS repo's real numbers ("file <…> is ~1,400 lines and imported by 5 modules — past the point where splitting pays off"), never generic dogma.
-   Score each dimension 0-4 (rubric: `references/deepinsight-method.md`) into `project_health` in the report JSON (`references/deepinsight-insights-schema.md`). Honesty inherited: a score may only come from files you actually opened — if you didn't read enough to judge a dimension, OMIT its score and say in `status` what wasn't assessed and why; never guess from project type; if you find a hardcoded secret, never write its value into any field. Local report only — never carry this block into anything shareable.
+8. **Project blind-spot coach (Beta):** ccoach is a **coach, not an auditor** — it names blind spots and assigns homework; the actual audit is the agent's job in a follow-up session. Three disciplines (full playbook: `references/deepinsight-method.md`):
+   - **Stage gate first.** Judge the project's stage from verifiable signals only — commit frequency, whether a CI config exists, whether sessions/commits ever mention deployment or real users. A prototype gets ONLY security-redline blind spots; the full four dimensions (security & data / stability & resources / verification gates & tests / architecture & layering) unlock as real-user signals appear. Telling a weekend prototype it "lacks observability and disaster recovery" is manufacturing anxiety, not coaching — mark out-of-stage dimensions `locked`.
+   - **Absence statements, not audit verdicts.** Every dimension statement must be a verifiable behavior/presence fact — "auth/secret work never appeared in your sessions or commits in this window" (grep-able), "no CI config file exists", "a ~1,400-line file imported by 5 modules" — never "your project's X is weak" (an audit conclusion this tool cannot stand behind; tests in an unusual directory ≠ no tests, and one false positive costs all trust). If you didn't check a dimension, omit its `attention` and say so.
+   - **Homework routes back to the harness.** Each unlocked blind spot gets one assignment the user can hand to the agent next session, anchored to an official feature (verification-first rule applies): "have Claude run a security review focused on <these three files>", "have the agent wire a post-edit typecheck hook". ccoach never performs the audit itself, so it never owes anyone a clean bill of health.
+   Output into `project_health` in the report JSON (`references/deepinsight-insights-schema.md`). Local report only — never carry this block into anything shareable.
 
 This pass alone is the highest-leverage, lowest-risk output. Stop here unless the user wants per-session depth or a session is spiral-flagged.
 
@@ -126,11 +125,11 @@ Desensitize all paths/identifiers to `<…>` before writing/sharing.
 
 ### HTML report (optional)
 
-For a shareable dossier, write the findings to a report JSON (schema: `references/deepinsight-insights-schema.md`) and render:
+For an HTML dossier, write the findings to a report JSON (schema: `references/deepinsight-insights-schema.md`) and render:
 
 `node ${CLAUDE_SKILL_DIR}/scripts/render_deepinsight.mjs --data <report.json> --output ccoach-deepinsight.html`
 
-The renderer is a standalone "diagnostic dossier" (dark editorial; root-cause categories color-coded; metrics demoted to a faint "signal" margin; grounding commits shown as a ledger). It HTML-escapes every field. Same privacy discipline: desensitize identifiers to `<…>` in the JSON before rendering anything you'll share, and keep `root_cause`/`headline` as paraphrase — never paste redacted prompt/digest text verbatim.
+The renderer is a standalone "diagnostic dossier" (dark editorial; root-cause categories color-coded; metrics demoted to a faint "signal" margin; grounding commits shown as a ledger). It HTML-escapes every field. The dossier is a **local report** by default. If the user wants to share it: strip `project_health` from the JSON first (that block is local-only), desensitize identifiers to `<…>`, and keep `root_cause`/`headline` as paraphrase — never paste redacted prompt/digest text verbatim.
 
 ## Honesty rules
 
