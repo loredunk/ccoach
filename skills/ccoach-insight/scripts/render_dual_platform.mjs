@@ -88,25 +88,26 @@ function compactTokens(n, loc) {
   return { n: String(Math.trunc(v)), u: '' }
 }
 
-// ---- On-page glossary (回合 / 严重程度 / 原地打转) ----
-// Single source of truth for the HTML term definitions, bilingual, keyed by locale.
-// (.mjs can't import src/i18n.ts; the CLI/text path keeps its own copy in i18n.ts.)
-// Product language only — NO internal markers (ADR numbers etc.).
+// ---- On-page glossary (回合 / 原地打转 / 严重程度) ----
+// Bilingual HTML term definitions, keyed by locale. Spiral comes before severity — severity is
+// defined as the degree of spiraling, so the reader needs the spiral term first.
+// (.mjs can't import src/i18n.ts and skills are standalone — the deepinsight renderer keeps its
+// own copy of this table; keep the wording in sync.) Product language only — NO internal markers.
 const GLOSSARY = {
   zh: {
     head: '术语',
     terms: [
       ['回合 episode', '你下的一条指令 → agent 为它做的整段工作；下一条指令开启下一个回合。'],
-      ['严重程度 severity', '0–6，衡量一个回合「原地打转」的程度：反复改同一个文件、连着报错、没有新进展、耗时异常，加在一起打分；0=完全顺畅，越高越卡。'],
       ['原地打转 spiral', 'agent 卡住、在原地兜圈子的回合——反复改同几个文件、命令一直报错、却没往前推进，很费 token。'],
+      ['严重程度 severity', '0–6，衡量一个回合「原地打转」的程度：反复改同一个文件、连着报错、没有新进展、耗时异常，加在一起打分；0=完全顺畅，越高越卡。'],
     ],
   },
   en: {
     head: 'Terms',
     terms: [
       ['episode', 'One instruction from you → all the work the agent did for it. The next instruction starts the next episode.'],
-      ['severity', '0-6 — how badly an episode got stuck. Points add up for: editing the same file again and again, repeated errors, no new progress, taking unusually long. 0 = smooth.'],
       ['spiral (going in circles)', 'An episode where the agent went in circles — same files edited over and over, same errors, no forward progress. Wastes tokens.'],
+      ['severity', '0-6 — how badly an episode went in circles. Points add up for: editing the same file again and again, repeated errors, no new progress, taking unusually long. 0 = smooth.'],
     ],
   },
 }
