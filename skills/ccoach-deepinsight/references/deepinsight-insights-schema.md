@@ -24,6 +24,7 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
         {
           "title": "plain-language root-cause statement",
           "category": "cognitive_gap | prompt_issue | code_structure | workflow | unknown_feature | other | <any snake_case category you create>",
+          "category_label": "optional — badge text in the report language; REQUIRED when category is outside the known list (otherwise the badge falls back to the title-cased English key)",
           "novel_category": false,
           "confidence": "high | med | low",
           "root_cause": "the semantic why, in human terms",
@@ -48,10 +49,13 @@ The renderer consumes one report JSON and emits a standalone HTML "diagnostic do
 ```
 
 Notes:
-- `category` is an **open** enum: the known values drive the color code; any other snake_case value is rendered
-  with its own literal label (neutral color). When you created the category from evidence (it fits none of the
-  known five), set `novel_category: true` — the renderer adds a small "novel" marker so readers see it is a
-  discovered, not predefined, class.
+- `category` is an **open** enum: the known values drive the color code and render as localized,
+  self-explanatory badges (e.g. unknown_feature → "Native feature available" / 「有现成官方特性」 — an
+  opportunity, not a defect); a legend near the top of the report explains each known category that appears.
+  Any other snake_case value is rendered with its own label (neutral color) — supply `category_label` in the
+  report language so non-English reports don't show a title-cased English key. When you created the category
+  from evidence (it fits none of the known five), set `novel_category: true` — the renderer adds a small
+  "novel" marker so readers see it is a discovered, not predefined, class.
 - `verdict.tone` colors the banner (healthy=green, churn=cyan, mixed=amber).
 - `signal` is intentionally rendered small and faint — the root cause and fix are the product, metrics are corroboration only.
 - `digest_stats` is reader-facing prose like every other field: write it in the report language with plain

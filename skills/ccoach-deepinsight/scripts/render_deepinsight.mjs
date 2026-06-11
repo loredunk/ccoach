@@ -62,6 +62,10 @@ const CHROME = {
     digest: '正文摘要',
     novel: '新类别',
     novelTitle: '从证据里新发现的类别，不在预设分类里',
+    fixK: '改法',
+    sigK: '信号',
+    confK: '置信',
+    legend: '分类含义',
     magic: 'Magic Time',
     magicSub: '平台自己报的数 + 精确计数——不是估算拍脑袋',
     privacy: '本地只读分析。指标只是佐证——根因和改法才是产品。绝不读取思考过程 / 系统提示词 / 文件内容；正文摘要为显式开启、已脱敏、限额读取。',
@@ -74,45 +78,90 @@ const CHROME = {
     digest: 'content summary',
     novel: 'novel',
     novelTitle: 'a category discovered from the evidence, not predefined',
+    fixK: 'fix',
+    sigK: 'signal',
+    confK: 'conf',
+    legend: 'categories',
     magic: 'Magic Time',
     magicSub: 'platform-reported numbers + exact counts — no made-up estimates',
     privacy: 'Local, read-only analysis. Metrics are supporting evidence only — the root cause and the fix are the product. Never reads thinking / system prompts / file contents as content; assistant/tool_result content is opt-in, redacted, token-bounded.',
   },
 }
 let L = CHROME.en // set per render in renderDeepinsight (single render per process)
+let LOC = 'en'
 
+// Category badges are reader-facing and self-explanatory in the report language —
+// e.g. unknown_feature renders as "Native feature available", an opportunity, never "Unknown Feature".
 const CAT = {
-  cognitive_gap: { label: 'Cognitive Gap', v: '--c-cog' },
-  prompt_issue: { label: 'Prompt', v: '--c-prompt' },
-  code_structure: { label: 'Code Structure', v: '--c-code' },
-  workflow: { label: 'Workflow', v: '--c-flow' },
-  unknown_feature: { label: 'Unknown Feature', v: '--c-feat' },
-  other: { label: 'Other', v: '--c-other' },
+  cognitive_gap: { en: 'Knowledge gap', zh: '知识盲区', v: '--c-cog' },
+  prompt_issue: { en: 'Prompt wording', zh: '提示词写法', v: '--c-prompt' },
+  code_structure: { en: 'Code structure', zh: '代码结构', v: '--c-code' },
+  workflow: { en: 'Workflow', zh: '工作流程', v: '--c-flow' },
+  unknown_feature: { en: 'Native feature available', zh: '有现成官方特性', v: '--c-feat' },
+  other: { en: 'Other', zh: '其他', v: '--c-other' },
 }
-// Open taxonomy: an unknown category keeps its own literal label (neutral color) instead of collapsing to Other.
-const cat = (k) => {
-  if (CAT[k]) return CAT[k]
+// One-line plain-language definitions for the category legend printed near the top of the report.
+const CAT_DEFS = {
+  zh: {
+    cognitive_gap: '对领域、代码或工具有一处还不知道的事，导致绕了路。',
+    prompt_issue: '指令的表达方式让 agent 理解偏了——换个说法就能避免。',
+    code_structure: '代码本身的结构让改动变难——问题在代码，不在你。',
+    workflow: '做事的流程顺序可以调整，让同样的工作更省力。',
+    unknown_feature: '平台已有一个现成的官方特性能解决这个问题——你还没用上。这是机会，不是故障。',
+    other: '不属于以上几类的发现。',
+  },
+  en: {
+    cognitive_gap: 'Something about the domain, code, or tool you did not know yet — it caused a detour.',
+    prompt_issue: 'The way an instruction was phrased sent the agent the wrong way — a rewording avoids it.',
+    code_structure: 'The code structure itself made the change hard — the code, not you.',
+    workflow: 'A change in the order or process of the work would make the same work cheaper.',
+    unknown_feature: "An official feature already solves this — you just haven't adopted it yet. An opportunity, not a bug.",
+    other: 'Findings that fit none of the categories above.',
+  },
+}
+// Open taxonomy: an unknown category keeps its own label (neutral color) instead of collapsing to Other.
+// Preference: known table (localized) → category_label supplied by the report → title-cased key.
+const cat = (k, categoryLabel) => {
+  const known = CAT[k]
+  if (known) return { label: known[LOC] ?? known.en, v: known.v }
+  if (categoryLabel) return { label: String(categoryLabel), v: '--c-other' }
   const label = String(k || '').trim().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-  return label ? { label, v: '--c-other' } : CAT.other
+  return label ? { label, v: '--c-other' } : { label: CAT.other[LOC] ?? CAT.other.en, v: CAT.other.v }
+}
+
+// Legend: only the known categories that actually appear in this report, each with its plain definition.
+function legendSection(passes, loc) {
+  const seen = new Set()
+  for (const p of passes || []) for (const f of p.findings || []) if (CAT[f.category]) seen.add(f.category)
+  if (!seen.size) return ''
+  const defs = CAT_DEFS[loc] ?? CAT_DEFS.en
+  const rows = Object.keys(CAT)
+    .filter((k) => seen.has(k))
+    .map((k) => {
+      const c = CAT[k]
+      return `<div class='lg-row' style='--cat: var(${c.v})'><span class='chip'>${esc(c[loc] ?? c.en)}</span><span class='lg-d'>${esc(defs[k])}</span></div>`
+    })
+    .join('')
+  return `<section class='legend'><div class='legend-k'>${esc(L.legend)}</div>${rows}</section>`
 }
 
 const CONF = { high: 3, med: 2, medium: 2, low: 1 }
 function confMeter(level) {
   const n = CONF[String(level || '').toLowerCase()] ?? 0
   const bars = [0, 1, 2].map((i) => `<i class='${i < n ? 'on' : ''}'></i>`).join('')
-  return `<span class='conf' title='confidence: ${esc(level || 'n/a')}'><span class='conf-k'>conf</span><span class='conf-bars'>${bars}</span></span>`
+  return `<span class='conf' title='confidence: ${esc(level || 'n/a')}'><span class='conf-k'>${esc(L.confK)}</span><span class='conf-bars'>${bars}</span></span>`
 }
 
 function findingCard(f, i) {
-  const c = cat(f.category)
+  const c = cat(f.category, f.category_label)
   const feature = f.feature
     ? `<span class='feat'>${esc(f.feature)}</span>`
     : ''
   const fix = f.fix
-    ? `<div class='fix'><span class='fix-k'>fix</span><div class='fix-b'>${esc(f.fix)} ${feature}</div></div>`
+    ? `<div class='fix'><span class='fix-k'>${esc(L.fixK)}</span><div class='fix-b'>${esc(f.fix)} ${feature}</div></div>`
     : ''
   const signal = f.signal
-    ? `<div class='signal'><span class='sig-k'>signal</span> ${esc(f.signal)}</div>`
+    ? `<div class='signal'><span class='sig-k'>${esc(L.sigK)}</span> ${esc(f.signal)}</div>`
     : ''
   const novel = f.novel_category === true
     ? `<span class='chip chip-novel' title='${esc(L.novelTitle)}'>${esc(L.novel)}</span>`
@@ -205,6 +254,7 @@ export function renderDeepinsight(data) {
   const d = data || {}
   const loc = String(d.lang ?? '').startsWith('zh') ? 'zh' : 'en'
   L = CHROME[loc] ?? CHROME.en
+  LOC = loc
   const passes = (d.passes || []).map((p, i) => passSection(p, i)).join('')
   const honesty =
     Array.isArray(d.honesty) && d.honesty.length
@@ -273,6 +323,13 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .terms dl>div{margin:9px 0}
 .terms dt{font-family:var(--mono);font-size:13px;color:var(--accent2);font-weight:500;letter-spacing:.02em}
 .terms dd{margin:4px 0 0;font-size:14.5px;line-height:1.55;color:var(--muted)}
+
+/* category legend */
+.legend{border:1px dashed var(--rule);border-radius:4px;padding:16px 22px;margin:-28px 0 44px;background:rgba(255,255,255,.012)}
+.legend-k{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--c-feat);margin-bottom:11px}
+.lg-row{display:flex;gap:12px;align-items:baseline;margin:8px 0}
+.lg-row .chip{flex:0 0 auto}
+.lg-d{font-size:14.5px;line-height:1.55;color:var(--muted)}
 
 /* pass */
 .pass{margin:0 0 70px;opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards;animation-delay:calc(var(--d,0)*.12s + .1s)}
@@ -362,6 +419,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
   </header>
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
   ${glossarySection(loc)}
+  ${legendSection(d.passes, loc)}
   ${magicSection(d.magic_time)}
   ${passes}
   ${honesty}

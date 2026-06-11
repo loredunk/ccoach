@@ -54,6 +54,45 @@ describe('render_deepinsight', () => {
     expect(renderDeepinsight({})).toContain('Deep')
   })
 
+  it('localizes category badges per lang — unknown_feature is self-explanatory, never "Unknown Feature"', () => {
+    const passes = [{ id: '01', kind: 'P', title: 'T', findings: [
+      { title: 'memory unused', category: 'unknown_feature', confidence: 'high', root_cause: 'x', fix: 'use /memory', feature: '/memory', signal: 'memory_usage_count 0' },
+      { title: 'gap', category: 'cognitive_gap', confidence: 'med', root_cause: 'y' },
+    ] }]
+    const zh = renderDeepinsight({ lang: 'zh', passes })
+    expect(zh).toContain('有现成官方特性')
+    expect(zh).toContain('知识盲区')
+    expect(zh).not.toContain('Unknown Feature')
+    expect(zh).toContain('改法') // fix label localized
+    expect(zh).toContain('信号') // would appear in legend-free reports too via sig-k when signal present
+    const en = renderDeepinsight({ lang: 'en', passes })
+    expect(en).toContain('Native feature available')
+    expect(en).not.toContain('Unknown Feature')
+  })
+
+  it('renders a category legend for known categories that appear (with plain definitions), omits otherwise', () => {
+    const zh = renderDeepinsight({ lang: 'zh', passes: [{ id: '01', kind: 'P', title: 'T', findings: [
+      { title: 'a', category: 'unknown_feature', root_cause: 'x' },
+    ] }] })
+    expect(zh).toContain("class='legend'")
+    expect(zh).toContain('这是机会，不是故障')
+    expect(zh).toContain('分类含义')
+    expect(zh).not.toContain('知识盲区') // legend lists only categories that appear
+    const none = renderDeepinsight({ lang: 'zh', passes: [{ id: '01', kind: 'P', title: 'T', findings: [
+      { title: 'a', category: 'my_own_thing', category_label: '自造类', root_cause: 'x' },
+    ] }] })
+    expect(none).not.toContain("class='legend'") // novel-only report → no legend
+  })
+
+  it('novel categories prefer category_label; title-case fallback still works', () => {
+    const html = renderDeepinsight({ lang: 'zh', passes: [{ id: '01', kind: 'P', title: 'T', findings: [
+      { title: 'a', category: 'context_thrash', category_label: '上下文反复重建', novel_category: true, root_cause: 'x' },
+      { title: 'b', category: 'observability_gap', root_cause: 'y' },
+    ] }] })
+    expect(html).toContain('上下文反复重建')
+    expect(html).toContain('Observability Gap') // fallback unchanged
+  })
+
   it('renders the magic_time highlight strip (value/unit/basis/tone), omits when absent', () => {
     const html = renderDeepinsight({
       project: 'demo', platform: 'codex',
