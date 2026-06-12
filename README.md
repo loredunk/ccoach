@@ -52,9 +52,13 @@ One command installs **both** skills (the repo auto-discovers `skills/*/SKILL.md
 You don't run a command — you just talk to your agent. Once a skill is installed, ask in plain language and the agent picks the right one:
 
 - **Usage report / scorecard** → *"Review my Claude Code and Codex usage for the last 7 days."* · *"Which projects burned the most tokens this week?"* · *"Build me an HTML dashboard of how I used AI today."*
-- **Deep root-cause coaching** → *"Why do I keep reworking this project?"* · *"Where am I wasting effort with Claude Code here, and what should I change?"* · *"Give me a deep insight into how I work in this repo."*
+- **Deep root-cause coaching** — call it by name and tell it which project to analyze:
 
-Prefer to call them by name? In **Claude Code** type `/ccoach-insight` or `/ccoach-deepinsight` (in **Codex**, `$ccoach-insight` / `$ccoach-deepinsight`). On its own each covers a sensible default (the report → **today**; the deep coach → the **current project**); add a number of days (`7`) or a date (`2026-06-01`) to widen the window.
+  ```text
+  /ccoach-deepinsight analyze the <project> project for me
+  ```
+
+In **Codex** the commands are `$ccoach-insight` / `$ccoach-deepinsight`. `/ccoach-insight` on its own reports **today** — add a number of days (`7`) or a date (`2026-06-01`) to widen the window. `/ccoach-deepinsight` defaults to the **current project** when you don't name one.
 
 Both are **English by default** — just ask in Chinese (or for a Chinese report) and the agent renders it in Chinese (see each skill's `SKILL.md`).
 

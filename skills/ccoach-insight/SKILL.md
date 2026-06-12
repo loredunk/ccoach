@@ -63,8 +63,8 @@ Let `<P>` be the chosen single platform (`claude-code` or `codex`). The **defaul
    Let `<L>` be the language flag `--lang en|zh` (**default English**; pass `--lang zh` etc. to match the user's language). **Use the same `<L>` on every `ccoach report` call AND on `merge_dual_platform.mjs` / `scorecard.mjs` / `render_*.mjs`** — the CLI localizes its habit/behavior signals and window description by `--lang`, so a Chinese report needs `--lang zh` everywhere, or some signals stay English. Omit `<L>` for the English default.
 
 1. Locate `ccoach` (a Node CLI, `@loredunk/ccoach`; the Go build is retired):
-   - Prefer `ccoach` from `PATH`; otherwise `npx @loredunk/ccoach@latest`.
-   - If this is the ccoach source repo, run `npm ci && npm run build`, then invoke `node dist/cli.js` (or `npm run dev --` to run `tsx src/cli.ts`).
+   - Always run `ccoach` via `npx @loredunk/ccoach@latest` — the latest published CLI, never a stale PATH install.
+   - Only if this is the ccoach source repo itself: `npm ci && npm run build`, then `node dist/cli.js` (or `npm run dev --` to run `tsx src/cli.ts`).
 2. Generate the **host platform report** from ccoach (offline local parse; same `<W>`/`<L>`):
    - `ccoach report --platform <P> <W> <L> --json > /tmp/<P>-report.json`
    - (Only the **Dual-platform comparison (opt-in)** path runs BOTH `--platform codex` and `--platform claude-code`.)
