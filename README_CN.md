@@ -48,9 +48,13 @@ npx skills add loredunk/ccoach
 你不用敲命令——直接跟你的 agent 说话就行。装好后用自然语言问一句，agent 会挑对那个 skill：
 
 - **用量报告 / 成绩卡** → *“看看我最近 7 天 Claude Code 和 Codex 的用量。”* · *“我这周哪些项目最烧 token？”* · *“把我今天用 AI 的情况做成一张 HTML 报告。”*
-- **深度根因教练** → *“为什么我在这个项目里老是返工？”* · *“我在这个仓库里用 Claude Code 哪儿在浪费力气，该改什么？”* · *“给我一份这个项目的深度洞察。”*
+- **深度根因教练** —— 点名调用，告诉它要分析哪个项目：
 
-想点名调用？在 **Claude Code** 里输入 `/ccoach-insight` 或 `/ccoach-deepinsight`（在 **Codex** 里是 `$ccoach-insight` / `$ccoach-deepinsight`）。单独用各有合理默认（报告 → **今天**；深度教练 → **当前项目**）；想放宽窗口就加「往回数几天」（`7`）或某个日期（`2026-06-01`）。
+  ```text
+  /ccoach-deepinsight 帮我分析一下 <项目名>
+  ```
+
+在 **Codex** 里命令是 `$ccoach-insight` / `$ccoach-deepinsight`。`/ccoach-insight` 单独用报告**今天**，加「往回数几天」（`7`）或某个日期（`2026-06-01`）放宽窗口；`/ccoach-deepinsight` 不点名项目时默认分析**当前项目**。
 
 两者都**默认英文**——用中文问（或直接说要中文），agent 就会渲染成中文（见各自的 `SKILL.md`）。
 

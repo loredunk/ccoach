@@ -2,8 +2,7 @@
 name: ccoach-deepinsight
 description: Deep, semantic root-cause coaching for how you work with Claude Code or Codex in a specific project. Goes beyond aggregate metrics — reads your own real code (read-only) and, on spiral-flagged sessions, an opt-in token-bounded content digest — to tell you in plain language WHY work churned and the concrete fix, anchored to official native features. Distinct from the entertainment-flavored ccoach-insight report. Claude Code + Codex (symmetric); read-only, local, desensitized.
 when_to_use: 'Trigger when the user wants a SERIOUS productivity / behavioral deep-dive on how they use Claude Code in a project — "why do I keep reworking this", "where am I wasting effort", "deep insight", "what should I change to use Claude Code better", "/ccoach-deepinsight". NOT for the fun usage scorecard (that is ccoach-insight).'
-argument-hint: "[YYYY-MM-DD | N (days back)]"
-arguments: period
+arguments: project
 allowed-tools: Read Write Grep Glob WebSearch WebFetch Bash(ccoach *) Bash(npx *) Bash(node *) Bash(git *)
 ---
 
@@ -42,7 +41,11 @@ Read-only; local; never exfiltrate. Read the user's own current-project code (ne
 
 > **Windows:** these steps are Bash command sequences (`/tmp`, `${CLAUDE_SKILL_DIR}`, POSIX shell syntax), so run them under **Git Bash or WSL** on Windows. The `ccoach` CLI and the `.mjs` scripts are themselves cross-platform Node.
 
-Two platforms, **symmetric**: **Claude Code** (default) and **Codex** — pass `--platform claude-code|codex`. The two passes below are written for Claude Code; the Codex equivalents are identical (just swap the flag) — see **Codex notes** at the end. Locate `ccoach` (prefer PATH; else `node dist/cli.js` in this repo, or `npx @loredunk/ccoach@latest`).
+Two platforms, **symmetric**: **Claude Code** (default) and **Codex** — pass `--platform claude-code|codex`. The two passes below are written for Claude Code; the Codex equivalents are identical (just swap the flag) — see **Codex notes** at the end.
+
+**Target project:** the invocation argument names the project to analyze (e.g. `/ccoach-deepinsight analyze the <project> project for me`) — resolve it to that repo's path; without one, default to the **current repo**. The time window defaults to the **last 30 days** unless the user names a date or "N days" in the request.
+
+**CLI:** always run `ccoach` via `npx @loredunk/ccoach@latest` — the latest published CLI, never a stale PATH install. (Only when working inside the ccoach source repo itself, `node dist/cli.js` is fine.)
 
 ### Pass 1 — PROJECT (always; cheap; NO content)
 
