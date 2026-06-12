@@ -182,6 +182,12 @@ describe('render_deepinsight', () => {
     ] } })
     expect(bad).toContain('未核查')
     expect(bad).not.toContain('--hf:')
+    // non-standard dimension id without label degrades to a title-cased word, not raw snake_case
+    const novel = renderDeepinsight({ lang: 'zh', project_health: { dimensions: [
+      { id: 'observability_gap', attention: 'never', statement: 's' },
+    ] } })
+    expect(novel).toContain('Observability Gap')
+    expect(novel).not.toContain('observability_gap')
   })
 
   it('renders the magic_time highlight strip (value/unit/basis/tone), omits when absent', () => {

@@ -154,13 +154,18 @@ const CAT = {
 // Open taxonomy: an unknown category keeps its own label (neutral color) instead of collapsing to Other.
 // Preference: known table (localized) → category_label supplied by the report → title-cased key.
 // Object.hasOwn guards keep prototype keys ('constructor', 'toString'…) on the fallback path.
+const titleCase = (s) => String(s || '').trim().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 const knownCat = (k) => typeof k === 'string' && Object.hasOwn(CAT, k)
 const cat = (k, categoryLabel) => {
   if (knownCat(k)) return { label: CAT[k][LOC] ?? CAT[k].en, v: CAT[k].v }
   if (categoryLabel) return { label: String(categoryLabel), v: '--c-other' }
-  const label = String(k || '').trim().replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  const label = titleCase(k)
   return label ? { label, v: '--c-other' } : { label: CAT.other[LOC] ?? CAT.other.en, v: CAT.other.v }
 }
+
+// Single home for the finding anchor format — the card id and every TOC href come from here,
+// so the two sides cannot drift.
+const findingId = (passIdx, i) => `f-${passIdx}-${i}`
 
 // Legend: only the known categories that actually appear in this report, each with its plain definition.
 function legendSection(passes) {
@@ -214,7 +219,7 @@ function healthSection(h) {
         ? L.healthDims[dim.id]
         : dim.label
           ? String(dim.label)
-          : String(dim.id || '')
+          : titleCase(dim.id)
       if (dim.locked) {
         return (
           `<div class='hd hd-locked'>` +
@@ -267,7 +272,7 @@ function tocSection(passes, hasHealth) {
       const rows = (p.findings || [])
         .map((f, i) => {
           const c = cat(f.category, f.category_label)
-          return `<li><a href='#f-${pi}-${i}'><span class='chip' style='--cat: var(${c.v})'>${esc(c.label)}</span><span class='toc-t'>${esc(f.title)}</span></a></li>`
+          return `<li><a href='#${findingId(pi, i)}'><span class='chip' style='--cat: var(${c.v})'>${esc(c.label)}</span><span class='toc-t'>${esc(f.title)}</span></a></li>`
         })
         .join('')
       const head = grouped ? `<div class='toc-g'>${esc([p.kind, p.title].filter(Boolean).join(' · '))}</div>` : ''
@@ -298,7 +303,7 @@ function findingCard(f, i, passIdx) {
     ? `<span class='chip chip-novel' title='${esc(L.novelTitle)}'>${esc(L.novel)}</span>`
     : ''
   return (
-    `<article class='card' id='f-${Number(passIdx) || 0}-${i}' style='--cat: var(${c.v})' data-i='${i}'>` +
+    `<article class='card' id='${findingId(passIdx, i)}' style='--cat: var(${c.v})'>` +
     `<header class='card-h'>` +
     `<span class='chips'><span class='chip'>${esc(c.label)}</span>${novel}</span>` +
     confMeter(f.confidence) +
@@ -344,7 +349,7 @@ function passSection(p, idx) {
   const stats = p.digest_stats ? `<div class='dstats'><span class='ds-k'>${esc(L.digest)}</span> ${esc(p.digest_stats)}</div>` : ''
   const cards = (p.findings || []).map((f, i) => findingCard(f, i, idx)).join('')
   return (
-    `<section class='pass' id='pass-${idx}' style='--d:${idx}'>` +
+    `<section class='pass' style='--d:${idx}'>` +
     head + verdict + headline + ledger + stats +
     `<div class='cards'>${cards}</div>` +
     `</section>`
