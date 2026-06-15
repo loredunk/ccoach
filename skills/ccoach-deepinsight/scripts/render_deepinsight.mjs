@@ -14,6 +14,8 @@ function parseArgs(argv) {
     const a = argv[i]
     if (a === '--data') o.data = argv[++i]
     else if (a === '--output') o.output = argv[++i]
+    else if (a === '--scorecard') o.scorecard = argv[++i]
+    else if (a === '--usage') o.usage = argv[++i]
   }
   return o
 }
@@ -22,6 +24,116 @@ function esc(v) {
   return String(v ?? '')
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&#39;')
+}
+
+// ===== shareable cover scorecard (ported from ccoach-insight; keep in sync) =====
+// A self-contained dark+gold hero unit. Its stat band is computed from the merged usage JSON
+// (the shape merge_dual_platform.mjs emits); its title + four axes come from scorecard.json
+// (scorecard.mjs + a model rewrite of the persona title and roasts). Pure string builders, no deps.
+function pct(v) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '0.0%'
+  return (n * 100).toFixed(1) + '%'
+}
+
+// Compact token count split into { n, u } so the unit can be gold-emphasized separately.
+// zh → 亿/万; en → B/M/K. Trims a trailing ".0"/".00".
+function compactTokens(n, loc) {
+  const v = Number(n) || 0
+  const trim = (s) => s.replace(/\.?0+$/, '')
+  if (loc === 'zh') {
+    if (v >= 1e8) return { n: trim((v / 1e8).toFixed(2)), u: '亿' }
+    if (v >= 1e4) return { n: trim((v / 1e4).toFixed(0)), u: '万' }
+    return { n: String(Math.trunc(v)), u: '' }
+  }
+  if (v >= 1e9) return { n: trim((v / 1e9).toFixed(2)), u: 'B' }
+  if (v >= 1e6) return { n: trim((v / 1e6).toFixed(0)), u: 'M' }
+  if (v >= 1e3) return { n: trim((v / 1e3).toFixed(0)), u: 'K' }
+  return { n: String(Math.trunc(v)), u: '' }
+}
+
+// Disjoint composition buckets summing to tokens.total, normalized across platforms (Claude's
+// cache buckets are disjoint; Codex's input already includes cached_input). Used for cache%.
+function tokenComposition(t, platform) {
+  t = t || {}
+  const cacheRead = Number(t.cache_read) || 0
+  const output = Number(t.output) || 0
+  if (platform === 'codex') {
+    const fresh = Math.max(0, (Number(t.input) || 0) - cacheRead)
+    return { fresh, cacheRead, cacheCreate: 0, output, reasoning: Number(t.reasoning) || 0, total: Number(t.total) || 0 }
+  }
+  return { fresh: Number(t.input) || 0, cacheRead, cacheCreate: Number(t.cache_create) || 0, output, reasoning: 0, total: Number(t.total) || 0 }
+}
+
+// esc() a roast, then turn ONE model-marked **key phrase** into a gold highlight (the only markup
+// allowed in a roast). esc runs first so ** survive; the phrase content is already escaped.
+function roastHtml(s) {
+  return esc(s).replace(/\*\*(.+?)\*\*/g, "<span class='sc-hl'>$1</span>")
+}
+
+// Render the cover scorecard — ONE bounded, screenshot-ready hero unit carrying brand, persona
+// title, the headline stat band, and the four axes with their roasts. `sc` is the scorecard.json
+// (title + axes, model-rewritten before render); `stats` is the headline block built in render().
+function scorecardHtml(sc, stats) {
+  if (!sc) return ''
+  // Render-order guard: persona title + roasts are MODEL-WRITTEN before render. If still the
+  // deterministic fallback, leave a visible HTML marker + warn on stderr (but still render).
+  const titleFallback = sc.title_is_fallback === true || /\s×\s/.test(sc.title ?? '')
+  const fixtureRoasts = (sc.axes ?? []).filter((ax) => ax.roast_is_fixture === true).length
+  if (titleFallback || fixtureRoasts) {
+    const bits = []
+    if (titleFallback) bits.push("persona title is still the fallback 'A × B × C × D'")
+    if (fixtureRoasts) bits.push(`${fixtureRoasts} roast line(s) are still the default fixture`)
+    process.stderr.write(
+      `⚠ scorecard: ${bits.join('; ')} — not written back before render. ` +
+        `Compose the persona title / rewrite roasts, then re-render.\n`,
+    )
+  }
+  const parts = ["<section class='scorecard'>"]
+  if (titleFallback) parts.push('<!-- ccoach:scorecard_title_is_fallback -->')
+  // top bar: brand top-left, run/platform meta top-right
+  if (stats) {
+    const metaLines = (stats.meta ?? []).map((m) => esc(m)).join('<br>')
+    parts.push(
+      `<div class='sc-top'><span class='sc-brand'>${esc(stats.brand ?? 'ccoach')}</span>` +
+        `<span class='sc-meta'>${metaLines}</span></div>`,
+    )
+  }
+  parts.push(`<span class='sc-kicker'>${esc(L.sc_kicker)}</span>`)
+  parts.push(`<h2 class='sc-title'>${esc(sc.title ?? '')}</h2>`)
+  // headline stat band: a hero cost block + a 2-cell grid (tokens / cache), numbers gold-emphasized
+  if (stats) {
+    parts.push(
+      "<div class='sc-band'>" +
+        "<div class='sc-hero-cell'>" +
+        `<div class='sc-hero-lab'>${esc(stats.heroLabel)}</div>` +
+        `<div class='sc-hero-cost'>${esc(stats.heroCost)}</div>` +
+        `<div class='sc-hero-sub'>${esc(stats.heroSub)}</div>` +
+        '</div>' +
+        "<div class='sc-grid'>" +
+        `<div class='sc-cell'><div class='sc-cell-lab'>${esc(stats.tokenLabel)}</div>` +
+        `<div class='sc-cell-val'>${esc(stats.tokenMantissa)} <span class='u'>${esc(stats.tokenUnit)}</span></div></div>` +
+        `<div class='sc-cell'><div class='sc-cell-lab'>${esc(stats.cacheLabel)}</div>` +
+        `<div class='sc-cell-val gold'>${esc(stats.cacheVal)}</div></div>` +
+        '</div></div>',
+    )
+  }
+  for (const ax of sc.axes ?? []) {
+    const roastMark = ax.roast_is_fixture === true ? '<!-- ccoach:roast_is_fixture -->' : ''
+    const topCls = ax.tier_index === 0 ? ' top' : ''
+    parts.push(
+      "<div class='sc-axis'>" +
+        roastMark +
+        `<span class='sc-ax-label'>${esc(ax.label)}</span>` +
+        `<span class='sc-tier${topCls}'>${esc(ax.tier)}</span>` +
+        `<span class='sc-roast'>${roastHtml(ax.roast ?? '')}</span>` +
+        '</div>',
+    )
+  }
+  if (sc.privacy_note) parts.push(`<p class='sc-note'>${esc(sc.privacy_note)}</p>`)
+  if (stats?.caption) parts.push(`<p class='sc-share'>${esc(stats.caption)}</p>`)
+  parts.push('</section>')
+  return parts.join('')
 }
 
 // ---- On-page glossary (回合 / 严重程度 / 原地打转) ----
@@ -84,6 +196,14 @@ const CHROME = {
     },
     magic: 'Magic Time',
     magicSub: '平台自己报的数 + 精确计数——不是估算拍脑袋',
+    sc_kicker: '本期称号',
+    sc_hero_label: '{n} 天烧掉（按 API 价折算）',
+    sc_hero_sub_plan: '走订阅统一定价，此为效率参考、非账单',
+    sc_hero_sub_api: '按官方 API 价计',
+    sc_plan_suffix: '订阅',
+    m_total_tokens: '合计 Token',
+    sc_cache_label: '缓存撑起',
+    sc_share_caption: '称号为本地估算，仅供娱乐',
     privacy: '本地只读分析。指标只是佐证——根因和改法才是产品。绝不读取思考过程 / 系统提示词 / 文件内容；正文摘要为显式开启、已脱敏、限额读取。',
   },
   en: {
@@ -116,6 +236,14 @@ const CHROME = {
     },
     magic: 'Magic Time',
     magicSub: 'platform-reported numbers + exact counts — no made-up estimates',
+    sc_kicker: "This run's title",
+    sc_hero_label: 'Burned in {n} days (API-equiv)',
+    sc_hero_sub_plan: 'Flat-rate plan — an efficiency proxy, not a bill',
+    sc_hero_sub_api: 'At official API prices',
+    sc_plan_suffix: 'plan',
+    m_total_tokens: 'Total Tokens',
+    sc_cache_label: 'Cache-backed',
+    sc_share_caption: 'Persona is a local estimate, just for fun',
     privacy: 'Local, read-only analysis. Metrics are supporting evidence only — the root cause and the fix are the product. Never reads thinking / system prompts / file contents as content; assistant/tool_result content is opt-in, redacted, token-bounded.',
   },
 }
@@ -386,7 +514,7 @@ function magicSection(items) {
 const GRAIN =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>"
 
-export function renderDeepinsight(data) {
+export function renderDeepinsight(data, scorecard = null, usage = null) {
   const d = data || {}
   const loc = String(d.lang ?? '').startsWith('zh') ? 'zh' : 'en'
   L = CHROME[loc] ?? CHROME.en
@@ -408,6 +536,57 @@ export function renderDeepinsight(data) {
     .filter(Boolean)
     .map((m) => `<span>${m}</span>`)
     .join('')
+
+  // Cover scorecard — the same hero unit ccoach-insight shows, pinned at the top (right below the
+  // masthead). Built from the merged usage JSON (`usage`) + scorecard.json (`scorecard`); rendered
+  // ONLY when both are supplied, so the default deepinsight report is byte-for-byte unchanged.
+  let cardHtml = ''
+  if (scorecard && usage) {
+    const cc = usage.platforms?.claude_code
+    const cx = usage.platforms?.codex
+    const both = !!cc && !!cx
+    const comb = usage.combined ?? {}
+    const scope = both ? 'Claude Code + Codex' : cc ? 'Claude Code' : 'Codex'
+    // cache% from token composition (same口径 as insight's stat band: cache_read / total summed)
+    const present = [cc || null, cx || null].filter(Boolean)
+    let bandCacheRead = 0
+    let bandTotal = 0
+    for (const pf of present) {
+      const cmp = tokenComposition(pf.tokens, pf === cx ? 'codex' : 'claude-code')
+      bandCacheRead += cmp.cacheRead
+      bandTotal += cmp.total
+    }
+    const cacheVal = bandTotal ? pct(bandCacheRead / bandTotal) : '0.0%'
+    // active days is a calendar-day UNION, not additive across platforms (days overlap)
+    const activeDays = both
+      ? comb.active_days ?? Math.max(cc.active_days || 0, cx.active_days || 0)
+      : (cc ?? cx ?? {}).active_days
+    const tok = compactTokens(comb.total_tokens, loc)
+    // top-right meta: window + "Claude Code · Max plan" (subscription only when official + subscription)
+    const host = cc ?? cx ?? {}
+    const ep = host.endpoint ?? {}
+    const planLabel =
+      ep.billing_mode === 'subscription' && ep.subscription_type && ep.relay_suspected !== true
+        ? `${ep.subscription_type.charAt(0).toUpperCase() + ep.subscription_type.slice(1)} ${L.sc_plan_suffix}`
+        : ep.billing_mode === 'api_or_relay'
+          ? 'API'
+          : ''
+    const heroSub = ep.billing_mode === 'subscription' ? L.sc_hero_sub_plan : L.sc_hero_sub_api
+    const scStats = {
+      brand: 'ccoach',
+      meta: [usage.window?.desc ?? usage.generated_at, planLabel ? `${scope} · ${planLabel}` : scope],
+      heroLabel: String(L.sc_hero_label).replace('{n}', activeDays ?? 0),
+      heroCost: '$' + Math.trunc(Number(comb.total_cost_usd) || 0).toLocaleString('en-US'),
+      heroSub,
+      tokenLabel: L.m_total_tokens,
+      tokenMantissa: tok.n,
+      tokenUnit: tok.u,
+      cacheLabel: L.sc_cache_label,
+      cacheVal,
+      caption: L.sc_share_caption,
+    }
+    cardHtml = scorecardHtml(scorecard, scStats)
+  }
 
   return `<!DOCTYPE html>
 <html lang="${esc(loc === 'zh' ? 'zh-CN' : 'en')}">
@@ -448,6 +627,41 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
 .metastrip{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:22px;font-family:var(--mono);font-size:11.5px;color:var(--muted);letter-spacing:.04em}
 .seal{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule);border-radius:100px;padding:5px 12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:18px}
 .seal::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--c-flow);box-shadow:0 0 9px var(--c-flow)}
+
+/* ===== shareable cover card: a bounded, single-screen hero unit (always dark+gold) ===== */
+.scorecard{position:relative;max-width:440px;margin:0 auto 44px;padding:26px 26px 18px;border-radius:20px;color:#f1ece1;overflow:hidden;background:radial-gradient(120% 60% at 82% -8%,rgba(233,185,73,.16),transparent 58%),radial-gradient(120% 55% at 8% 0%,rgba(244,212,136,.10),transparent 55%),linear-gradient(180deg,#181610 0%,#0c0b08 64%);border:1px solid rgba(233,185,73,.22);box-shadow:0 30px 70px -28px rgba(0,0,0,.85)}
+.scorecard::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#e9b949,transparent);opacity:.65}
+.scorecard::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.scorecard>*{position:relative;z-index:1}
+.sc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+.sc-top .sc-brand{display:inline-flex;align-items:center;gap:7px;color:#f5b942;font-weight:700;letter-spacing:.02em}
+.sc-top .sc-brand::before{content:"";width:7px;height:7px;border-radius:50%;background:#f5b942;box-shadow:0 0 9px #f5b942}
+.sc-top .sc-meta{text-align:right;color:#8b857a;line-height:1.55}
+.scorecard .sc-kicker{display:block;margin-top:24px;font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;text-transform:uppercase;color:#e8a85a}
+.scorecard .sc-title{margin:9px 0 0;font-size:34px;line-height:1.12;font-weight:800;letter-spacing:.01em;background:linear-gradient(180deg,#fff 6%,#f5b942 132%);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* stat band: hero cost cell + 2-cell grid (tokens / cache) */
+.sc-band{margin:20px 0 2px;border:1px solid rgba(233,185,73,.20);border-radius:14px;overflow:hidden}
+.sc-hero-cell{padding:15px 18px 14px;background:linear-gradient(110deg,rgba(245,185,66,.12),rgba(255,107,53,.04))}
+.sc-hero-lab{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:#e8a85a}
+.sc-hero-cost{font-family:var(--mono);font-size:46px;font-weight:800;line-height:1;margin:7px 0 6px;background:linear-gradient(92deg,#f5b942,#ff6b35);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sc-hero-sub{font-family:var(--mono);font-size:10.5px;color:#8b857a}
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid rgba(233,185,73,.16)}
+.sc-cell{padding:13px 18px}
+.sc-cell+.sc-cell{border-left:1px solid rgba(233,185,73,.16)}
+.sc-cell-lab{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#8b857a}
+.sc-cell-val{font-family:var(--mono);font-size:23px;font-weight:800;color:#f1ece1;margin-top:6px}
+.sc-cell-val .u{color:#f5b942}
+.sc-cell-val.gold{color:#f5b942}
+.sc-axis{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:baseline;padding:12px 0;border-top:1px solid rgba(233,185,73,.12)}
+.sc-axis:first-of-type{margin-top:12px}
+.sc-axis .sc-ax-label{grid-row:1;align-self:center;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:#8b857a}
+.sc-axis .sc-tier{grid-row:1;justify-self:start;font-size:14px;font-weight:700;color:#f5b942;padding:3px 12px;border:1px solid rgba(233,185,73,.28);border-radius:999px;background:rgba(233,185,73,.06);white-space:nowrap}
+.sc-axis .sc-tier.top{color:#0c0b08;background:linear-gradient(90deg,#f5b942,#e8a85a);border-color:transparent;box-shadow:0 0 16px rgba(245,185,66,.3)}
+.sc-axis .sc-roast{grid-column:1 / -1;font-size:13px;line-height:1.55;color:#cfc9bc}
+.sc-axis .sc-roast .sc-hl{color:#f5b942;font-weight:600}
+.scorecard .sc-note{margin:18px 0 0;padding-top:14px;border-top:1px solid rgba(255,255,255,.07);font-family:var(--mono);font-size:10px;line-height:1.5;color:#8b857a}
+.scorecard .sc-share{margin:9px 0 0;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:#e8a85a}
+.scorecard .sc-share::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:#f5b942;box-shadow:0 0 8px #f5b942;margin-right:7px;vertical-align:middle}
 
 /* tldr — readable lead paragraph (not a display-size column) */
 .tldr{font-family:var(--serif);font-size:clamp(18px,2.1vw,22px);line-height:1.62;margin:0 0 30px;color:var(--paper);max-width:62ch;border-left:2px solid var(--accent);padding-left:20px}
@@ -588,6 +802,7 @@ body::after{content:"";position:fixed;inset:0;background-image:url("${GRAIN}");o
     <div class="metastrip">${meta}</div>
     <span class="seal">${esc(L.seal)}</span>
   </header>
+  ${cardHtml}
   ${d.tldr ? `<p class="tldr">${esc(d.tldr)}</p>` : ''}
   ${tocSection(d.passes, Boolean(health))}
   ${glossarySection()}
@@ -610,6 +825,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exit(1)
   }
   const data = JSON.parse(readFileSync(a.data, 'utf8'))
-  writeFileSync(a.output, renderDeepinsight(data))
+  const scorecard = a.scorecard ? JSON.parse(readFileSync(a.scorecard, 'utf8')) : null
+  const usage = a.usage ? JSON.parse(readFileSync(a.usage, 'utf8')) : null
+  writeFileSync(a.output, renderDeepinsight(data, scorecard, usage))
   process.stdout.write(`wrote ${a.output}\n`)
 }

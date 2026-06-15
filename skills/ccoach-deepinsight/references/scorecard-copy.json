@@ -1,0 +1,62 @@
+{
+  "_about": "Copy for the scorecard. Tiers are high->low. The tier NAMES ({LANG}_name) + ui labels are the fixed, deterministic identity (don't run-to-run vary them). The {LANG}_roast lines are the SAFE DEFAULT/FALLBACK + a tone EXEMPLAR: at runtime the model rewrites axes[].roast (the full line shown on the share card itself — there is no separate breakdown section) in the user's language, idiomatic and aggregate-grounded; it may wrap ONE key phrase in **…** which the renderer turns into a gold highlight. GROUNDING RULE: every roast must describe a phenomenon backed by a concrete number in the merged JSON — describing the phenomenon is enough; a light wry note is optional, NOT a savage punchline tacked onto every axis. NEVER assert an activity ccoach does not measure (e.g. whether tests were executed, whether code was reviewed, whether plan mode 'should' have been used) — it tracks tool/command CATEGORIES and counts, not intent; inventing such a claim (e.g. 'never ran a test') is a correctness bug, not a joke. Roasts tease changeable HABITS, never the person/ability, and never quote prompt text. The 'title'/personality summary is model-written. To add a tier-name locale: add {LANG}_name (and optionally {LANG}_roast) to every tier and a ui.{LANG} block; scorecard.mjs reads them generically and falls back to the default language.",
+  "ui": {
+    "zh": {
+      "report_title": "ccoach Insight 成绩卡",
+      "scorecard": "成绩卡",
+      "tier": "段位",
+      "title_label": "称号",
+      "axis_prompt": "Prompt 功力",
+      "axis_spending": "烧钱姿势",
+      "axis_engineering": "工程素养",
+      "axis_diligence": "勤奋度",
+      "local_privacy_note": "全部 logs 解析在你本地完成"
+    },
+    "en": {
+      "report_title": "ccoach Insight Report",
+      "scorecard": "Scorecard",
+      "tier": "Tier",
+      "title_label": "Title",
+      "axis_prompt": "Prompt Skill",
+      "axis_spending": "Spending Style",
+      "axis_engineering": "Engineering Sense",
+      "axis_diligence": "Diligence",
+      "local_privacy_note": "All log parsing happens on your machine."
+    }
+  },
+  "axes": {
+    "prompt": {
+      "tiers": [
+        {"zh_name": "渡劫飞升", "en_name": "One-Shot", "zh_roast": "结构清晰、带约束、点名文件——需求一次说清，几乎不返工", "en_roast": "Structured, constrained, file-anchored — the ask lands in one pass."},
+        {"zh_name": "结丹有成", "en_name": "Locked In", "zh_roast": "方向准，偶尔补一句收尾", "en_roast": "On target — just the occasional follow-up to tidy up."},
+        {"zh_name": "筑基初成", "en_name": "Mid", "zh_roast": "能说清楚，准头和篇幅还能再收一点", "en_roast": "Clear enough — aim and length could tighten up."},
+        {"zh_name": "卡瓶颈", "en_name": "Vibe Coder", "zh_roast": "结构和约束偏少，常常边问边改", "en_roast": "Light on structure and constraints — lots of fixing as you go."},
+        {"zh_name": "伪灵根", "en_name": "Manifesting", "zh_roast": "prompt 又短又松散，细节多靠 AI 推断", "en_roast": "Short, loosely-structured prompts — much is left for the AI to infer."}
+      ]
+    },
+    "spending": {
+      "tiers": [
+        {"zh_name": "性价比刺客", "en_name": "Value Assassin", "zh_roast": "花费不高，产出不少", "en_roast": "Low spend, plenty shipped."},
+        {"zh_name": "理性消费", "en_name": "Sensible Spender", "zh_roast": "账单平稳，花在刀刃上", "en_roast": "A steady bill — spent where it counts."},
+        {"zh_name": "富哥随意", "en_name": "High Roller", "zh_roast": "这段时间成本偏高，缓存重放占了大头", "en_roast": "A high-spend stretch — much of it cache replay."},
+        {"zh_name": "Opus 锤钉子", "en_name": "Opus for a One-Liner", "zh_roast": "高价模型占了大头，单次任务却不大", "en_roast": "The priciest model carries most of the load, even on small tasks."}
+      ]
+    },
+    "engineering": {
+      "tiers": [
+        {"zh_name": "架构师", "en_name": "Architect", "zh_roast": "改动集中，编辑与探索比例均衡", "en_roast": "Focused work — a balanced mix of editing and exploring."},
+        {"zh_name": "工程师", "en_name": "Engineer", "zh_roast": "以动手编辑为主，节奏稳", "en_roast": "Mostly hands-on edits, at a steady pace."},
+        {"zh_name": "莽夫", "en_name": "Cowboy Coder", "zh_roast": "命令和搜索远多于实际文件改动", "en_roast": "Far more shell and search than actual file edits."},
+        {"zh_name": "考古学家", "en_name": "Archaeologist", "zh_roast": "一个 session 横跨好几个仓库", "en_roast": "A single session spread across several repos."}
+      ]
+    },
+    "diligence": {
+      "tiers": [
+        {"zh_name": "劳模", "en_name": "Workhorse", "zh_roast": "活跃天数很多，几乎天天在线", "en_roast": "Active on most days across the window."},
+        {"zh_name": "996 战士", "en_name": "Crunch Lord", "zh_roast": "深夜时段的活跃占比不低", "en_roast": "A sizable share of activity lands late at night."},
+        {"zh_name": "养生程序员", "en_name": "Zen Coder", "zh_roast": "作息规律，深夜很少上线", "en_roast": "Regular hours — rarely online late."},
+        {"zh_name": "周末才想起来", "en_name": "Weekend Warrior", "zh_roast": "活跃集中在少数几天", "en_roast": "Activity clustered into just a few days."}
+      ]
+    }
+  }
+}
