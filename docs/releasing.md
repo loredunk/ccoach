@@ -8,7 +8,7 @@
 
 ## 发布正式版本
 
-1. 确认 `package.json` 和 `package-lock.json` 已更新为同一个尚未发布的稳定版本，并将版本提交合入 `main`。
-2. 确认目标提交的 CI 通过，为该提交创建与包版本一致的标签，例如 `git tag v0.1.7 <commit>`，再运行 `git push origin v0.1.7`。
+1. 确认 `package.json` 和 `package-lock.json` 已更新为同一个尚未发布、且没有同名 Git 标签的稳定版本，并将版本提交合入 `main`。
+2. 确认目标提交的 CI 通过，为该提交创建与包版本一致的标签，例如 `git tag v0.1.8 <commit>`，再运行 `git push origin v0.1.8`。现有 `v0.1.7` 标签早于发布工作流，下一次自动发布使用新版本号。
 3. 在 [GitHub Actions](https://github.com/loredunk/ccoach/actions/workflows/publish.yml) 检查发布结果。工作流会验证标签和版本一致、提交属于 `main`，然后重新运行 Linux 和 Windows CI。通过后使用 GitHub OIDC 发布 npm 包。
 4. 用 `npm view @loredunk/ccoach version` 确认远程版本。
