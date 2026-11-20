@@ -116,19 +116,20 @@
   - [x] **块 B · scope**：`ccoach report --scope {global,project,session}` → `projects[]` / `sessions_detail[]`（每桶 tokens/tool_calls/cache_hit_rate/categories/git_top/prompt_signals），两平台；取代 `collect_claude_behavior --scope`。SKILL「Analysis scopes」改指 ccoach。
   - [x] **块 C · 会话钻取/预览**：新增 `ccoach sessions`（候选清单数值-零原文 + opt-in 单会话 redacted 预览，脱敏逐条移植）取代 `session_drilldown` / `claude_session_prompts`；删 3 个采集 `.py`、SKILL 去掉 `Bash(python3 *)`、ADR 0005 链接改指 0018。**至此仓库无 `.py`、无 `.go`。**
 
-## T4 · npm 分发（P0）— ⏸ 暂缓（需 NPM_TOKEN + GitHub Actions 执行）
+## T4 · npm 分发（P0）
 
 > 决策：[`adr/0003-npm-distribution.md`](adr/0003-npm-distribution.md)。
 > **随 [ADR 0010](adr/0010-cli-rewrite-node-ccusage.md) 简化**：CLI 是普通 Node 包，原「Go 二进制
-> 平台子包矩阵」（旧 T4.2）作废。沙箱无法真正 `npm publish` / `npx` 端到端验证；待 npm 凭证与包名归属后落地。
+> 平台子包矩阵」（旧 T4.2）作废。发版操作见 [npm 发布流程](releasing.md)。
 
 ### T4.1 仓库结构
 - [ ] 落地 monorepo：`packages/cli/`（`ccoach`）+ `packages/skills/`（`@ccoach/skills`），npm workspaces。
 - [ ] 终定包名 / scope（ADR 0003 OQ1）。
 
 ### T4.2 CLI 发布（普通 Node 包）
-- [ ] CLI 作为普通 npm 包发布，`npx ccoach` 跨平台即用（无二进制矩阵、无 postinstall 下载）。
-- [ ] CI：build + test + 发布；版本与仓库同源。
+- [x] CLI 作为普通 npm 包 `@loredunk/ccoach` 发布，使用 `npx @loredunk/ccoach` 运行。
+- [x] GitHub Actions 配置标签与包版本校验、跨平台 CI 和 npm 发布。
+- [ ] 在 npm 配置 Trusted Publishing 并验证首次自动发布。
 
 ### T4.3 skills 分发 — ✅ 改走 `npx skills add`（ADR 0028，取代自建 `ccoach skills install`）
 - [x] **主推 `npx skills add loredunk/ccoach`**（Vercel Labs `skills` CLI，交互选 agent/scope；非交互可加 `-a claude-code -a codex -g -y`）：

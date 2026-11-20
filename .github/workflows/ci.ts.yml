@@ -1,6 +1,13 @@
 name: ts-ci
 
-on: [push, pull_request]
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   ts:
@@ -13,6 +20,8 @@ jobs:
       TZ: UTC # 窗口/本地日期判定确定化（Node 跨平台尊重 TZ）
     steps:
       - uses: actions/checkout@v5 # v4 跑在被弃用的 runner Node 20 上（2026-09 移除），v5 起走 Node 24
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -20,5 +29,6 @@ jobs:
       - run: npm run typecheck
       - run: npm test # vitest（含 scorecard 回归 + Windows 反斜杠路径 basename 回归）
       - run: npm run build
+      - run: npm pack --dry-run --ignore-scripts
       - run: node tools/check_adrs.mjs # docs lint：ADR 编号/状态 + 相对链接（原 tools/check_adrs.py）
       - run: npm run verify:ccusage # 在线时强校验（token 严等 / 成本 1% 容差）；无数据/离线则 SKIP
