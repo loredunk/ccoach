@@ -13,6 +13,7 @@ import { buildGitHabits, buildProjectMgmt, topCounts, type RepoFacts } from './h
 import { dominantLanguage, EXT_LANG } from './language.js'
 import { newPromptAcc, promptAccUpdate, promptSignals, type PromptAcc } from './prompt-signals.js'
 import { EpisodeAccumulator, EpisodeBuilder, EPISODES_MAX } from './episodes.js'
+import { ConversationHabitsAccumulator } from './conversation-habits.js'
 
 const IDLE_CAP_MS = 5 * 60 * 1000
 
@@ -141,9 +142,12 @@ export class Aggregator {
   private curEpisode: EpisodeBuilder | null = null
   private epIndexBySession = new Map<string, number>()
 
-  constructor(platform: string, scope: Scope = 'global') {
+  readonly conversationHabits?: ConversationHabitsAccumulator
+
+  constructor(platform: string, scope: Scope = 'global', conversationHabits = false) {
     this.platform = platform
     this.scope = scope
+    if (conversationHabits) this.conversationHabits = new ConversationHabitsAccumulator(scope === 'project')
   }
 
   // 适配器在处理每条记录前调用，按 scope 选当前桶（project=repo / session=sessionId）。
@@ -177,6 +181,7 @@ export class Aggregator {
 
   // 回合边界（ADR 0032 D2，平台特异，由 parser 调用）：finalize 上一个 episode、开一个新的。
   beginEpisode(session: string, repo: string, ts: Date, correctsPrev: boolean): void {
+    if (this.scope === 'project') this.beginRecord(repo, session === '(unknown)' ? '' : session, ts)
     if (this.curEpisode) {
       if (correctsPrev && !this.curEpisode.isInterrupted) this.curEpisode.markCorrectedByNext()
       this.episodes.add(this.curEpisode.finalizeOpen())
@@ -596,6 +601,11 @@ export class Aggregator {
       const cl: ClaudeSpecific = { web_search_requests: this.clWebSearchReq, web_fetch_requests: this.clWebFetchReq }
       report.claude_specific = cl
     }
+    // Project rates and the summary use all episodes, before the details output cap.
+    this.endEpisodeBoundary()
+    const builtEp = this.episodes.build()
+    report.episode_summary = builtEp.summary
+    if (this.conversationHabits) report.conversation_habits = this.conversationHabits.total
     report.scope = this.scope
     if (this.scope === 'project' || this.scope === 'session') {
       const toBucket = (g: GroupAcc): ScopeBucket => {
@@ -614,11 +624,29 @@ export class Aggregator {
         }
       }
       if (this.scope === 'project') {
+        const episodesByRepo = new Map<string, { episodes: number; spiral_episodes: number }>()
+        for (const episode of builtEp.details) {
+          let counts = episodesByRepo.get(episode.repo)
+          if (!counts) {
+            counts = { episodes: 0, spiral_episodes: 0 }
+            episodesByRepo.set(episode.repo, counts)
+          }
+          counts.episodes++
+          if (episode.spiral.severity > 0) counts.spiral_episodes++
+        }
         report.projects = [...this.groups.values()]
           .map((g): ProjectScope => {
-            const p: ProjectScope = { repo: g.key, sessions: g.sessions.size, ...toBucket(g) }
+            const counts = episodesByRepo.get(g.key)
+            const p: ProjectScope = {
+              repo: g.key, sessions: g.sessions.size, ...toBucket(g),
+              episodes: counts?.episodes ?? 0,
+              spiral_episodes: counts?.spiral_episodes ?? 0,
+              spiral_rate: counts ? counts.spiral_episodes / counts.episodes : null,
+            }
             const fc = buildFileChurn(this.fileChurnByRepo.get(g.key))
             if (fc) p.file_churn = fc
+            const habits = this.conversationHabits?.projects.get(g.key)
+            if (habits) p.conversation_habits = habits
             return p
           })
           .sort((a, b) => b.tokens - a.tokens)
@@ -633,10 +661,6 @@ export class Aggregator {
           .sort((a, b) => b.tokens - a.tokens)
       }
     }
-    // 回合层收尾（ADR 0032 D6）：finalize 未关闭的当前 episode，恒附 episode_summary；--scope episode 出 episodes_detail。
-    this.endEpisodeBoundary()
-    const builtEp = this.episodes.build()
-    report.episode_summary = builtEp.summary
     if (this.scope === 'episode') {
       report.episodes_detail = builtEp.details
         .sort((a, b) => (b.spiral.severity - a.spiral.severity) || (b.tokens.total - a.tokens.total))

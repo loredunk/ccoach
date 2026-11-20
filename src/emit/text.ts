@@ -1,6 +1,7 @@
 import { type Report, type UsageReport, type HourReport } from '../model.js'
 import { comma } from '../text.js'
 import { t, tf } from '../i18n.js'
+import type { ConversationHabits } from '../conversation-habits.js'
 
 function truncate(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + '…'
@@ -101,6 +102,45 @@ function renderExtras(lines: string[], r: Report): void {
   }
 }
 
+function renderConversation(lines: string[], h: ConversationHabits, indent: string): void {
+  if (!h.observed_prompts) {
+    lines.push(indent + t('tx_conversation_empty'))
+    return
+  }
+  lines.push(indent + tf('tx_conversation_early', {
+    n: h.observed_prompts, design: h.design_prompts_before_implementation, criteria: h.criteria_prompts_before_implementation,
+  }))
+  lines.push(indent + tf('tx_conversation_starts', {
+    n: h.implementation_starts, design: h.starts_after_design, bare: h.starts_without_design_or_criteria,
+  }))
+  lines.push(indent + tf('tx_conversation_late', {
+    n: h.prompts_after_edits, criteria: h.criteria_prompts_after_edits,
+    symptoms: h.symptom_prompts_without_criteria_after_edits,
+  }))
+}
+
+function renderProjectAndConversation(lines: string[], r: Report, byRepo: boolean): void {
+  if (r.conversation_habits) {
+    lines.push(t('tx_conversation_header'))
+    renderConversation(lines, r.conversation_habits, '  ')
+    lines.push('  ' + t('tx_conversation_note'), '')
+  }
+  const projects = r.projects
+  if (!projects?.length) return
+  lines.push(t('tx_project_spirals'))
+  const shown = byRepo ? projects : projects.slice(0, 8)
+  for (const project of shown) {
+    const { repo, episodes, spiral_episodes, spiral_rate, conversation_habits } = project
+    const rate = spiral_rate === null
+      ? tf('tx_project_spiral_empty', { repo })
+      : tf('tx_project_spiral_row', { repo, episodes, spirals: spiral_episodes, rate: (100 * spiral_rate).toFixed(1) })
+    lines.push('  ' + rate)
+    if (conversation_habits) renderConversation(lines, conversation_habits, '    ')
+  }
+  if (shown.length < projects.length) lines.push('  ' + tf('tx_more_repos', { n: projects.length - shown.length }))
+  lines.push('')
+}
+
 export function emitText(r: Report, byRepo: boolean): string {
   const lines: string[] = []
   const label = platformLabel(r.platform)
@@ -110,6 +150,10 @@ export function emitText(r: Report, byRepo: boolean): string {
 
   if (r.tokens.total === 0) {
     lines.push(t('tx_no_records'))
+    if (r.projects?.length || r.conversation_habits) {
+      lines.push('')
+      renderProjectAndConversation(lines, r, byRepo)
+    }
     return lines.join('\n') + '\n'
   }
 
@@ -182,6 +226,7 @@ export function emitText(r: Report, byRepo: boolean): string {
     if (ep.deepest_pit) lines.push('  ' + tf('tx_episode_deepest', { type: ep.deepest_pit.task_type, sev: ep.deepest_pit.severity, tok: comma(ep.deepest_pit.tokens) }))
     lines.push('')
   }
+  renderProjectAndConversation(lines, r, byRepo)
   if (r.skills?.length) {
     lines.push(t('tx_skills_label') + r.skills.map((c) => {
       const i = c.command.indexOf(':')

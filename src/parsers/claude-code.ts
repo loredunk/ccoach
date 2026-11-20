@@ -2,10 +2,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { Aggregator, type Scope } from '../aggregate.js'
-import { inLocalRange, type Window } from '../window.js'
+import { localYmd, type Window } from '../window.js'
 import { repoName, extOf } from '../text.js'
 import { classifyError } from '../errors.js'
 import { isHumanPrompt } from '../human-prompt.js'
+import { ConversationPhase } from '../conversation-habits.js'
 import { type Tokens, type Report } from '../model.js'
 
 // $CLAUDE_CONFIG_DIR/projects 或 ~/.claude/projects
@@ -37,6 +38,7 @@ const CORRECTION_RE = /\b(actually|sorry|wait|wrong|instead|nope|no,)\b|不对|�
 const LONGRUN_RE = /\b(train|fit|pytest|jest|vitest|benchmark|bench|notebook|jupyter)\b/i
 // 思考强度指令（ADR 0053）：用户 prompt 显式调高思考预算的关键词；瞬时匹配派生布尔、绝不存原文。
 const THINKING_RE = /\b(ultrathink|megathink|think\s+(hard|harder|deeply|intensely|longer))\b/i
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit'])
 
 // 机器注入的 "user 角色" 记录不是真人指令（ADR 0043）：isHumanPrompt 抽到 ../human-prompt.ts，
 // 由主解析器与 `ccoach sessions` 钻取共用同一谓词（单一真相源），两条路径口径不再分叉。
@@ -117,6 +119,18 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
     agg.endEpisodeBoundary() // 收尾上一个文件未关闭的 episode，绝不跨文件桥接（ADR 0032 D4）
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
+    const habits = agg.conversationHabits
+    const phase = habits && new ConversationPhase()
+    const observeConversation = (record: any, inWindow: boolean): void => {
+      if (!habits || !phase || record?.type !== 'user' || record.isSidechain === true) return
+      const blocks = record.message?.content
+      // A result acknowledges an edit; a failed request or a read leaves the phase unchanged.
+      if (!phase.edited && Array.isArray(blocks) && blocks.some((b) =>
+        b?.type === 'tool_result' && b.is_error !== true && EDIT_TOOLS.has(toolUseNames.get(b.tool_use_id) ?? ''),
+      )) phase.edited = true
+      const text = userText(record.message)
+      if (isHumanPrompt(record, text)) habits.prompt(phase, text, repoName(record.cwd), inWindow)
+    }
     for (const line of content.split('\n')) {
       const trimmed = line.trim()
       if (!trimmed) continue
@@ -129,7 +143,12 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       if (typeof tsRaw !== 'string') continue
       const ts = new Date(tsRaw)
       if (Number.isNaN(ts.getTime())) continue
-      if (!inLocalRange(ts, window)) continue
+      const day = localYmd(ts)
+      if (day > window.toYmd) continue
+      if (day < window.fromYmd) {
+        if (habits) observeConversation(rec, false)
+        continue
+      }
 
       const msgId = rec?.message?.id
       const dedupKey =
@@ -139,7 +158,11 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
             ? rec.uuid
             : null
       if (dedupKey !== null) {
-        if (seen.has(dedupKey)) continue
+        if (seen.has(dedupKey)) {
+          // Forked history informs its phase, but contributes to counts only once.
+          if (habits) observeConversation(rec, false)
+          continue
+        }
         seen.add(dedupKey)
       }
 
@@ -147,6 +170,7 @@ export function feedClaudeCode(agg: Aggregator, dir: string, window: Window): vo
       const session = typeof rec.sessionId === 'string' ? rec.sessionId : ''
       const repo = repoName(typeof rec.cwd === 'string' ? rec.cwd : '')
       const branch = typeof rec.gitBranch === 'string' ? rec.gitBranch : undefined
+      if (habits) observeConversation(rec, true)
 
       // API/网络/限流报错：仅主会话计入（错误信号反映用户的工作环境）。
       if (rec.isApiErrorMessage === true && !sidechain) agg.applyApiError()

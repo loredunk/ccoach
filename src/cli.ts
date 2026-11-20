@@ -15,6 +15,7 @@ cli
   .option('--since <date>', 'From a date until today (YYYY-MM-DD)')
   .option('--days <n>', 'Last N days (including today)')
   .option('--by-repo', 'Expand all repos (default: top 8 only)')
+  .option('--conversation-habits', 'Analyze local user prompts and edit timing (counts only)')
   .option('--platform <platform>', 'Data source: claude-code | codex | all', { default: 'all' })
   .option('--claude-dir <dir>', 'Override Claude data dir: path to the projects dir directly (e.g. ~/.claude/projects); bypasses CLAUDE_CONFIG_DIR/projects')
   .option('--codex-home <dir>', 'Override Codex data dir: path to the Codex home (reads <dir>/sessions; e.g. ~/.codex)')

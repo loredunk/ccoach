@@ -22,6 +22,7 @@ export interface BuildOpts {
   claudeDir?: string
   codexHome?: string
   scope?: Scope
+  conversationHabits?: boolean
   claudeJsonPath?: string // 测试/覆盖用：~/.claude.json 路径（特性采用信号，ADR 0056）
 }
 
@@ -39,7 +40,7 @@ export function buildReport(opts: BuildOpts): Report {
   const wantClaude = platform === 'claude-code' || platform === 'all'
   const wantCodex = platform === 'codex' || platform === 'all'
 
-  const agg = new Aggregator(platform, scope)
+  const agg = new Aggregator(platform, scope, opts.conversationHabits)
   if (wantClaude) feedClaudeCode(agg, claudeDir, window)
   if (wantCodex) feedCodex(agg, cxHome, window)
   const report = agg.assemble(window, 'glob')

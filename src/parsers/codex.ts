@@ -2,9 +2,11 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { Aggregator, type Scope } from '../aggregate.js'
-import { inLocalRange, type Window } from '../window.js'
+import { inLocalRange, localYmd, type Window } from '../window.js'
 import { repoName } from '../text.js'
 import { classifyError } from '../errors.js'
+import { ConversationPhase } from '../conversation-habits.js'
+import { isHumanPrompt } from '../human-prompt.js'
 import { type Tokens, type Report } from '../model.js'
 
 // 从 Codex function_call_output 的 output 解析 exit code 与（瞬时）错误文本。
@@ -50,6 +52,18 @@ function globRollouts(home: string): string[] {
 }
 
 function num(x: unknown): number { return typeof x === 'number' && isFinite(x) ? x : 0 }
+
+// Read canonical human-input events and avoid duplicate response_item copies
+// that can also contain injected context.
+function conversationPrompt(event: any): string {
+  if (event.type === 'user_message' && typeof event.message === 'string') return event.message
+  const item = event.item
+  if (event.type !== 'item_completed' || item?.type !== 'UserMessage' || !Array.isArray(item.content)) return ''
+  return item.content
+    .filter((part: any) => part?.type === 'text' && typeof part.text === 'string')
+    .map((part: { text: string }) => part.text)
+    .join('\n')
+}
 
 // 长任务弱信号（experiment 分型；仅瞬时匹配命令、不存命令全行）。
 const LONGRUN_RE = /\b(train|fit|pytest|jest|vitest|benchmark|bench|notebook|jupyter)\b/i
@@ -131,12 +145,14 @@ export function parseCodex(home: string, window: Window, scope: Scope = 'global'
 // 把 Codex 用量喂进（可共享的）聚合器——--platform all 时与 Claude 喂同一个 agg。
 export function feedCodex(agg: Aggregator, home: string, window: Window): void {
   const inWin = (d: Date): boolean => !Number.isNaN(d.getTime()) && inLocalRange(d, window)
+  const habits = agg.conversationHabits
   for (const file of globRollouts(home)) {
     let content: string
     try { content = readFileSync(file, 'utf8') } catch { continue }
     const lines = content.split('\n')
     // 子代理 rollout：token 仍计入用量，但工具/会话/活跃时长等习惯信号不计（对齐 Claude sidechain）。
     const sidechain = isSubagentRollout(lines)
+    const phase = habits && !sidechain ? new ConversationPhase() : undefined
     agg.resetActive()
     agg.endEpisodeBoundary() // 收尾上一个 rollout 未关闭的 episode，绝不跨 rollout 桥接（ADR 0032 D4）
     let prevTotal: CodexTokens = { input: 0, cached: 0, output: 0, reasoning: 0, total: 0 }
@@ -182,7 +198,7 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           if (typeof payload.model === 'string' && payload.model) curModel = payload.model
           // Codex 执行画像（ADR 0023 D1）：仅窗口内、非子代理（习惯信号）；只取枚举/mode 名，绝不读 developer_instructions。
           if (!sidechain && inWin(ts)) {
-            // 回合边界（ADR 0032 D2）：Codex 无用户消息记录，turn_context≈一次用户指令；无 corrected（不读 prompt，ADR 0041）。
+            // 回合边界（ADR 0032 D2）：turn_context≈一次用户指令；无 corrected（ADR 0041）。
             // 口径审计（ADR 0043）：Codex rollout 无 isMeta/命令桩/中断哨兵这类机器注入的 user 记录，turn_context 本身已是真实回合边界，无需对称过滤。
             agg.beginEpisode(sessionId || '(unknown)', repo, ts, false)
             // per-turn effort 同时挂到 episode（ADR 0053）：session 级分布之外，支持同 task_type 的 effort 弹性分析。
@@ -201,6 +217,17 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           break
         }
         case 'event_msg': {
+          if (habits && phase && !Number.isNaN(ts.getTime())) {
+            const text = conversationPrompt(payload)
+            if (isHumanPrompt(payload, text)) {
+              const day = localYmd(ts)
+              if (day <= window.toYmd) {
+                const inWindow = day >= window.fromYmd
+                if (inWindow) agg.beginRecord(repo, sessionId, ts)
+                habits.prompt(phase, text, repo, inWindow)
+              }
+            }
+          }
           // API/网络/流式错误事件（类型推断）：窗口内则计入 api_errors；子代理不计入（习惯信号）。
           if (payload.type === 'error' || payload.type === 'stream_error') {
             if (!sidechain && inWin(ts)) agg.applyApiError()
@@ -209,12 +236,22 @@ export function feedCodex(agg: Aggregator, home: string, window: Window): void {
           // Codex 执行画像（ADR 0023 D1）：上下文压缩 / 主动放弃回合（窗口内、非子代理）。
           if (payload.type === 'context_compacted') { if (!sidechain && inWin(ts)) agg.markCodexCompaction(); break }
           if (payload.type === 'turn_aborted') { if (!sidechain && inWin(ts)) agg.markCodexAbortedTurn(); break }
-          // 文件编辑信号（ADR 0050 D1）：patch_apply_end.changes 派生 applyEdit + 文件 fileKey（喂 episode edit_ring / rework）。
-          if (payload.type === 'patch_apply_end') {
-            const changes = payload.changes
-            if (!sidechain && inWin(ts) && changes && typeof changes === 'object') {
+          // 文件编辑信号（ADR 0050 D1）：旧版 patch_apply_end 与新版 FileChange 都记录改动。
+          const patch = payload.type === 'patch_apply_end' ? payload
+            : payload.type === 'item_completed' && payload.item?.type === 'FileChange' ? payload.item : null
+          if (patch) {
+            const changes = patch.changes
+            const successful = patch.status != null ? patch.status === 'completed'
+              : payload.type === 'patch_apply_end' && patch.success !== false
+            if (!sidechain && successful && changes && typeof changes === 'object') {
+              if (Number.isNaN(ts.getTime())) break
+              const day = localYmd(ts)
+              if (day > window.toYmd) break
+              const entries = Object.entries(changes as Record<string, any>)
+              if (phase && entries.length > 0) phase.edited = true
+              if (day < window.fromYmd) break
               agg.beginRecord(repo, sessionId, ts)
-              for (const [path, ch] of Object.entries(changes as Record<string, any>)) {
+              for (const [path, ch] of entries) {
                 const diff = typeof ch?.unified_diff === 'string' ? ch.unified_diff : ''
                 let added = 0, removed = 0
                 for (const dl of diff.split('\n')) {

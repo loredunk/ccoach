@@ -1,3 +1,5 @@
+import type { ConversationHabits } from './conversation-habits.js'
+
 // 统一 token 结构：两平台公共字段 + 平台特有可选并存。
 // reasoning_output 主要来自 Codex；cache_creation（缓存写入）主要来自 Claude Code。
 export interface Tokens {
@@ -71,7 +73,15 @@ export interface FileChurn {
   top: FileChurnTop[]        // 按编辑次数取前 N（basename + 次数 + 涉及会话数）
   top3_share: number         // 前 3 个文件的编辑占比 0–1（集中度）
 }
-export interface ProjectScope extends ScopeBucket { repo: string; sessions: number; file_churn?: FileChurn }
+export interface ProjectScope extends ScopeBucket {
+  repo: string
+  sessions: number
+  file_churn?: FileChurn
+  episodes: number
+  spiral_episodes: number
+  spiral_rate: number | null
+  conversation_habits?: ConversationHabits
+}
 export interface SessionScope extends ScopeBucket { session_id: string; repo: string; duration_seconds: number }
 // 回合（Episode）抽象（ADR 0032/0033/0034）：以用户指令为边界切分会话；全部派生信号、瞬时序列即弃。
 export type TaskType =
@@ -302,6 +312,7 @@ export interface Report {
   git_habits: GitHabitsReport
   project_management: ProjectMgmtReport
   prompt_signals: PromptSignals
+  conversation_habits?: ConversationHabits
   error_signals: ErrorSignals
   rework_signals: ReworkSignals
   skills?: SkillUsage[]
@@ -349,10 +360,11 @@ export const REPORT_GLOSSARY: Record<string, string> = {
   file_languages: 'Language file counts derived from read/edited file extensions (extension→language mapping only, never paths/file contents).',
   'hours.count': 'Active-event count for the hour (alongside tokens; for activity heat, no content).',
   scope: 'Analysis level: global (default, cross-project aggregate) / project (adds projects[]) / session (adds sessions_detail[]).',
-  projects: 'Per-project cross-session derived-signal buckets (tokens/tool_calls/cache_hit_rate/categories/git_top/prompt_signals); only with --scope project.',
+  projects: 'Cross-session buckets by working-directory basename; only with --scope project. spiral_rate = spiral_episodes / episodes (null with zero episodes), using the same classifier as episode_summary over all episodes in the window.',
+  conversation_habits: 'Opt-in local counts from observed human prompts (global and, with --scope project, per project). Earlier loaded history establishes phase without adding to window counts. Implementation starts are first explicit implementation requests before an observed edit; starts_after_design requires an earlier design prompt in the same log. Criteria on the starting request count as early. Post-edit signals require a supported edit event. Counts are heuristics, neither judgments of discussion quality nor causes of spirals.',
   sessions_detail: 'Per-session derived-signal buckets (incl. session_id/duration_seconds); only with --scope session; contains no raw prompt text.',
   episode_summary: 'Per-turn (episode) rollup; an episode is "one user instruction -> the next". Empty episodes with no token/tool activity (back-to-back user messages, aborted turns, trailing prompts) are excluded. autonomy_rate=share of episodes with no interruption; intervention_style derived from interrupt+correction rates; spiral_episodes=episodes with any structural loop signal; task_mix=share of episodes per task type; deepest_pit=worst spiral episode (severity x tokens). Episode token sums are main-session only (sidechain excluded), so they are <= report.tokens.total. Always present (additive).',
-  episodes_detail: 'Per-episode derived signals (only with --scope episode): duration/tokens/tool_calls/files_touched(count only)/error stats/interrupted/end_type/task_type/spiral. Contains no prompt text, no paths, no file names, no diff text (ADR 0016/0017). end_type=corrected is Claude-only (Codex does not read user prompts, ADR 0041).',
+  episodes_detail: 'Per-episode derived signals (only with --scope episode): duration/tokens/tool_calls/files_touched(count only)/error stats/interrupted/end_type/task_type/spiral. Contains no prompt text, no paths, no file names, no diff text (ADR 0016/0017). end_type=corrected is Claude-only (ADR 0041).',
   'episodes_detail.effort': 'Codex only: the turn_context.effort label (high/medium/…) the episode ran under. Whitelisted label only. Use with episode_summary.effort_calibration for effort-elasticity analysis.',
   'episodes_detail.model': 'Dominant model of the episode (most tokens, normalized name). On Claude Code this is the effort-gradient evidence (opus vs sonnet vs haiku); on Codex it complements the effort label.',
   'episodes_detail.thinking_directive': 'Claude Code only: true when the user own prompt explicitly dialed thinking up (e.g. "ultrathink", "think harder"). Derived boolean from the user own prompt, no text stored.',

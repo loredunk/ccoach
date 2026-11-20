@@ -100,6 +100,18 @@ ccoach sessions --top 20        # session candidates (numbers only); --id <id> d
 ccoach digest --id <id>         # opt-in: token-bounded, redacted content digest of one session (never thinking/system)
 ```
 
+### Project spiral rates and conversation habits
+
+```bash
+ccoach --days 30 --scope project --conversation-habits
+```
+
+The project spiral rate divides flagged episodes by all episodes observed in the time window. The report shows both counts. Projects use the last component of the working directory as the name, so directories with the same name are grouped together. Add `--by-repo` to show every project in the terminal.
+
+`--conversation-habits` analyzes human input from Claude Code and Codex locally. Use `--scope project` for project-level counts and `--json` for structured output. The report counts early design discussion and explicit acceptance criteria, direct requests to begin implementation, and follow-up prompts that state criteria or only describe symptoms after recorded file edits. An implementation start is the first explicit request in a conversation log. Criteria in that request count as early.
+
+The analysis uses English and Chinese wording and supported edit events. Earlier history can establish the phase, while only events in the selected window contribute to counts. Assessing the depth of a design discussion or the cause of a spiral requires task context. Conversation habit output contains aggregate counts, and the input text stays local.
+
 ## Notes & boundaries
 
 - **Local machine only**: rollouts are per-machine; this tool reads only local files and never aggregates across machines.

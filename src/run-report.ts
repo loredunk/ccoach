@@ -15,6 +15,7 @@ export interface ReportCliOptions {
   since?: string
   days?: number | string
   byRepo?: boolean
+  conversationHabits?: boolean
   platform?: string
   scope?: string
   lang?: string
@@ -49,6 +50,7 @@ export function runReport(options: ReportCliOptions): string {
     platform,
     window,
     scope,
+    conversationHabits: options.conversationHabits,
     claudeDir: options.claudeDir,
     codexHome: options.codexHome,
   })
